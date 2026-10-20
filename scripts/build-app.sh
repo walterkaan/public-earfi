@@ -34,11 +34,8 @@ mkdir -p "$APP/Contents/Resources/Licenses"
 cp -R "$ROOT/Sources/PublicEarFi/Resources/Licenses/." "$APP/Contents/Resources/Licenses/"
 
 mkdir -p "$ROOT/build"
-if python3 "$ROOT/scripts/make_icon.py" "$ROOT/build/AppIcon.icns"; then
-  cp "$ROOT/build/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
-else
-  echo "Icon generation skipped"
-fi
+python3 "$ROOT/scripts/make_icon.py" "$ROOT/build/AppIcon.icns"
+cp "$ROOT/build/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
 sed \
   -e "s/__VERSION__/${VERSION}/g" \
