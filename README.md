@@ -94,6 +94,7 @@ Closing the laptop lid still sleeps the Mac unless it is on power with an extern
 | Microphone prompt on every update | Expected for ad-hoc builds. See the first-open section. |
 | "Public EarFi is damaged" | Re-download. Do not run a half-copied app. |
 | A port is already in use | The window names the port and the program (for example mediamtx). Quit that program, or change the listener or ICE port in Settings. Public EarFi does not keep restarting. A leftover copy of its own helper has a Stop leftover helper button. Opening the app still stops a helper it recorded before a crash. |
+| Settings look wrong, or Start quits | Quit Public EarFi. In Terminal: `defaults delete io.github.walterkaan.public-earfi publicEarfi.settings.v1` then open the app again. Settings live in `~/Library/Preferences/io.github.walterkaan.public-earfi.plist`. Reset to defaults in Settings does the same thing and keeps the log. |
 
 Copy diagnostics puts the version, settings, and the last 200 log lines on the clipboard. Logs are also in `~/Library/Logs/Public EarFi/`.
 

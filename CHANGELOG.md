@@ -10,6 +10,7 @@ First MVP build of Public EarFi.
 - Bundled MediaMTX 1.21.2 and an LGPL FFmpeg 9.0.2 with libopus 1.6.1, built from pinned source.
 - Generated `mediamtx.yml`, device selection by Core Audio UID, defaults from the spec, and Reset.
 - Start/stop supervision, auto-restart, stall detection, LAN address selection, and file logging. A port that is already in use is named, including the other program, and is not retried. A leftover Public EarFi helper can be stopped from the window.
+- Invalid saved settings are replaced with defaults instead of crashing Start. A missing audio device is reported and cleared. Reset to defaults writes a full default set back to preferences.
 - Poster preview, PDF export, printing, and QR copy.
 - Organiser manual in `docs/MANUAL.md`: install, Speech, the poster, listener tips, bandwidth for about 30 phones, and a travel-router network. A phone server is described as planned.
 - GitHub Actions builds an ad-hoc signed universal app and DMG. Release tags sign with `RELEASE_SIGNING_P12` when that secret exists.

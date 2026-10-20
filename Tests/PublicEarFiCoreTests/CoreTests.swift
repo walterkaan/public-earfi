@@ -143,6 +143,52 @@ final class SettingsTests: XCTestCase {
       "builtin"
     )
     XCTAssertNil(DeviceSelection.preferred(devices: [outputOnly], rememberedUID: "missing"))
+    XCTAssertTrue(DeviceSelection.isMissing(rememberedUID: "BlackHole2ch_UID", devices: [builtIn]))
+    XCTAssertFalse(DeviceSelection.isMissing(rememberedUID: "builtin", devices: [builtIn]))
+    XCTAssertFalse(DeviceSelection.isMissing(rememberedUID: nil, devices: [builtIn]))
+    XCTAssertFalse(DeviceSelection.isMissing(rememberedUID: "  ", devices: [builtIn]))
+  }
+
+  func testInvalidSettingsAreRepairedAndPersisted() {
+    let suite = "public-earfi-tests-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defaults.removePersistentDomain(forName: suite)
+    let store = SettingsStore(userDefaults: defaults)
+    var settings = AppSettings.defaults
+    settings.listenerPort = 80
+    settings.icePort = 8554
+    settings.streamName = "Live"
+    settings.inputChannel = 0
+    settings.inputDeviceUID = "  "
+    settings.maxListeners = 900
+    settings.customBitrateKbps = 1
+    settings.advertisedAddress = "bad host"
+    store.save(settings)
+
+    let resolved = store.loadResolved()
+    XCTAssertEqual(resolved.settings.listenerPort, 8889)
+    XCTAssertEqual(resolved.settings.icePort, 8189)
+    XCTAssertEqual(resolved.settings.streamName, "live")
+    XCTAssertEqual(resolved.settings.inputChannel, 1)
+    XCTAssertNil(resolved.settings.inputDeviceUID)
+    XCTAssertEqual(resolved.settings.maxListeners, 0)
+    XCTAssertEqual(resolved.settings.customBitrateKbps, 16)
+    XCTAssertNil(resolved.settings.advertisedAddress)
+    XCTAssertEqual(
+      resolved.notice,
+      "Saved settings were invalid (device, input channel, bitrate, stream name, listener port, ICE port, max listeners, address) and were reset. Check Settings, then press Start."
+    )
+    XCTAssertEqual(store.load().listenerPort, 8889)
+    XCTAssertEqual(store.load().streamName, "live")
+    XCTAssertFalse(SettingsRepair.channelFits(8, inputCount: 2))
+    XCTAssertTrue(SettingsRepair.channelFits(2, inputCount: 2))
+
+    defaults.set(Data([0x00, 0x01, 0xFF]), forKey: SettingsStore.storageKey)
+    let unreadable = store.loadResolved()
+    XCTAssertEqual(unreadable.settings, .defaults)
+    XCTAssertEqual(unreadable.notice, SettingsRepair.unreadableNotice)
+    XCTAssertEqual(store.reset(), .defaults)
+    XCTAssertEqual(store.load(), .defaults)
   }
 }
 

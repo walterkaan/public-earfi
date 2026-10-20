@@ -80,6 +80,7 @@ public enum DiagnosticsReport {
       "max listeners: \(settings.maxListeners)",
       "keep awake: \(settings.keepAwake)",
       "log level: \(settings.logLevel.rawValue)",
+      "saved in: ~/Library/Preferences/\(SettingsRepair.defaultsDomain).plist key \(SettingsStore.storageKey)",
     ].joined(separator: "\n")
   }
 }

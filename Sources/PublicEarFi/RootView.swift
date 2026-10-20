@@ -293,11 +293,14 @@ struct SettingsTab: View {
           SectionLabel(text: "Audio input")
           LabeledRow(title: "Device") {
             Picker("Device", selection: deviceBinding) {
-              if model.devices.isEmpty {
-                Text("No input devices").tag(String?.none)
-              }
+              Text("Automatic").tag(String?.none)
               ForEach(model.devices) { device in
                 Text(device.name).tag(Optional(device.id))
+              }
+              if let uid = model.settings.inputDeviceUID,
+                !model.devices.contains(where: { $0.id == uid })
+              {
+                Text("Not connected").tag(Optional(uid))
               }
             }
             .labelsHidden()
@@ -310,7 +313,7 @@ struct SettingsTab: View {
             .pickerStyle(.segmented)
             .frame(width: 150)
             Picker("Input", selection: channelBinding) {
-              ForEach(1...max(1, model.selectedDevice?.inputChannels ?? 2), id: \.self) { channel in
+              ForEach(1...channelUpper, id: \.self) { channel in
                 Text("Input \(channel)").tag(channel)
               }
             }
@@ -341,7 +344,7 @@ struct SettingsTab: View {
             TextField("live", text: streamBinding)
               .frame(width: 120)
             Text("Port")
-            TextField("8889", value: portBinding, format: .number)
+            TextField("8889", text: portText)
               .frame(width: 70)
           }
           LabeledRow(title: "Network mode") {
@@ -373,7 +376,7 @@ struct SettingsTab: View {
         }
         DisclosureGroup("Advanced") {
           LabeledRow(title: "ICE port") {
-            TextField("8189", value: iceBinding, format: .number).frame(width: 80)
+            TextField("8189", text: iceText).frame(width: 80)
           }
           LabeledRow(title: "URL style") {
             Picker("URL", selection: styleBinding) {
@@ -389,7 +392,7 @@ struct SettingsTab: View {
               .foregroundStyle(.secondary)
           }
           LabeledRow(title: "Max listeners") {
-            TextField("0", value: maxBinding, format: .number).frame(width: 80)
+            TextField("0", text: maxText).frame(width: 80)
             Text("0 = unlimited").font(.caption).foregroundStyle(.secondary)
           }
           LabeledRow(title: "Log level") {
@@ -404,7 +407,7 @@ struct SettingsTab: View {
           Toggle("Custom bitrate", isOn: customToggle)
           if model.settings.quality == .custom {
             LabeledRow(title: "Bitrate") {
-              TextField("64", value: bitrateBinding, format: .number).frame(width: 80)
+              TextField("64", text: bitrateText).frame(width: 80)
               Text("16–256 kbps").font(.caption).foregroundStyle(.secondary)
             }
           }
@@ -430,20 +433,31 @@ struct SettingsTab: View {
     }
     .padding(16)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .id(model.settingsRevision)
     .sheet(isPresented: $model.showCredits) { CreditsSheet() }
-    .confirmationDialog(
-      "Reset every setting, including the poster text?", isPresented: $confirmReset
-    ) {
+    .alert("Reset every setting, including the poster text?", isPresented: $confirmReset) {
       Button("Reset to defaults", role: .destructive) { model.resetDefaults() }
       Button("Cancel", role: .cancel) {}
     } message: {
-      Text("Logs are kept. If you are live, the reset applies on the next Start.")
+      Text(
+        "Logs are kept. The defaults are saved immediately. If you are live, they apply on the next Start."
+      )
     }
   }
 
   private var deviceBinding: Binding<String?> {
     Binding(
-      get: { model.selectedDevice?.id }, set: { if let value = $0 { model.chooseDevice(value) } })
+      get: { model.settings.inputDeviceUID },
+      set: { model.chooseDevice($0) }
+    )
+  }
+  private var channelUpper: Int {
+    let available = max(1, model.selectedDevice?.inputChannels ?? 1)
+    let selected = model.settings.inputChannel
+    if (1...SettingsRepair.maxInputChannel).contains(selected) {
+      return max(available, selected)
+    }
+    return available
   }
   private var modeBinding: Binding<ChannelMode> {
     Binding(
@@ -452,7 +466,10 @@ struct SettingsTab: View {
   }
   private var channelBinding: Binding<Int> {
     Binding(
-      get: { model.settings.inputChannel },
+      get: {
+        let selected = model.settings.inputChannel
+        return (1...channelUpper).contains(selected) ? selected : 1
+      },
       set: { value in model.mutate { $0.inputChannel = value } })
   }
   private var qualityBinding: Binding<QualityPreset> {
@@ -465,11 +482,7 @@ struct SettingsTab: View {
     Binding(
       get: { model.settings.streamName }, set: { value in model.mutate { $0.streamName = value } })
   }
-  private var portBinding: Binding<Int> {
-    Binding(
-      get: { model.settings.listenerPort },
-      set: { value in model.mutate { $0.listenerPort = value } })
-  }
+  private var portText: Binding<String> { numberText(\.listenerPort) }
   private var networkBinding: Binding<NetworkMode> {
     Binding(
       get: { model.settings.networkMode }, set: { value in model.mutate { $0.networkMode = value } }
@@ -489,18 +502,12 @@ struct SettingsTab: View {
       get: { model.settings.startWhenAppOpens },
       set: { value in model.mutate { $0.startWhenAppOpens = value } })
   }
-  private var iceBinding: Binding<Int> {
-    Binding(get: { model.settings.icePort }, set: { value in model.mutate { $0.icePort = value } })
-  }
+  private var iceText: Binding<String> { numberText(\.icePort) }
   private var styleBinding: Binding<URLStyle> {
     Binding(
       get: { model.settings.urlStyle }, set: { value in model.mutate { $0.urlStyle = value } })
   }
-  private var maxBinding: Binding<Int> {
-    Binding(
-      get: { model.settings.maxListeners },
-      set: { value in model.mutate { $0.maxListeners = value } })
-  }
+  private var maxText: Binding<String> { numberText(\.maxListeners) }
   private var logBinding: Binding<LogLevel> {
     Binding(
       get: { model.settings.logLevel }, set: { value in model.mutate { $0.logLevel = value } })
@@ -515,11 +522,17 @@ struct SettingsTab: View {
       }
     )
   }
-  private var bitrateBinding: Binding<Int> {
+  private func numberText(_ keyPath: WritableKeyPath<AppSettings, Int>) -> Binding<String> {
     Binding(
-      get: { model.settings.customBitrateKbps },
-      set: { value in model.mutate { $0.customBitrateKbps = value } })
+      get: { String(model.settings[keyPath: keyPath]) },
+      set: { text in
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        guard let value = Int(trimmed) else { return }
+        model.mutate { $0[keyPath: keyPath] = value }
+      }
+    )
   }
+  private var bitrateText: Binding<String> { numberText(\.customBitrateKbps) }
 }
 
 struct LabeledRow<Content: View>: View {

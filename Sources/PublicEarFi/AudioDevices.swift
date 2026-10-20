@@ -29,6 +29,23 @@ enum AudioDeviceList {
     return identifiers.compactMap(makeDevice)
   }
 
+  /// False for a missing or unplugged device. Call this before touching
+  /// AVAudioEngine, which can abort if the device id is stale.
+  static func isAlive(_ deviceID: AudioDeviceID) -> Bool {
+    guard deviceID != 0, deviceID != AudioObjectID(kAudioObjectUnknown) else { return false }
+    var address = AudioObjectPropertyAddress(
+      mSelector: kAudioDevicePropertyDeviceIsAlive,
+      mScope: kAudioObjectPropertyScopeGlobal,
+      mElement: kAudioObjectPropertyElementMain
+    )
+    var alive: UInt32 = 0
+    var size = UInt32(MemoryLayout<UInt32>.size)
+    guard AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &alive) == noErr else {
+      return false
+    }
+    return alive != 0
+  }
+
   /// Changes the hardware clock. Broadcasting must not call this.
   /// The app captures at the device's own rate and converts to 48 kHz.
   static func setNominalSampleRate(deviceID: AudioDeviceID, rate: Double) -> Bool {

@@ -28,6 +28,8 @@ final class AppModel: ObservableObject {
   @Published var qrImage: NSImage?
   @Published var selectedLicense: CreditComponent?
   @Published var strayHelper: StrayHelper?
+  /// Bumped when Reset replaces every control, so text fields rebuild.
+  @Published var settingsRevision = 0
 
   let credits: CreditsDocument?
   private let store: SettingsStore
@@ -49,7 +51,8 @@ final class AppModel: ObservableObject {
     logger = FileLogger(directory: AppPaths.logDirectory(home: home))
     controller = BroadcastController(logger: logger)
     store = SettingsStore()
-    settings = store.load()
+    let resolved = store.loadResolved()
+    settings = resolved.settings
     credits = BundledResources.credits()
     controller.onPhase = { [weak self] phase in
       Task { @MainActor in self?.apply(phase: phase) }
@@ -73,6 +76,11 @@ final class AppModel: ObservableObject {
       }
     }
     controller.reapStaleChildren()
+    var notices: [String] = []
+    if let notice = resolved.notice {
+      notices.append(notice)
+    }
+    notices += adoptDeviceList(AudioDeviceList.inputs())
     if let helpers = HelperLocator.locate(),
       let conflict = controller.bundledConflict(
         settings: settings,
@@ -80,9 +88,9 @@ final class AppModel: ObservableObject {
       )
     {
       strayHelper = conflict.stray
-      phase = .blocked(conflict.message)
-      health = conflict.message
+      notices.append(conflict.message)
     }
+    noteSettings(notices)
     refreshDevices(startMeter: false)
     refreshNetwork()
     hotplug.start { [weak self] in
@@ -248,10 +256,16 @@ final class AppModel: ObservableObject {
 
   func resetDefaults() {
     settings = store.reset()
+    settingsRevision += 1
     loginItemMessage = nil
     try? LoginItemController.apply(false)
+    objectWillChange.send()
     refreshDevices()
     refreshQR()
+    if case .blocked = phase {
+      phase = .stopped
+      health = "Ready"
+    }
   }
 
   func restoreInstructions() {
@@ -263,11 +277,13 @@ final class AppModel: ObservableObject {
     mutate { $0.posterNetworkName = knownSSID }
   }
 
-  func chooseDevice(_ uid: String) {
-    mutate { $0.inputDeviceUID = uid }
+  func chooseDevice(_ uid: String?) {
+    let trimmed = uid?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let stored = (trimmed?.isEmpty == false) ? trimmed : nil
+    mutate { $0.inputDeviceUID = stored }
     restartMeter()
     if isBroadcasting {
-      let device = devices.first { $0.id == uid }
+      let device = stored.flatMap { value in devices.first { $0.id == value } }
       controller.deviceChanged(
         name: device?.name, deviceID: device?.deviceID, present: device != nil)
     }
@@ -383,10 +399,26 @@ final class AppModel: ObservableObject {
   }
 
   private func beginBroadcast() {
-    refreshDevices()
+    var notices = adoptDeviceList(AudioDeviceList.inputs())
+    let (repaired, fields) = SettingsRepair.applying(settings)
+    if repaired != settings {
+      settings = repaired
+      store.save(settings)
+      if let notice = SettingsRepair.notice(for: fields) {
+        notices.append(notice)
+      }
+    }
+    if let channel = clampChannelToSelectedDevice() {
+      notices.append(channel)
+    }
+    if !notices.isEmpty {
+      noteSettings(notices)
+      restartMeter()
+      return
+    }
     let issues = validate(settings)
     if let issue = issues.first {
-      phase = .problem(issue.message)
+      phase = .blocked(issue.message)
       health = issue.message
       return
     }
@@ -406,6 +438,7 @@ final class AppModel: ObservableObject {
     let snapshot = settings
     let host = snapshot.advertisedAddress
     runningSignature = BroadcastSignature(snapshot)
+    restartMeter()
     controller.start(
       BroadcastLaunch(
         settings: snapshot,
@@ -471,7 +504,10 @@ final class AppModel: ObservableObject {
 
   private func refreshDevices(startMeter: Bool = true) {
     let found = AudioDeviceList.inputs()
-    devices = found
+    let notices = adoptDeviceList(found)
+    if !notices.isEmpty {
+      noteSettings(notices)
+    }
     let remembered = settings.inputDeviceUID.flatMap { uid in found.first { $0.id == uid } }
     if let remembered {
       lastDeviceName = remembered.name
@@ -508,6 +544,59 @@ final class AppModel: ObservableObject {
       return
     }
     qrImage = QRCodeMaker.image(text: listenerURL, side: 512)
+  }
+
+  /// Stores the device list and clears a remembered device or channel that
+  /// cannot be used. Does not start the broadcast.
+  private func adoptDeviceList(_ found: [AudioInputDevice]) -> [String] {
+    devices = found
+    guard !isBroadcasting else { return [] }
+    var notices: [String] = []
+    if let missing = clearMissingDevice() {
+      notices.append(missing)
+    }
+    if let channel = clampChannelToSelectedDevice() {
+      notices.append(channel)
+    }
+    return notices
+  }
+
+  private func clearMissingDevice() -> String? {
+    guard
+      DeviceSelection.isMissing(rememberedUID: settings.inputDeviceUID, devices: deviceCandidates)
+    else { return nil }
+    settings.inputDeviceUID = nil
+    store.save(settings)
+    return SettingsRepair.missingDeviceNotice
+  }
+
+  private func clampChannelToSelectedDevice() -> String? {
+    guard let device = selectedDevice else { return nil }
+    guard !SettingsRepair.channelFits(settings.inputChannel, inputCount: device.inputChannels)
+    else {
+      return nil
+    }
+    let was = settings.inputChannel
+    settings.inputChannel = 1
+    store.save(settings)
+    return SettingsRepair.channelNotice(was: was)
+  }
+
+  private var deviceCandidates: [DeviceCandidate] {
+    devices.map {
+      DeviceCandidate(
+        uid: $0.id, name: $0.name, isBuiltIn: $0.isBuiltIn, inputChannels: $0.inputChannels)
+    }
+  }
+
+  private func noteSettings(_ notices: [String]) {
+    let text = notices.filter { !$0.isEmpty }.joined(separator: " ")
+    guard !text.isEmpty else { return }
+    if case .live = phase { return }
+    if case .starting = phase { return }
+    if case .waitingForDevice = phase { return }
+    phase = .blocked(text)
+    health = text
   }
 
   private func restartMeter() {

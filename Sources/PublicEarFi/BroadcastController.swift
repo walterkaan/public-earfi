@@ -120,7 +120,7 @@ final class BroadcastController {
         self.stopProcess(self.ffmpeg)
         self.ffmpeg = nil
         self.stall.reset()
-        let label = name?.isEmpty == false ? name! : "audio interface"
+        let label = (name?.isEmpty == false ? name : nil) ?? "audio interface"
         self.publish(.waitingForDevice(label))
         self.publishHealth(HealthText.waiting(deviceName: label))
       } else if changed || self.ffmpeg?.isRunning != true {
@@ -198,7 +198,8 @@ final class BroadcastController {
   private func startFFmpeg() {
     guard desired, !stopping, let launch else { return }
     guard launch.devicePresent, let name = launch.deviceName, !name.isEmpty else {
-      let label = launch.deviceName?.isEmpty == false ? launch.deviceName! : "audio interface"
+      let label =
+        (launch.deviceName?.isEmpty == false ? launch.deviceName : nil) ?? "audio interface"
       publish(.waitingForDevice(label))
       publishHealth(HealthText.waiting(deviceName: label))
       return
@@ -213,7 +214,11 @@ final class BroadcastController {
     ffmpegAttemptClosed = false
     resetFFmpegErrors()
     guard let deviceID = launch.deviceID else {
-      noteFailure(component: "audio", detail: "No input device is available.")
+      stopWithProblem("No input device is available.")
+      return
+    }
+    guard AudioDeviceList.isAlive(deviceID) else {
+      stopWithProblem("The selected audio device is not connected.")
       return
     }
     let pipe = Pipe()
@@ -237,7 +242,14 @@ final class BroadcastController {
     ) {
       stopCapture()
       abandon(process)
-      noteFailure(component: "audio", detail: problem)
+      if problem == "The selected audio device is not connected."
+        || problem == "Could not map the selected input channel."
+        || problem == "Could not open the selected audio device."
+      {
+        stopWithProblem(problem)
+      } else {
+        noteFailure(component: "audio", detail: problem)
+      }
       return
     }
     ffmpeg = process
@@ -416,6 +428,17 @@ final class BroadcastController {
     publish(.live(since: stableSince ?? Date()))
     publishHealth("\(clock(Date())) audio healthy")
     startPoller()
+  }
+
+  /// Leaves a problem on screen and does not schedule another Start.
+  private func stopWithProblem(_ message: String) {
+    desired = false
+    pendingRestart?.cancel()
+    stopPoller()
+    stopChildren()
+    logger.log("audio", message)
+    publish(.blocked(message))
+    publishHealth(message)
   }
 
   /// Stops the restart loop and leaves the port message on screen.

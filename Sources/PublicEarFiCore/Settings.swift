@@ -298,6 +298,110 @@ public enum DeviceSelection {
     }
     return inputs.first
   }
+
+  /// True when Settings still names a device that is not in the current list.
+  public static func isMissing(rememberedUID: String?, devices: [DeviceCandidate]) -> Bool {
+    guard let rememberedUID else { return false }
+    let uid = rememberedUID.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !uid.isEmpty else { return false }
+    return !devices.contains { $0.uid == uid && $0.inputChannels > 0 }
+  }
+}
+
+public struct StoredSettingsLoad: Equatable {
+  public var settings: AppSettings
+  public var notice: String?
+
+  public init(settings: AppSettings, notice: String?) {
+    self.settings = settings
+    self.notice = notice
+  }
+}
+
+public enum SettingsRepair {
+  public static let maxInputChannel = 64
+  /// UserDefaults domain for the signed app. The file is
+  /// ~/Library/Preferences/io.github.walterkaan.public-earfi.plist
+  public static let defaultsDomain = "io.github.walterkaan.public-earfi"
+
+  public static let missingDeviceNotice =
+    "The saved audio device is not connected. It was cleared. Choose a device in Settings, then press Start."
+
+  public static let unreadableNotice =
+    "Saved settings could not be read and were reset. Check Settings, then press Start."
+
+  public static func channelNotice(was: Int) -> String {
+    "Input \(was) is not on this device. Reset to Input 1. Press Start again."
+  }
+
+  public static func notice(for fields: [String]) -> String? {
+    guard !fields.isEmpty else { return nil }
+    return
+      "Saved settings were invalid (\(fields.joined(separator: ", "))) and were reset. Check Settings, then press Start."
+  }
+
+  /// Replaces values that would crash a picker or the broadcast. Device
+  /// presence is checked separately, because it depends on the live device list.
+  public static func applying(_ original: AppSettings) -> (AppSettings, [String]) {
+    var settings = original
+    var fields: [String] = []
+    if let uid = settings.inputDeviceUID {
+      let trimmed = uid.trimmingCharacters(in: .whitespacesAndNewlines)
+      settings.inputDeviceUID = trimmed.isEmpty ? nil : trimmed
+      if settings.inputDeviceUID != original.inputDeviceUID {
+        fields.append("device")
+      }
+    }
+    if !(1...maxInputChannel).contains(settings.inputChannel) {
+      settings.inputChannel = 1
+      fields.append("input channel")
+    }
+    if !(16...256).contains(settings.customBitrateKbps) {
+      settings.customBitrateKbps = min(256, max(16, settings.customBitrateKbps))
+      fields.append("bitrate")
+    }
+    if !isValidStreamName(settings.streamName) {
+      settings.streamName = "live"
+      fields.append("stream name")
+    }
+    if !isUsablePort(settings.listenerPort) {
+      settings.listenerPort = 8889
+      fields.append("listener port")
+    }
+    if !isUsablePort(settings.icePort) || settings.icePort == settings.listenerPort {
+      settings.icePort = settings.listenerPort == 8189 ? 8190 : 8189
+      fields.append("ICE port")
+    }
+    if !(0...500).contains(settings.maxListeners) {
+      settings.maxListeners = 0
+      fields.append("max listeners")
+    }
+    if let address = settings.advertisedAddress {
+      let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+      if trimmed.isEmpty || !isSafeAdvertised(trimmed) {
+        settings.advertisedAddress = nil
+        fields.append("address")
+      } else if trimmed != address {
+        settings.advertisedAddress = trimmed
+      }
+    }
+    return (settings, fields)
+  }
+
+  public static func channelFits(_ channel: Int, inputCount: Int) -> Bool {
+    (1...max(1, inputCount)).contains(channel)
+  }
+
+  public static func isUsablePort(_ port: Int) -> Bool {
+    (1024...65535).contains(port) && port != 8554 && port != 9997
+  }
+
+  private static func isSafeAdvertised(_ host: String) -> Bool {
+    host.allSatisfy { character in
+      character.isLetter || character.isNumber || character == "." || character == "-"
+        || character == ":"
+    }
+  }
 }
 
 private struct StoredSettings: Codable {
@@ -338,11 +442,42 @@ public struct SettingsStore {
   }
 
   public func load() -> AppSettings {
-    guard let data = userDefaults.data(forKey: Self.storageKey),
-      let stored = try? JSONDecoder().decode(StoredSettings.self, from: data)
-    else {
-      return .defaults
+    loadResolved().settings
+  }
+
+  /// Reads saved settings. Invalid values are replaced with defaults and
+  /// written back. A notice is set when anything was repaired.
+  public func loadResolved() -> StoredSettingsLoad {
+    guard let data = userDefaults.data(forKey: Self.storageKey) else {
+      return StoredSettingsLoad(settings: .defaults, notice: nil)
     }
+    guard let stored = try? JSONDecoder().decode(StoredSettings.self, from: data) else {
+      let settings = AppSettings.defaults
+      save(settings)
+      return StoredSettingsLoad(settings: settings, notice: SettingsRepair.unreadableNotice)
+    }
+    let (repaired, fields) = SettingsRepair.applying(apply(stored))
+    if !fields.isEmpty {
+      save(repaired)
+    }
+    return StoredSettingsLoad(settings: repaired, notice: SettingsRepair.notice(for: fields))
+  }
+
+  public func save(_ settings: AppSettings) {
+    if let data = try? JSONEncoder().encode(settings) {
+      userDefaults.set(data, forKey: Self.storageKey)
+    }
+  }
+
+  /// Deletes the saved blob and writes a complete default set.
+  public func reset() -> AppSettings {
+    userDefaults.removeObject(forKey: Self.storageKey)
+    let settings = AppSettings.defaults
+    save(settings)
+    return load()
+  }
+
+  private func apply(_ stored: StoredSettings) -> AppSettings {
     var settings = AppSettings.defaults
     settings.inputDeviceUID = stored.inputDeviceUID
     if let value = stored.channelMode { settings.channelMode = value }
@@ -367,18 +502,6 @@ public struct SettingsStore {
     if let value = stored.posterNetworkName { settings.posterNetworkName = value }
     settings.posterPaperSize = stored.posterPaperSize
     if let value = stored.posterUseFooter { settings.posterUseFooter = value }
-    return settings
-  }
-
-  public func save(_ settings: AppSettings) {
-    if let data = try? JSONEncoder().encode(settings) {
-      userDefaults.set(data, forKey: Self.storageKey)
-    }
-  }
-
-  public func reset() -> AppSettings {
-    let settings = AppSettings.defaults
-    save(settings)
     return settings
   }
 

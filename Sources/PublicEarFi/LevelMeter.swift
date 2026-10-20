@@ -10,6 +10,11 @@ final class LevelMeter {
 
   func start(deviceID: AudioDeviceID?) {
     stop()
+    if let deviceID {
+      guard AudioDeviceList.isAlive(deviceID) else { return }
+    } else if AudioDeviceList.inputs().isEmpty {
+      return
+    }
     let input = engine.inputNode
     if let deviceID, let audioUnit = input.audioUnit {
       var identifier = deviceID

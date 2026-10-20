@@ -40,6 +40,9 @@ final class CapturePipe {
     output: FileHandle
   ) -> String? {
     stop()
+    guard AudioDeviceList.isAlive(deviceID) else {
+      return "The selected audio device is not connected."
+    }
     let input = engine.inputNode
     guard let audioUnit = input.audioUnit else {
       return "The audio engine has no input."
@@ -60,11 +63,15 @@ final class CapturePipe {
     guard hardware.sampleRate > 0, hardware.channelCount > 0 else {
       return "The audio device has no input stream."
     }
+    let inputCount = Int(hardware.channelCount)
     let map = CaptureChannelMap.indices(
       mode: channelMode,
       inputChannel: inputChannel,
-      inputCount: Int(hardware.channelCount)
+      inputCount: inputCount
     )
+    guard !map.isEmpty, map.allSatisfy({ $0 >= 0 && $0 < inputCount }) else {
+      return "Could not map the selected input channel."
+    }
     let channels = AVAudioChannelCount(map.count)
     guard
       let target = AVAudioFormat(
