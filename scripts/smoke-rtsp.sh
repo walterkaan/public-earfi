@@ -32,7 +32,7 @@ component_list="$(
   "$FFMPEG" -hide_banner -protocols
   "$FFMPEG" -hide_banner -muxers
 )"
-for name in aresample pan aformat libopus rtsp tcp udp rtp; do
+for name in aresample pan aformat libopus rtsp file pipe tcp udp rtp; do
   if ! printf '%s\n' "$component_list" | grep -Eq "(^|[[:space:]])${name}([[:space:]]|$)"; then
     echo "ffmpeg is missing component ${name}" >&2
     printf '%s\n' "$component_list" >&2

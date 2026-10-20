@@ -1,7 +1,8 @@
 # AVFoundation sets the audio stream to packed PCM: pcm_f32le/be, pcm_s16le/be,
 # pcm_s24le/be, or pcm_s32le/be. pcm_f64le/be is included so a raw float64
 # input can be decoded too. The matching demuxers let CI publish with -f f32le.
-# rtsp selects the rtp muxer; tcp/udp/rtp/http are listed explicitly.
+# rtsp selects the rtp muxer. file and pipe are required to feed raw PCM
+# (the CI smoke test uses pipe:0). tcp/udp/rtp/http are listed explicitly.
 # LGPL only: do not add --enable-gpl, --enable-nonfree, or a GPL library.
 --disable-shared
 --enable-static
@@ -21,7 +22,7 @@
 --enable-filter=aresample,pan,astats,aformat
 --enable-encoder=libopus
 --enable-muxer=rtsp,rtp
---enable-protocol=tcp,udp,rtp,http
+--enable-protocol=file,pipe,tcp,udp,rtp,http
 --enable-libopus
 --enable-small
 --pkg-config-flags=--static

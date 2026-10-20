@@ -479,7 +479,7 @@ final class APIAndCreditsTests: XCTestCase {
     XCTAssertTrue(flags.contains("pcm_s32le"))
     XCTAssertTrue(flags.contains("pcm_f64le"))
     XCTAssertTrue(flags.contains("--enable-filter=aresample,pan,astats,aformat"))
-    XCTAssertTrue(flags.contains("--enable-protocol=tcp,udp,rtp,http"))
+    XCTAssertTrue(flags.contains("--enable-protocol=file,pipe,tcp,udp,rtp,http"))
     XCTAssertFalse(flags.contains(" --enable-gpl"))
     XCTAssertFalse(flags.contains("--enable-nonfree"))
     let lgpl = try String(
