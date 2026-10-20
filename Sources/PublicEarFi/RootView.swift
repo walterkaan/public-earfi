@@ -104,7 +104,7 @@ struct RunningTab: View {
           .font(.caption)
           .foregroundStyle(.secondary)
         if model.noSignal {
-          Text("No signal for about 10 seconds. Check the desk feed.")
+          Text("No signal for about 5 seconds. Check the desk feed and the selected input.")
             .font(.caption)
             .foregroundStyle(.orange)
         }
@@ -185,7 +185,8 @@ struct RunningTab: View {
       if model.hasPendingChanges {
         WarningBanner(
           text:
-            "Settings changed. Apply now (brief interruption), or they take effect on the next Start."
+            "Settings changed. Apply now (brief interruption), or they take effect on the next Start.",
+          buttonTitle: "Apply New Settings Now"
         ) {
           model.applyNow()
         }
@@ -288,13 +289,14 @@ struct LevelBar: View {
 
 struct WarningBanner: View {
   var text: String
+  var buttonTitle: String = "Why?"
   var action: () -> Void
 
   var body: some View {
     HStack(alignment: .top) {
       Text(text).font(.caption)
       Spacer()
-      Button("Why?", action: action).font(.caption)
+      Button(buttonTitle, action: action).font(.caption)
     }
     .padding(8)
     .background(Color.yellow.opacity(0.35))

@@ -509,9 +509,10 @@ final class AppModel: ObservableObject {
 
   private func tick() {
     now = Date()
-    if case .live = phase, levelDB < -50 {
+    if case .live = phase, controller.recentCaptureDecibels() < CaptureFormatPlan.silenceDB {
       if silenceSince == nil { silenceSince = now }
-      noSignal = now.timeIntervalSince(silenceSince ?? now) >= 10
+      noSignal =
+        now.timeIntervalSince(silenceSince ?? now) >= CaptureFormatPlan.silenceWarningSeconds
     } else {
       silenceSince = nil
       noSignal = false

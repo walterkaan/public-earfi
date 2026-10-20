@@ -827,6 +827,44 @@ final class APIAndCreditsTests: XCTestCase {
     XCTAssertEqual(capped.excerpt, "")
   }
 
+  func testCaptureFormatKeepsTheDeviceRateAndDoesNotRetry() {
+    let desk = CaptureStreamDescription(
+      sampleRate: 44_100,
+      channelCount: 8,
+      bitsPerChannel: 24,
+      isFloat: false,
+      isInterleaved: true
+    )
+    XCTAssertTrue(desk.canOpen)
+    XCTAssertEqual(
+      desk.summary,
+      "44100 Hz, 24-bit integer, 8 channels, interleaved"
+    )
+    XCTAssertEqual(CaptureFormatPlan.converterChannels(inputChannels: 8, mono: true), 8)
+    XCTAssertEqual(CaptureFormatPlan.converterChannels(inputChannels: 8, mono: false), 2)
+    XCTAssertEqual(CaptureFormatPlan.pipeChannels(mono: true), 1)
+    XCTAssertEqual(CaptureFormatPlan.interleavedChoices(channelCount: 8), [false])
+    XCTAssertEqual(CaptureFormatPlan.interleavedChoices(channelCount: 2), [true, false])
+    XCTAssertEqual(CaptureFormatPlan.silenceWarningSeconds, 5)
+    XCTAssertFalse(
+      CaptureFormatPlan.shouldRetry(message: "Could not build the 48 kHz capture format."))
+    let impossible = CaptureFormatPlan.impossibleMessage(deviceName: "USB Audio", stream: desk)
+    XCTAssertTrue(impossible.contains("44100 Hz"))
+    XCTAssertTrue(impossible.contains("does not change the device's sample rate"))
+    XCTAssertFalse(CaptureFormatPlan.shouldRetry(message: impossible))
+    let silent = CaptureStreamDescription(
+      sampleRate: 0, channelCount: 0, bitsPerChannel: 0, isFloat: false, isInterleaved: true)
+    XCTAssertFalse(silent.canOpen)
+    XCTAssertTrue(
+      CaptureFormatPlan.impossibleMessage(deviceName: "USB Audio", stream: silent).contains(
+        "no input"))
+    XCTAssertFalse(
+      CaptureFormatPlan.shouldRetry(
+        message: CaptureFormatPlan.conversionStoppedMessage(
+          deviceName: "USB Audio", summary: desk.summary)
+      ))
+  }
+
   func testPCMCopyStaysInsideTheBuffersItWasGiven() {
     XCTAssertEqual(
       PCMCopy.interleavedSampleCount(byteSize: 64, frameCount: 4, channelCount: 2), 8)

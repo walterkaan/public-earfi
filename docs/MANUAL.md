@@ -199,7 +199,7 @@ Your own Wi-Fi still has to carry that 1 Mbps, plus a little overhead, shared am
 |---|---|
 | macOS says the app was not opened, or is from an unidentified developer | Use the Open Anyway steps above. On macOS 15, click Done first, then System Settings → Privacy & Security → Open Anyway. |
 | macOS says the app is damaged | Download it again. Drag a fresh copy to Applications. |
-| The level meter does not move | The desk is not feeding the interface. Mono already mixes every input. Raise Volume if the voice is quiet. |
+| The level meter does not move | The desk is not feeding the interface. Mono already mixes every input. Raise Volume if the voice is quiet. While you are live, the window also says there is no signal after about 5 seconds of silence. |
 | Your test phone will not open the link | The phone is on a different Wi-Fi. Join the same network as the Mac. Turn mobile data off for the test if the phone keeps leaving that network. |
 | Listeners in the venue cannot connect | They are on the venue Wi-Fi, or that Wi-Fi isolates clients. Move them to your own Wi-Fi. If you must use the venue network, ask for a fixed address for the Mac. |
 | The link used to work and now times out | The Mac’s address changed. Check the reservation, then compare the on-screen link with the poster. Make a new poster if they differ. |

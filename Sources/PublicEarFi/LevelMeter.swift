@@ -37,25 +37,17 @@ final class LevelMeter {
 
   func start(deviceID: AudioDeviceID?) {
     stop()
-    if let deviceID {
-      guard AudioDeviceList.isAlive(deviceID) else { return }
-    } else if AudioDeviceList.inputs().isEmpty {
+    guard let deviceID, AudioDeviceList.isAlive(deviceID) else { return }
+    let prepared: AudioInputBind.Prepared
+    switch AudioInputBind.prepare(engine: engine, deviceID: deviceID) {
+    case .success(let value):
+      prepared = value
+    case .failure:
       return
     }
-    let input = engine.inputNode
-    if let deviceID, let audioUnit = input.audioUnit {
-      var identifier = deviceID
-      AudioUnitSetProperty(
-        audioUnit,
-        kAudioOutputUnitProperty_CurrentDevice,
-        kAudioUnitScope_Global,
-        0,
-        &identifier,
-        UInt32(MemoryLayout<AudioDeviceID>.size)
-      )
-    }
-    let hardware = input.outputFormat(forBus: 0)
+    let hardware = prepared.format
     guard hardware.sampleRate > 0, hardware.channelCount > 0 else { return }
+    let input = engine.inputNode
     input.installTap(onBus: 0, bufferSize: 1_024, format: hardware) { [weak self] buffer, _ in
       self?.measure(buffer)
     }
@@ -63,6 +55,13 @@ final class LevelMeter {
     do {
       engine.prepare()
       try engine.start()
+      if AudioInputBind.confirm(prepared, deviceID: deviceID) != nil {
+        stop()
+        return
+      }
+      if !engine.isRunning {
+        try engine.start()
+      }
       callbackLock.lock()
       accepting = true
       running = true

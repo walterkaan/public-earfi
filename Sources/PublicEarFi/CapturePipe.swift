@@ -4,6 +4,7 @@ import CoreAudio
 import Darwin
 import Foundation
 import PublicEarFiCore
+import os
 
 /// Captures one Core Audio device and writes 48 kHz little-endian float PCM
 /// to ffmpeg's stdin. The device is the HAL device chosen in Settings (by
@@ -39,6 +40,29 @@ final class CapturePipe {
   private var accepting = false
   private var inFlight = 0
   private var tapInstalled = false
+  private var formatSummary = "input format unknown"
+  private var nativeSummary = ""
+  private var openedDeviceName = ""
+  private var activeChannelMap: [Int] = []
+  private var conversionProblem: String?
+  private var consecutiveConversionFailures = 0
+  private let level = OSAllocatedUnfairLock(
+    initialState: CaptureLevel(decibels: -120, at: .distantPast))
+
+  func recentDecibels(now: Date = Date()) -> Double {
+    level.withLock { state in
+      if now.timeIntervalSince(state.at) > 1 { return -120 }
+      return state.decibels
+    }
+  }
+
+  func takeConversionProblem() -> String? {
+    callbackLock.lock()
+    defer { callbackLock.unlock() }
+    let problem = conversionProblem
+    conversionProblem = nil
+    return problem
+  }
 
   func setGainDB(_ db: Double) {
     gainLock.lock()
@@ -51,32 +75,24 @@ final class CapturePipe {
     deviceID: AudioDeviceID,
     channelMode: ChannelMode,
     inputChannel: Int,
-    output: FileHandle
+    output: FileHandle,
+    deviceName: String = ""
   ) -> String? {
     stop()
     guard AudioDeviceList.isAlive(deviceID) else {
       return "The selected audio device is not connected."
     }
-    let input = engine.inputNode
-    guard let audioUnit = input.audioUnit else {
-      return "The audio engine has no input."
+    let prepared: AudioInputBind.Prepared
+    switch AudioInputBind.prepare(engine: engine, deviceID: deviceID) {
+    case .success(let value):
+      prepared = value
+    case .failure(let message):
+      return message
     }
-    var identifier = deviceID
-    let setStatus = AudioUnitSetProperty(
-      audioUnit,
-      kAudioOutputUnitProperty_CurrentDevice,
-      kAudioUnitScope_Global,
-      0,
-      &identifier,
-      UInt32(MemoryLayout<AudioDeviceID>.size)
-    )
-    guard setStatus == noErr else {
-      return "Could not open the selected audio device."
-    }
-    let hardware = input.outputFormat(forBus: 0)
-    guard hardware.sampleRate > 0, hardware.channelCount > 0 else {
-      return "The audio device has no input stream."
-    }
+    let hardware = prepared.format
+    formatSummary = AudioInputBind.summary(native: prepared.native, engine: prepared.engine)
+    nativeSummary = prepared.native.summary
+    openedDeviceName = deviceName
     let inputCount = Int(hardware.channelCount)
     let mono = channelMode == .mono
     let map = CaptureChannelMap.indices(
@@ -87,28 +103,19 @@ final class CapturePipe {
     guard !map.isEmpty, map.allSatisfy({ $0 >= 0 && $0 < inputCount }) else {
       return "Could not map the selected input channel."
     }
-    let convertCount = mono ? inputCount : map.count
-    let channels = AVAudioChannelCount(convertCount)
+    let outputChannels = map.count
     guard
-      let target = AVAudioFormat(
-        commonFormat: .pcmFormatFloat32,
-        sampleRate: Double(FFmpegCommand.sampleRate),
-        channels: channels,
-        interleaved: true
-      )
+      let opened = openConverter(from: hardware, outputChannels: outputChannels, channelMap: map)
     else {
-      return "Could not build the 48 kHz capture format."
+      return CaptureFormatPlan.impossibleMessage(deviceName: deviceName, stream: prepared.native)
     }
-    guard let converter = AVAudioConverter(from: hardware, to: target) else {
-      return "Could not convert the device audio to 48 kHz."
-    }
-    converter.channelMap = map.map { NSNumber(value: $0) }
     downmixToMono = mono
-    captureChannels = convertCount
+    captureChannels = outputChannels
+    activeChannelMap = map
     let ratio = Double(FFmpegCommand.sampleRate) / hardware.sampleRate
     let capacity = AVAudioFrameCount(ceil(8_192 * ratio) + 32)
-    guard let converted = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else {
-      return "Could not build the 48 kHz capture format."
+    guard let converted = AVAudioPCMBuffer(pcmFormat: opened.target, frameCapacity: capacity) else {
+      return CaptureFormatPlan.impossibleMessage(deviceName: deviceName, stream: prepared.native)
     }
     let descriptor = output.fileDescriptor
     let flags = fcntl(descriptor, F_GETFL)
@@ -122,9 +129,11 @@ final class CapturePipe {
     writePos = 0
     stored = 0
     condition.unlock()
-    self.converter = converter
-    self.targetFormat = target
+    self.converter = opened.converter
+    self.targetFormat = opened.target
     self.convertedBuffer = converted
+    self.conversionProblem = nil
+    self.consecutiveConversionFailures = 0
     self.outputHandle = output
     self.outputFD = descriptor
     stopWriter = false
@@ -136,6 +145,7 @@ final class CapturePipe {
       done.signal()
     }
 
+    let input = engine.inputNode
     input.installTap(onBus: 0, bufferSize: 960, format: hardware) { [weak self] buffer, _ in
       self?.consume(buffer)
     }
@@ -143,6 +153,13 @@ final class CapturePipe {
     do {
       engine.prepare()
       try engine.start()
+      if let problem = AudioInputBind.confirm(prepared, deviceID: deviceID) {
+        stop()
+        return problem
+      }
+      if !engine.isRunning {
+        try engine.start()
+      }
       callbackLock.lock()
       accepting = true
       running = true
@@ -150,9 +167,13 @@ final class CapturePipe {
       return nil
     } catch {
       stop()
-      return "Could not start audio capture. Allow the microphone, and check the selected device."
+      return
+        "Could not start audio capture (\(error.localizedDescription)). Allow the microphone in System Settings, and check the selected device."
     }
   }
+
+  var openedFormatSummary: String { formatSummary }
+  var openedNativeSummary: String { nativeSummary }
 
   func stop() {
     callbackLock.lock()
@@ -204,11 +225,31 @@ final class CapturePipe {
   private func renderWhileAccepted(_ buffer: AVAudioPCMBuffer) -> [Float]? {
     callbackLock.lock()
     defer { callbackLock.unlock() }
-    guard accepting, let converter, let targetFormat else { return nil }
+    guard accepting else { return nil }
+    if converter == nil || converter?.inputFormat != buffer.format {
+      guard
+        let rebuilt = openConverter(
+          from: buffer.format,
+          outputChannels: captureChannels,
+          channelMap: activeChannelMap
+        )
+      else {
+        noteConversionFailure()
+        return nil
+      }
+      converter = rebuilt.converter
+      targetFormat = rebuilt.target
+      if convertedBuffer?.format != rebuilt.target {
+        convertedBuffer = nil
+      }
+    }
+    guard let converter, let targetFormat else { return nil }
     let ratio = targetFormat.sampleRate / max(buffer.format.sampleRate, 1)
     let needed = AVAudioFrameCount(ceil(Double(buffer.frameLength) * ratio) + 32)
     let output: AVAudioPCMBuffer
-    if let converted = convertedBuffer, needed <= converted.frameCapacity {
+    if let converted = convertedBuffer, converted.format == targetFormat,
+      needed <= converted.frameCapacity
+    {
       output = converted
     } else if let larger = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: needed) {
       convertedBuffer = larger
@@ -228,8 +269,41 @@ final class CapturePipe {
       outStatus.pointee = .haveData
       return buffer
     }
-    guard error == nil, status != .error, output.frameLength > 0 else { return nil }
+    guard error == nil, status != .error, output.frameLength > 0 else {
+      noteConversionFailure()
+      return nil
+    }
+    consecutiveConversionFailures = 0
     return CapturePCM.interleavedFloats(from: output)
+  }
+
+  private func noteConversionFailure() {
+    consecutiveConversionFailures += 1
+    guard consecutiveConversionFailures == 25, conversionProblem == nil else { return }
+    conversionProblem = CaptureFormatPlan.conversionStoppedMessage(
+      deviceName: openedDeviceName, summary: formatSummary)
+  }
+
+  private func openConverter(
+    from hardware: AVAudioFormat, outputChannels: Int, channelMap: [Int]
+  ) -> (converter: AVAudioConverter, target: AVAudioFormat)? {
+    let inputChannels = Int(hardware.channelCount)
+    guard outputChannels > 0, inputChannels > 0 else { return nil }
+    for interleaved in CaptureFormatPlan.interleavedChoices(channelCount: outputChannels) {
+      guard
+        let target = AudioInputBind.floatFormat(
+          sampleRate: CaptureFormatPlan.encodeRate,
+          channels: outputChannels,
+          interleaved: interleaved
+        ),
+        let converter = AVAudioConverter(from: hardware, to: target)
+      else { continue }
+      if channelMap.count == outputChannels, channelMap != Array(0..<inputChannels) {
+        converter.channelMap = channelMap.map { NSNumber(value: $0) }
+      }
+      return (converter, target)
+    }
+    return nil
   }
 
   private func beginCallback() -> Bool {
@@ -265,6 +339,11 @@ final class CapturePipe {
       gainDB: currentGain()
     )
     guard !rendered.isEmpty else { return }
+    let decibels = SignalLevel.decibels(rendered)
+    level.withLock { state in
+      state.decibels = decibels
+      state.at = Date()
+    }
     rendered.withUnsafeBytes { raw in
       guard let base = raw.baseAddress else { return }
       enqueue(base, count: raw.count)
@@ -338,6 +417,11 @@ final class CapturePipe {
     readPos = (readPos + amount) % ring.count
     stored -= amount
     return amount
+  }
+
+  private struct CaptureLevel {
+    var decibels: Double
+    var at: Date
   }
 
   private func writerMain() {

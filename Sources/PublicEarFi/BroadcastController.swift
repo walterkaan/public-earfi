@@ -59,6 +59,11 @@ final class BroadcastController {
   private var ffmpegLog: FileHandle?
   private var ffmpegAttemptClosed = false
   private let capture = CapturePipe()
+  private let formatWatch = AudioFormatWatch()
+  private var pendingFormat: DispatchWorkItem?
+  private var lastFormatSummary = ""
+  private var formatRebuilds: [Date] = []
+  private var nextLevelLog = Date.distantPast
   private var ffmpegInput: Pipe?
   private var helperPaths: [String] = []
   private var mediamtxLog: FileHandle?
@@ -69,6 +74,10 @@ final class BroadcastController {
 
   func setInputGain(_ db: Double) {
     capture.setGainDB(db)
+  }
+
+  func recentCaptureDecibels() -> Double {
+    capture.recentDecibels()
   }
 
   func start(_ launch: BroadcastLaunch) {
@@ -253,26 +262,33 @@ final class BroadcastController {
       deviceID: deviceID,
       channelMode: launch.settings.channelMode,
       inputChannel: launch.settings.inputChannel,
-      output: pipe.fileHandleForWriting
+      output: pipe.fileHandleForWriting,
+      deviceName: name
     ) {
       stopCapture()
       abandon(process)
-      if problem == "The selected audio device is not connected."
-        || problem == "Could not map the selected input channel."
-        || problem == "Could not open the selected audio device."
-      {
-        stopWithProblem(problem)
-      } else {
+      if CaptureFormatPlan.shouldRetry(message: problem) {
         noteFailure(component: "audio", detail: problem)
+      } else {
+        stopWithProblem(problem)
       }
       return
     }
     ffmpeg = process
     writePIDs()
+    lastFormatSummary = capture.openedNativeSummary
+    nextLevelLog = Date().addingTimeInterval(4)
+    logger.log(
+      "audio",
+      "opened \(name): \(capture.openedFormatSummary); sending 48 kHz \(launch.settings.channelMode == .mono ? "mono" : "stereo") float"
+    )
     logger.log(
       "ffmpeg",
-      "started pid \(process.processIdentifier), Core Audio \(name) at 48 kHz"
+      "started pid \(process.processIdentifier), Core Audio \(name)"
     )
+    formatWatch.start(deviceID: deviceID, queue: queue) { [weak self] in
+      self?.scheduleFormatRebuild()
+    }
     guard waitUntilReady(stream: launch.settings.streamName) else {
       let stillRunning = process.isRunning
       let status = process.terminationStatus
@@ -610,6 +626,16 @@ final class BroadcastController {
 
   private func poll() {
     guard desired, !stopping, !isHalted(), let settings = launch?.settings else { return }
+    if let problem = capture.takeConversionProblem() {
+      stopWithProblem(problem)
+      return
+    }
+    if Date() >= nextLevelLog {
+      nextLevelLog = Date().addingTimeInterval(4)
+      let decibels = capture.recentDecibels()
+      let peak = decibels <= -100 ? "silent" : String(format: "%.0f dB", decibels)
+      logger.log("audio", "\(capture.openedFormatSummary); peak \(peak)")
+    }
     guard let data = httpGet(MediaMTXAPI.pathGetPath(streamName: settings.streamName)),
       let snapshot = try? MediaMTXAPI.parsePath(data)
     else {
@@ -703,8 +729,40 @@ final class BroadcastController {
   }
 
   private func stopCapture() {
+    pendingFormat?.cancel()
+    pendingFormat = nil
+    formatWatch.stop()
     capture.stop()
     ffmpegInput = nil
+  }
+
+  private func scheduleFormatRebuild() {
+    guard desired, !stopping, !isHalted() else { return }
+    pendingFormat?.cancel()
+    let work = DispatchWorkItem { [weak self] in
+      guard let self, self.desired, !self.stopping, !self.isHalted(),
+        let deviceID = self.launch?.deviceID,
+        let native = AudioInputBind.nativeDescription(deviceID: deviceID)
+      else { return }
+      let summary = native.summary
+      guard summary != self.lastFormatSummary else { return }
+      let now = Date()
+      self.formatRebuilds.removeAll { now.timeIntervalSince($0) > 30 }
+      if self.formatRebuilds.count >= 3 {
+        self.stopWithProblem(
+          "The audio device keeps changing format. Public EarFi left its sample rate unchanged. Pick the device again, or set its format in Audio MIDI Setup."
+        )
+        return
+      }
+      self.formatRebuilds.append(now)
+      self.logger.log(
+        "audio",
+        "input format changed from \(self.lastFormatSummary) to \(summary). Reopening."
+      )
+      self.startFFmpeg()
+    }
+    pendingFormat = work
+    queue.asyncAfter(deadline: .now() + 0.5, execute: work)
   }
 
   private func stopChildren() {
