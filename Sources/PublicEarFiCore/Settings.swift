@@ -40,6 +40,8 @@ public struct AppSettings: Codable, Equatable {
   public var quality: QualityPreset
   public var customBitrateKbps: Int
   public var streamName: String
+  /// Empty means the listener page uses "<App name> Broadcast".
+  public var broadcastTitle: String
   public var listenerPort: Int
   public var icePort: Int
   public var networkMode: NetworkMode
@@ -66,6 +68,7 @@ public struct AppSettings: Codable, Equatable {
     quality: QualityPreset = .speech,
     customBitrateKbps: Int = 64,
     streamName: String = "live",
+    broadcastTitle: String = "",
     listenerPort: Int = 8889,
     icePort: Int = 8189,
     networkMode: NetworkMode = .auto,
@@ -91,6 +94,7 @@ public struct AppSettings: Codable, Equatable {
     self.quality = quality
     self.customBitrateKbps = customBitrateKbps
     self.streamName = streamName
+    self.broadcastTitle = broadcastTitle
     self.listenerPort = listenerPort
     self.icePort = icePort
     self.networkMode = networkMode
@@ -375,6 +379,11 @@ public enum SettingsRepair {
       settings.streamName = "live"
       fields.append("stream name")
     }
+    let title = BroadcastTitle.sanitize(settings.broadcastTitle)
+    if title != settings.broadcastTitle {
+      settings.broadcastTitle = title
+      fields.append("broadcast title")
+    }
     if !isUsablePort(settings.listenerPort) {
       settings.listenerPort = 8889
       fields.append("listener port")
@@ -423,6 +432,7 @@ private struct StoredSettings: Codable {
   var quality: QualityPreset?
   var customBitrateKbps: Int?
   var streamName: String?
+  var broadcastTitle: String?
   var listenerPort: Int?
   var icePort: Int?
   var networkMode: NetworkMode?
@@ -498,6 +508,7 @@ public struct SettingsStore {
     if let value = stored.quality { settings.quality = value }
     if let value = stored.customBitrateKbps { settings.customBitrateKbps = value }
     if let value = stored.streamName { settings.streamName = value }
+    if let value = stored.broadcastTitle { settings.broadcastTitle = value }
     if let value = stored.listenerPort { settings.listenerPort = value }
     if let value = stored.icePort { settings.icePort = value }
     if let value = stored.networkMode { settings.networkMode = value }

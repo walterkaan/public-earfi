@@ -45,30 +45,26 @@ final class LevelMeter {
     case .failed:
       return
     }
-    let hardware = prepared.format
-    guard hardware.sampleRate > 0, hardware.channelCount > 0 else { return }
-    let input = engine.inputNode
-    input.installTap(onBus: 0, bufferSize: 1_024, format: hardware) { [weak self] buffer, _ in
-      self?.measure(buffer)
-    }
-    tapInstalled = true
-    do {
-      engine.prepare()
-      try engine.start()
-      if AudioInputBind.confirm(prepared, deviceID: deviceID) != nil {
-        stop()
-        return
+    switch AudioInputBind.startEngine(
+      engine: engine,
+      prepared: prepared,
+      deviceID: deviceID,
+      bufferSize: 1_024,
+      onBuffer: { [weak self] buffer in
+        self?.measure(buffer)
       }
-      if !engine.isRunning {
-        try engine.start()
-      }
-      callbackLock.lock()
-      accepting = true
-      running = true
-      callbackLock.unlock()
-    } catch {
+    ) {
+    case .failed:
       stop()
+      return
+    case .ready:
+      break
     }
+    callbackLock.lock()
+    accepting = true
+    running = true
+    tapInstalled = true
+    callbackLock.unlock()
   }
 
   func stop() {

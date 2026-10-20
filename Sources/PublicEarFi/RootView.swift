@@ -343,7 +343,7 @@ struct SettingsTab: View {
               .labelsHidden()
               .frame(width: 110)
             } else {
-              Text("All inputs mixed")
+              Text("All inputs summed")
                 .foregroundStyle(.secondary)
             }
           }
@@ -374,6 +374,15 @@ struct SettingsTab: View {
             TextField("8889", text: portText)
               .frame(width: 70)
           }
+          LabeledRow(title: "Broadcast title") {
+            TextField(model.defaultBroadcastTitle, text: titleBinding)
+              .frame(maxWidth: 280)
+          }
+          Text(
+            "Shown on the listener page, including the player. Leave this blank for \(model.defaultBroadcastTitle). A blank title follows the app name."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
           LabeledRow(title: "Network mode") {
             Picker("Network", selection: networkBinding) {
               Text("Auto (UDP+TCP)").tag(NetworkMode.auto)
@@ -508,6 +517,12 @@ struct SettingsTab: View {
   private var streamBinding: Binding<String> {
     Binding(
       get: { model.settings.streamName }, set: { value in model.mutate { $0.streamName = value } })
+  }
+  private var titleBinding: Binding<String> {
+    Binding(
+      get: { model.settings.broadcastTitle },
+      set: { value in model.mutate { $0.broadcastTitle = BroadcastTitle.limited(value) } }
+    )
   }
   private var portText: Binding<String> { numberText(\.listenerPort) }
   private var networkBinding: Binding<NetworkMode> {

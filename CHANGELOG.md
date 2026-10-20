@@ -13,10 +13,11 @@ First MVP build of Public EarFi.
 - Invalid saved settings are replaced with defaults instead of crashing Start. A missing audio device is reported and cleared. Reset to defaults writes a full default set back to preferences.
 - Start no longer quits while reading ffmpeg output. Progress lines that end with a carriage return, and a chunk that ends on a newline, are split as bytes on one queue. Saved settings were not the cause of that crash.
 - Stop, quit, and the next launch end mediamtx and ffmpeg with SIGTERM, then SIGKILL, including the process group. A TCP port that is only closing is not treated as still in use, so Start works again immediately. The UDP ICE port is released with the process.
-- Mono mixes every input channel together, so a stereo desk is not silent when only one side has the voice. Stereo still uses the chosen input and the next one.
+- Mono sums every input channel in the app before the 48 kHz converter, so a stereo desk is heard when only one side has the voice, at that side's level. The limiter catches a loud sum. Stereo still uses the chosen input and the next one.
 - The main window has a Volume slider from -12 dB to +24 dB, default 0 dB. It applies live, without restarting, and a soft limiter keeps a boost from hard-clipping. The level meter next to it shows the boosted level.
 - Start and the input picker no longer crash. The meter publishes its level on a timer, and capture finishes the current buffer before the device is closed.
 - Capture converts whatever format the device is already using (any rate, sample type, or channel count) to 48 kHz. The app does not change the device's sample rate. A format it cannot open is reported once, instead of retrying. The log records the native format and a peak level every few seconds. Silence for about 5 seconds while live shows a no-signal warning. After a settings change, the button says Apply New Settings Now.
+- The listener page title is a Settings field, Broadcast title. Blank stays “Public EarFi Broadcast” and follows the app name. The live status line is Live, the elapsed time, and the input device feeding the stream. The no-signal line waits for sustained silence and does not flicker.
 - Poster preview, PDF export, printing, and QR copy.
 - Organiser manual in `docs/MANUAL.md`: install, Speech, the poster, listener tips, bandwidth for about 30 phones, and a travel-router network. A phone server is described as planned.
 - GitHub Actions builds an ad-hoc signed universal app and DMG. Release tags sign with `RELEASE_SIGNING_P12` when that secret exists.

@@ -25,6 +25,9 @@ jobs:
       - name: Unit tests
         run: swift test
 
+      - name: Listener page patch
+        run: python3 scripts/patch-mediamtx-listener.py --self-test
+
       - name: Address sanitizer
         run: swift test --sanitize=address --filter PublicEarFiCoreTests
 

@@ -44,16 +44,29 @@ public struct CaptureStreamDescription: Equatable, Sendable {
 /// How a device format becomes 48 kHz float for ffmpeg.
 /// An interleaved float layout is only requested for one or two channels.
 /// Wider devices use non-interleaved float, because the interleaved
-/// initializer cannot represent them, then the mono mix averages every channel.
+/// initializer cannot represent them. Mono sums every channel in our own
+/// code before the rate converter, so the converter never picks channel 0.
 public enum CaptureFormatPlan {
   public static let encodeRate = 48_000.0
   public static let silenceDB = -50.0
+  /// Once the no-signal line is showing, the level has to rise to here
+  /// before it can clear. A reading that jitters around `silenceDB` stays put.
+  public static let silenceClearDB = -40.0
   public static let silenceWarningSeconds: TimeInterval = 5
+  public static let silenceClearSeconds: TimeInterval = 2
 
-  public static func converterChannels(inputChannels: Int, mono: Bool) -> Int {
+  /// Channels the 48 kHz converter is allowed to see, after our mix.
+  /// Mono is already one channel. Stereo is the chosen pair.
+  public static func rateChannels(inputChannels: Int, mono: Bool) -> Int {
     guard inputChannels > 0 else { return 0 }
-    if mono { return inputChannels }
-    return min(2, inputChannels)
+    return mono ? 1 : 2
+  }
+
+  /// Source channel for each output channel, in order. A shorter map would
+  /// keep channel 0 and drop the rest, which is the one-sided mono bug.
+  public static func identityChannelMap(channelCount: Int) -> [Int] {
+    guard channelCount > 0 else { return [] }
+    return Array(0..<channelCount)
   }
 
   public static func pipeChannels(mono: Bool) -> Int {
@@ -104,5 +117,49 @@ public enum CaptureFormatPlan {
     let name = deviceName.isEmpty ? "this device" : deviceName
     return
       "Audio from \(name) is not reaching the broadcast (\(summary)). Check the selected input. Public EarFi does not change the device's sample rate."
+  }
+}
+
+/// Shows the no-signal line only after sustained quiet, and keeps it up
+/// until the signal has been back for a moment. A single loud frame, or a
+/// level that jitters around the threshold, does not flip the line.
+public struct SilenceWatch: Equatable {
+  public var showing = false
+  public var quietSince: Date?
+  public var heardSince: Date?
+
+  public init() {}
+
+  public mutating func reset() {
+    showing = false
+    quietSince = nil
+    heardSince = nil
+  }
+
+  public mutating func update(decibels: Double, now: Date) {
+    let silent =
+      showing
+      ? decibels < CaptureFormatPlan.silenceClearDB
+      : decibels < CaptureFormatPlan.silenceDB
+    if silent {
+      heardSince = nil
+      if quietSince == nil { quietSince = now }
+      if let quietSince,
+        now.timeIntervalSince(quietSince) >= CaptureFormatPlan.silenceWarningSeconds
+      {
+        showing = true
+      }
+      return
+    }
+    quietSince = nil
+    guard showing else {
+      heardSince = nil
+      return
+    }
+    if heardSince == nil { heardSince = now }
+    if let heardSince, now.timeIntervalSince(heardSince) >= CaptureFormatPlan.silenceClearSeconds {
+      showing = false
+      self.heardSince = nil
+    }
   }
 }

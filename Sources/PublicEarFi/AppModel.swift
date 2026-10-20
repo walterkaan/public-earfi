@@ -39,11 +39,12 @@ final class AppModel: ObservableObject {
   private let hotplug = AudioHotplug()
   private let pathWatcher = PathWatcher()
   private let sleepAssertion = SleepAssertion()
-  private var silenceSince: Date?
   private var runningSignature: BroadcastSignature?
   private var didAutoStart = false
   private var lastAnnouncedIP: String?
   private var lastDeviceName = "audio interface"
+  private var feedingDeviceName = ""
+  private var silenceWatch = SilenceWatch()
   private var timer: Timer?
   private var meterTimer: Timer?
 
@@ -141,13 +142,22 @@ final class AppModel: ObservableObject {
     InterfaceEnumerator.localHostname()
   }
 
+  var defaultBroadcastTitle: String {
+    BroadcastTitle.resolved(stored: "", appName: AppIdentity.name)
+  }
+
+  var broadcastTitle: String {
+    BroadcastTitle.resolved(stored: settings.broadcastTitle, appName: AppIdentity.name)
+  }
+
   var listenerURL: String? {
     ListenerLink.make(
       style: settings.urlStyle,
       ipAddress: selectedIP,
       localHostname: hostname,
       port: settings.listenerPort,
-      streamName: settings.streamName
+      streamName: settings.streamName,
+      broadcastTitle: broadcastTitle
     )
   }
 
@@ -158,7 +168,8 @@ final class AppModel: ObservableObject {
       ipAddress: nil,
       localHostname: hostname,
       port: settings.listenerPort,
-      streamName: settings.streamName
+      streamName: settings.streamName,
+      broadcastTitle: broadcastTitle
     )
   }
 
@@ -199,7 +210,9 @@ final class AppModel: ObservableObject {
     case .problem(let reason), .blocked(let reason):
       return "Problem: \(reason)"
     case .live(let since):
-      return "Live · \(elapsed(since: since)) · \(levelDB < -50 ? "quiet" : "audio healthy")"
+      let feeding = feedingDeviceName.isEmpty ? lastDeviceName : feedingDeviceName
+      let name = feeding.isEmpty ? "audio interface" : feeding
+      return "Live · \(elapsed(since: since)) · \(name)"
     }
   }
 
@@ -296,6 +309,7 @@ final class AppModel: ObservableObject {
     restartMeter()
     if isBroadcasting {
       let device = stored.flatMap { value in devices.first { $0.id == value } }
+      noteFeedingDevice(device?.name)
       controller.deviceChanged(
         name: device?.name, deviceID: device?.deviceID, present: device != nil)
     }
@@ -367,6 +381,7 @@ final class AppModel: ObservableObject {
       appVersion: versionLabel,
       systemDescription: ProcessInfo.processInfo.operatingSystemVersionString,
       settings: settings,
+      appName: AppIdentity.name,
       listenerURL: listenerURL ?? "(no LAN address)",
       helperSummary: helperSummary,
       logLines: logger.recent(200)
@@ -442,6 +457,7 @@ final class AppModel: ObservableObject {
     let device = selectedDevice
     if let device {
       lastDeviceName = device.name
+      feedingDeviceName = device.name
       if settings.inputDeviceUID == nil {
         settings.inputDeviceUID = device.id
         store.save(settings)
@@ -509,12 +525,11 @@ final class AppModel: ObservableObject {
 
   private func tick() {
     now = Date()
-    if case .live = phase, controller.recentCaptureDecibels() < CaptureFormatPlan.silenceDB {
-      if silenceSince == nil { silenceSince = now }
-      noSignal =
-        now.timeIntervalSince(silenceSince ?? now) >= CaptureFormatPlan.silenceWarningSeconds
+    if case .live = phase {
+      silenceWatch.update(decibels: controller.recentCaptureDecibels(), now: now)
+      noSignal = silenceWatch.showing
     } else {
-      silenceSince = nil
+      silenceWatch.reset()
       noSignal = false
     }
     if isBroadcasting {
@@ -534,10 +549,12 @@ final class AppModel: ObservableObject {
     }
     if isBroadcasting {
       if settings.inputDeviceUID == nil {
+        noteFeedingDevice(selectedDevice?.name)
         controller.deviceChanged(
           name: selectedDevice?.name, deviceID: selectedDevice?.deviceID,
           present: selectedDevice != nil)
       } else {
+        noteFeedingDevice(remembered?.name ?? lastDeviceName)
         controller.deviceChanged(
           name: remembered?.name ?? lastDeviceName, deviceID: remembered?.deviceID,
           present: remembered != nil)
@@ -629,6 +646,13 @@ final class AppModel: ObservableObject {
     if logLines.count > 2_000 {
       logLines.removeFirst(logLines.count - 2_000)
     }
+  }
+
+  private func noteFeedingDevice(_ name: String?) {
+    let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard !trimmed.isEmpty else { return }
+    feedingDeviceName = trimmed
+    lastDeviceName = trimmed
   }
 
   private func elapsed(since: Date) -> String {

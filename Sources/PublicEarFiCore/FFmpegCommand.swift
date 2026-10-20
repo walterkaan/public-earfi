@@ -49,8 +49,8 @@ public enum FFmpegCommand {
 }
 
 public enum CaptureChannelMap {
-  /// Zero-based device channels to copy into the converter.
-  /// Mono keeps every channel so the capture path can average them.
+  /// Zero-based device channels the mix keeps.
+  /// Mono keeps every channel so the sum runs before the rate converter.
   /// Stereo takes the desk input chosen in Settings and the next one.
   public static func indices(mode: ChannelMode, inputChannel: Int, inputCount: Int) -> [Int] {
     let count = max(1, inputCount)

@@ -50,13 +50,14 @@ public enum DiagnosticsReport {
     appVersion: String,
     systemDescription: String,
     settings: AppSettings,
+    appName: String = BroadcastTitle.fallbackAppName,
     listenerURL: String,
     helperSummary: String,
     logLines: [String],
     logLimit: Int = 200
   ) -> String {
     let tail = Array(logLines.suffix(logLimit))
-    let summary = settingsSummary(settings)
+    let summary = settingsSummary(settings, appName: appName)
     return """
       Public EarFi \(appVersion)
       \(systemDescription)
@@ -71,14 +72,17 @@ public enum DiagnosticsReport {
       """
   }
 
-  public static func settingsSummary(_ settings: AppSettings) -> String {
+  public static func settingsSummary(
+    _ settings: AppSettings, appName: String = BroadcastTitle.fallbackAppName
+  ) -> String {
     [
       "device UID: \(settings.inputDeviceUID ?? "(auto)")",
-      "channels: \(settings.channelMode == .mono ? "mono (all inputs mixed)" : "stereo from input \(settings.inputChannel)")",
+      "channels: \(settings.channelMode == .mono ? "mono (all inputs summed)" : "stereo from input \(settings.inputChannel)")",
       "volume: \(InputGain.label(settings.inputGainDB))",
       "quality: \(settings.quality.rawValue) \(settings.resolvedBitrateKbps) kbps \(settings.opusApplication)",
       "sample rate: \(FFmpegCommand.sampleRate) Hz, \(FFmpegCommand.frameDurationMilliseconds) ms frames",
       "stream: \(settings.streamName)",
+      "broadcast title: \(BroadcastTitle.resolved(stored: settings.broadcastTitle, appName: appName))",
       "listener port: \(settings.listenerPort)",
       "ICE port: \(settings.icePort)",
       "network mode: \(settings.networkMode.rawValue)",

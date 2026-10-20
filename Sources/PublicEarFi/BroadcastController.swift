@@ -280,7 +280,7 @@ final class BroadcastController {
     nextLevelLog = Date().addingTimeInterval(4)
     logger.log(
       "audio",
-      "opened \(name): \(capture.openedFormatSummary); sending 48 kHz \(launch.settings.channelMode == .mono ? "mono" : "stereo") float"
+      "opened \(name): \(capture.openedFormatSummary); sending 48 kHz \(capture.openedMixNote) float"
     )
     logger.log(
       "ffmpeg",

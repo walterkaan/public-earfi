@@ -29,6 +29,9 @@ chmod +x "$APP/Contents/MacOS/PublicEarFi"
 
 cp "$ROOT/build/helpers/ffmpeg" "$ROOT/build/helpers/mediamtx" "$APP/Contents/Helpers/"
 chmod +x "$APP/Contents/Helpers/ffmpeg" "$APP/Contents/Helpers/mediamtx"
+# The listener page is embedded in the MediaMTX binary. Patch that copy only.
+# build/helpers stays the pinned download so the helper cache can be reused.
+python3 "$ROOT/scripts/patch-mediamtx-listener.py" "$APP/Contents/Helpers/mediamtx"
 
 mkdir -p "$APP/Contents/Resources/Licenses"
 cp -R "$ROOT/Sources/PublicEarFi/Resources/Licenses/." "$APP/Contents/Resources/Licenses/"

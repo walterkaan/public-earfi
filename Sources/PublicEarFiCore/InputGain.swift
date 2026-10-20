@@ -1,9 +1,21 @@
 import Foundation
 
-/// Averages every channel of an interleaved frame into one mono sample.
-/// Stereo is (L+R)/2. One channel is copied through.
+/// Mixes an interleaved frame down to one mono sample.
+/// `sum` adds every channel, so a voice on only the left or only the right
+/// stays at its own level. `average` divides by the channel count (a
+/// one-sided stereo signal is about 6 dB quieter) and is kept for comparison.
 public enum MonoDownmix {
+  public static func sum(interleaved samples: [Float], channelCount: Int) -> [Float] {
+    mix(interleaved: samples, channelCount: channelCount, scale: 1)
+  }
+
   public static func average(interleaved samples: [Float], channelCount: Int) -> [Float] {
+    guard channelCount > 0 else { return [] }
+    return mix(interleaved: samples, channelCount: channelCount, scale: 1 / Float(channelCount))
+  }
+
+  private static func mix(interleaved samples: [Float], channelCount: Int, scale: Float) -> [Float]
+  {
     guard channelCount > 0 else { return [] }
     let frames = samples.count / channelCount
     if frames == 0 { return [] }
@@ -12,16 +24,53 @@ public enum MonoDownmix {
     }
     var mono: [Float] = []
     mono.reserveCapacity(frames)
-    let scale = 1 / Float(channelCount)
     for frame in 0..<frames {
-      var sum: Float = 0
+      var total: Float = 0
       let base = frame * channelCount
       for channel in 0..<channelCount {
-        sum += samples[base + channel]
+        total += samples[base + channel]
       }
-      mono.append(sum * scale)
+      mono.append(total * scale)
     }
     return mono
+  }
+}
+
+/// Mono sums every device channel. Stereo copies the chosen input and the
+/// next one. Both run on the samples we already have, before any resampler.
+public enum CaptureMix {
+  public static func render(
+    interleaved samples: [Float],
+    channelCount: Int,
+    mode: ChannelMode,
+    inputChannel: Int
+  ) -> [Float] {
+    switch mode {
+    case .mono:
+      return MonoDownmix.sum(interleaved: samples, channelCount: channelCount)
+    case .stereo:
+      let indices = CaptureChannelMap.indices(
+        mode: .stereo, inputChannel: inputChannel, inputCount: channelCount)
+      return select(interleaved: samples, channelCount: channelCount, indices: indices)
+    }
+  }
+
+  public static func select(interleaved samples: [Float], channelCount: Int, indices: [Int])
+    -> [Float]
+  {
+    guard channelCount > 0, !indices.isEmpty else { return [] }
+    let frames = samples.count / channelCount
+    if frames == 0 { return [] }
+    var output: [Float] = []
+    output.reserveCapacity(frames * indices.count)
+    for frame in 0..<frames {
+      let base = frame * channelCount
+      for index in indices {
+        let channel = min(max(0, index), channelCount - 1)
+        output.append(samples[base + channel])
+      }
+    }
+    return output
   }
 }
 
@@ -65,8 +114,9 @@ public enum InputGain {
     return samples.map { softLimit($0 * scale) }
   }
 
-  /// Mono mode averages every channel first. Stereo keeps the mapped pair.
-  /// Gain and the soft limiter run after that.
+  /// Mono mode sums every channel first, then gain and the soft limiter.
+  /// A single side is not turned down. A loud sum bends at the limiter
+  /// instead of hard-clipping. Stereo keeps the samples it was given.
   public static func render(
     interleaved samples: [Float],
     channelCount: Int,
@@ -75,7 +125,7 @@ public enum InputGain {
   ) -> [Float] {
     let source =
       downmixToMono
-      ? MonoDownmix.average(interleaved: samples, channelCount: channelCount)
+      ? MonoDownmix.sum(interleaved: samples, channelCount: channelCount)
       : samples
     return apply(source, gainDB: gainDB)
   }

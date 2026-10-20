@@ -81,6 +81,25 @@ struct AppMenus: Commands {
   }
 }
 
+enum AppIdentity {
+  /// Display name from the bundle, so a rename of the app follows the
+  /// default listener title without a stored string.
+  static var name: String {
+    let info = Bundle.main.infoDictionary
+    if let display = info?["CFBundleDisplayName"] as? String,
+      !display.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    {
+      return display
+    }
+    if let bundle = info?["CFBundleName"] as? String,
+      !bundle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    {
+      return bundle
+    }
+    return BroadcastTitle.fallbackAppName
+  }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
     MainActor.assumeIsolated {

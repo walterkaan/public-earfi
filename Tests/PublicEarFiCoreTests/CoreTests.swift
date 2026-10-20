@@ -121,6 +121,7 @@ final class SettingsTests: XCTestCase {
     settings.posterDescription = "Hall"
     settings.keepAwake = false
     settings.inputGainDB = 18
+    settings.broadcastTitle = "Hall A"
     XCTAssertEqual(BroadcastSignature(settings), before)
     settings.listenerPort = 8890
     XCTAssertNotEqual(BroadcastSignature(settings), before)
@@ -339,6 +340,29 @@ final class NetworkAndURLTests: XCTestCase {
       streamName: "live"
     )
     XCTAssertEqual(ip, "http://192.168.1.42:8889/live")
+    let titled = ListenerLink.make(
+      style: .ip,
+      ipAddress: "192.168.1.42",
+      localHostname: "Hall-Mac.local",
+      port: 8889,
+      streamName: "live",
+      broadcastTitle: "Public EarFi Broadcast"
+    )
+    let titledParts = URLComponents(string: titled ?? "")
+    XCTAssertEqual(titledParts?.queryItems?.count, 1)
+    XCTAssertEqual(titledParts?.queryItems?.first?.name, "title")
+    XCTAssertEqual(titledParts?.queryItems?.first?.value, "Public EarFi Broadcast")
+    let awkward = ListenerLink.make(
+      style: .ip,
+      ipAddress: "192.168.1.42",
+      localHostname: "Hall-Mac.local",
+      port: 8889,
+      streamName: "live",
+      broadcastTitle: "A & B"
+    )
+    let awkwardParts = URLComponents(string: awkward ?? "")
+    XCTAssertEqual(awkwardParts?.queryItems?.count, 1)
+    XCTAssertEqual(awkwardParts?.queryItems?.first?.value, "A & B")
     XCTAssertNil(
       ListenerLink.make(
         style: .ip, ipAddress: nil, localHostname: "Hall-Mac", port: 8889, streamName: "live")
@@ -369,6 +393,36 @@ final class NetworkAndURLTests: XCTestCase {
         currentURL: "http://192.168.1.40:8889/live"
       )
     )
+    XCTAssertNil(
+      ListenerLink.staleWarning(
+        previousURL: "http://192.168.1.40:8889/live?title=Old",
+        currentURL: "http://192.168.1.40:8889/live?title=New"
+      )
+    )
+  }
+
+  func testBroadcastTitleFollowsTheAppName() {
+    XCTAssertEqual(
+      BroadcastTitle.resolved(stored: "", appName: "Public EarFi"),
+      "Public EarFi Broadcast"
+    )
+    XCTAssertEqual(
+      BroadcastTitle.resolved(stored: "   ", appName: "Public EarFi"),
+      "Public EarFi Broadcast"
+    )
+    XCTAssertEqual(BroadcastTitle.resolved(stored: "", appName: "Hall Ear"), "Hall Ear Broadcast")
+    XCTAssertEqual(
+      BroadcastTitle.resolved(stored: "", appName: ""),
+      "Public EarFi Broadcast"
+    )
+    XCTAssertEqual(
+      BroadcastTitle.resolved(stored: "Morning session", appName: "Public EarFi"),
+      "Morning session"
+    )
+    let long = String(repeating: "a", count: 90)
+    XCTAssertEqual(BroadcastTitle.sanitize(long).count, BroadcastTitle.maximumLength)
+    XCTAssertEqual(BroadcastTitle.limited("Hello\nthere").contains("\n"), false)
+    XCTAssertEqual(BroadcastTitle.sanitize("  Hello   there \n"), "Hello there")
   }
 
   func testPaperSizeFollowsRegion() {
@@ -675,10 +729,12 @@ final class APIAndCreditsTests: XCTestCase {
     XCTAssertTrue(report.contains("line 250"))
     XCTAssertFalse(report.contains("line 1\n"))
     XCTAssertTrue(report.contains("stream: live"))
+    XCTAssertTrue(report.contains("broadcast title: Public EarFi Broadcast"))
     XCTAssertTrue(report.contains("Recent log (200 lines)"))
   }
 
   func testMonoDownmixGainAndSoftLimit() {
+    XCTAssertEqual(MonoDownmix.sum(interleaved: [1, 3, 5, 7], channelCount: 2), [4, 12])
     XCTAssertEqual(MonoDownmix.average(interleaved: [1, 3, 5, 7], channelCount: 2), [2, 6])
     XCTAssertEqual(MonoDownmix.average(interleaved: [1, 2, 3], channelCount: 3), [2])
     XCTAssertEqual(MonoDownmix.average(interleaved: [0.5], channelCount: 1), [0.5])
@@ -718,6 +774,63 @@ final class APIAndCreditsTests: XCTestCase {
 
     let level = SignalLevel.decibels([1, -1, 1, -1])
     XCTAssertEqual(level, 0, accuracy: 0.01)
+
+    let oneSide = InputGain.render(
+      interleaved: [0.5, 0],
+      channelCount: 2,
+      downmixToMono: true,
+      gainDB: 0
+    )
+    XCTAssertEqual(oneSide, [0.5])
+    let bothSides = InputGain.render(
+      interleaved: [0.8, 0.8],
+      channelCount: 2,
+      downmixToMono: true,
+      gainDB: 0
+    )
+    XCTAssertEqual(bothSides.count, 1)
+    XCTAssertGreaterThan(bothSides[0], 0.9)
+    XCTAssertLessThanOrEqual(bothSides[0], 1)
+  }
+
+  func testMonoSumKeepsEitherStereoSide() {
+    let left: [Float] = [0.4, 0, 0.2, 0]
+    let right: [Float] = [0, 0.4, 0, 0.2]
+    let fromLeft = MonoDownmix.sum(interleaved: left, channelCount: 2)
+    let fromRight = MonoDownmix.sum(interleaved: right, channelCount: 2)
+    XCTAssertEqual(fromLeft, [0.4, 0.2])
+    XCTAssertEqual(fromRight, [0.4, 0.2])
+    let leftLevel = SignalLevel.decibels(fromLeft)
+    let rightLevel = SignalLevel.decibels(fromRight)
+    XCTAssertGreaterThan(leftLevel, -40)
+    XCTAssertEqual(leftLevel, rightLevel, accuracy: 0.01)
+
+    let gainedLeft = InputGain.render(
+      interleaved: left, channelCount: 2, downmixToMono: true, gainDB: 0)
+    let gainedRight = InputGain.render(
+      interleaved: right, channelCount: 2, downmixToMono: true, gainDB: 0)
+    XCTAssertEqual(gainedLeft, fromLeft)
+    XCTAssertEqual(gainedRight, fromRight)
+
+    let channel0 = stride(from: 0, to: right.count, by: 2).map { right[$0] }
+    XCTAssertEqual(channel0, [0, 0])
+    XCTAssertLessThan(SignalLevel.decibels(channel0), -40)
+
+    let mixedLeft = CaptureMix.render(
+      interleaved: left, channelCount: 2, mode: .mono, inputChannel: 1)
+    let mixedRight = CaptureMix.render(
+      interleaved: right, channelCount: 2, mode: .mono, inputChannel: 2)
+    XCTAssertEqual(mixedLeft, fromLeft)
+    XCTAssertEqual(mixedRight, fromRight)
+    XCTAssertEqual(
+      CaptureMix.render(
+        interleaved: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+        channelCount: 3,
+        mode: .stereo,
+        inputChannel: 2
+      ),
+      [0.2, 0.3, 0.5, 0.6]
+    )
   }
 
   func testInputGainIsPersistedAndOutOfRangeValuesReset() {
@@ -840,9 +953,13 @@ final class APIAndCreditsTests: XCTestCase {
       desk.summary,
       "44100 Hz, 24-bit integer, 8 channels, interleaved"
     )
-    XCTAssertEqual(CaptureFormatPlan.converterChannels(inputChannels: 8, mono: true), 8)
-    XCTAssertEqual(CaptureFormatPlan.converterChannels(inputChannels: 8, mono: false), 2)
+    XCTAssertEqual(CaptureFormatPlan.rateChannels(inputChannels: 8, mono: true), 1)
+    XCTAssertEqual(CaptureFormatPlan.rateChannels(inputChannels: 8, mono: false), 2)
+    XCTAssertEqual(CaptureFormatPlan.identityChannelMap(channelCount: 2), [0, 1])
+    XCTAssertEqual(CaptureFormatPlan.identityChannelMap(channelCount: 8), Array(0..<8))
     XCTAssertEqual(CaptureFormatPlan.pipeChannels(mono: true), 1)
+    XCTAssertEqual(CaptureFormatPlan.silenceClearDB, -40)
+    XCTAssertEqual(CaptureFormatPlan.silenceClearSeconds, 2)
     XCTAssertEqual(CaptureFormatPlan.interleavedChoices(channelCount: 8), [false])
     XCTAssertEqual(CaptureFormatPlan.interleavedChoices(channelCount: 2), [true, false])
     XCTAssertEqual(CaptureFormatPlan.silenceWarningSeconds, 5)
@@ -863,6 +980,29 @@ final class APIAndCreditsTests: XCTestCase {
         message: CaptureFormatPlan.conversionStoppedMessage(
           deviceName: "USB Audio", summary: desk.summary)
       ))
+  }
+
+  func testSilenceWarningWaitsAndDoesNotFlicker() {
+    var watch = SilenceWatch()
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    watch.update(decibels: -80, now: start)
+    XCTAssertFalse(watch.showing)
+    watch.update(decibels: -80, now: start.addingTimeInterval(4.9))
+    XCTAssertFalse(watch.showing)
+    watch.update(decibels: -80, now: start.addingTimeInterval(5))
+    XCTAssertTrue(watch.showing)
+    watch.update(decibels: -45, now: start.addingTimeInterval(6))
+    XCTAssertTrue(watch.showing)
+    watch.update(decibels: -20, now: start.addingTimeInterval(6.2))
+    XCTAssertTrue(watch.showing)
+    watch.update(decibels: -20, now: start.addingTimeInterval(8.2))
+    XCTAssertFalse(watch.showing)
+    watch.update(decibels: -80, now: start.addingTimeInterval(8.3))
+    XCTAssertFalse(watch.showing)
+    watch.update(decibels: -80, now: start.addingTimeInterval(13.3))
+    XCTAssertTrue(watch.showing)
+    watch.reset()
+    XCTAssertFalse(watch.showing)
   }
 
   func testPCMCopyStaysInsideTheBuffersItWasGiven() {

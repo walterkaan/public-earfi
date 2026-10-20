@@ -109,7 +109,7 @@ If macOS says the app **is damaged**, the download or the signature is broken. D
 Open **Public EarFi → Settings…** (Command-,). Settings is in the app menu, under the Public EarFi name. It is not in the File menu.
 
 - **Device.** Pick the USB interface. If you have not chosen one yet, the app prefers a USB interface over the built-in microphone.
-- **Channels.** For an interpreter feed, leave this on **Mono**. Mono mixes every input on the device into one stream, so a stereo desk is heard even when the voice is only on one side. Stereo uses the input you choose and the next one.
+- **Channels.** For an interpreter feed, leave this on **Mono**. Mono adds every input on the device into one stream, so a stereo desk is heard even when the voice is only on one side, at that side's own level. A very loud sum is softened so it does not crackle. Stereo uses the input you choose and the next one.
 - **Volume.** The slider on the main window goes from -12 dB to +24 dB. Leave it at 0 dB unless the interpreter is quiet. It changes immediately, including while you are live. A loud boost is softened so it does not crackle.
 - **Level meter.** It is on the main window, next to the volume slider, and it works before Start. No movement means the desk is not reaching the interface.
 
@@ -120,6 +120,8 @@ Open **Public EarFi → Settings…** (Command-,). Settings is in the app menu, 
 That uses the least Wi-Fi. Standard and Music use more for the same number of listeners.
 
 Standard (64 kbps) and Music (96 kbps mono, or 128 kbps stereo) use more of the Wi-Fi for the same number of listeners. Speech is the one sized for about 30 phones.
+
+**Broadcast title**, under Stream, is the name phones show on the listener page and on the player. Leave it blank for “Public EarFi Broadcast”. That blank default follows the app name, so a rename updates it. A name you type is used as it is. It changes the listener link immediately and does not restart the audio.
 
 **TCP only**, under Network mode, is the setting to try if listeners hear dropouts on Wi-Fi. Auto is the normal choice.
 
@@ -166,8 +168,8 @@ There is no password on the stream. Anyone on that Wi-Fi who has the link can li
 1. Turn on your own Wi-Fi. It does not need the internet.
 2. Join the Mac to it and open Public EarFi. Confirm the listener link matches the poster.
 3. Connect the sound desk to the interface. Check the level meter.
-4. Press **Start Broadcasting**.
-5. Listen on your own phone once, on that Wi-Fi, before people arrive.
+4. Press **Start Broadcasting**. The status line stays on Live, the elapsed time, and the input device that is feeding the stream. It does not switch between quiet and healthy; the level meter shows the level. After about 5 seconds of real silence it adds a no-signal line, and that line stays until the sound has been back for a moment.
+5. Listen on your own phone once, on that Wi-Fi, before people arrive. The page title is the broadcast title from Settings.
 6. Put the poster where people can scan it. Remind them about the Wi-Fi name and the unmute step.
 7. The main window shows how many people are listening, and one health line. **View → Show Log** (Command-L) opens the longer log if you need it.
 
@@ -199,7 +201,7 @@ Your own Wi-Fi still has to carry that 1 Mbps, plus a little overhead, shared am
 |---|---|
 | macOS says the app was not opened, or is from an unidentified developer | Use the Open Anyway steps above. On macOS 15, click Done first, then System Settings → Privacy & Security → Open Anyway. |
 | macOS says the app is damaged | Download it again. Drag a fresh copy to Applications. |
-| The level meter does not move | The desk is not feeding the interface. Mono already mixes every input. Raise Volume if the voice is quiet. While you are live, the window also says there is no signal after about 5 seconds of silence. |
+| The level meter does not move | The desk is not feeding the interface. Mono already adds every input, including a voice that is only on one side. Raise Volume if the voice is quiet. While you are live, the window also says there is no signal after about 5 seconds of silence, and that line stays until the sound returns. |
 | Your test phone will not open the link | The phone is on a different Wi-Fi. Join the same network as the Mac. Turn mobile data off for the test if the phone keeps leaving that network. |
 | Listeners in the venue cannot connect | They are on the venue Wi-Fi, or that Wi-Fi isolates clients. Move them to your own Wi-Fi. If you must use the venue network, ask for a fixed address for the Mac. |
 | The link used to work and now times out | The Mac’s address changed. Check the reservation, then compare the on-screen link with the poster. Make a new poster if they differ. |

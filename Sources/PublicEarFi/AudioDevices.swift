@@ -94,7 +94,7 @@ enum AudioDeviceList {
     return value
   }
 
-  private static func inputChannelCount(_ deviceID: AudioDeviceID) -> Int {
+  static func inputChannelCount(_ deviceID: AudioDeviceID) -> Int {
     var address = AudioObjectPropertyAddress(
       mSelector: kAudioDevicePropertyStreamConfiguration,
       mScope: kAudioObjectPropertyScopeInput,
