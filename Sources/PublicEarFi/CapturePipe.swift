@@ -84,9 +84,9 @@ final class CapturePipe {
     }
     let prepared: AudioInputBind.Prepared
     switch AudioInputBind.prepare(engine: engine, deviceID: deviceID) {
-    case .success(let value):
+    case .ready(let value):
       prepared = value
-    case .failure(let message):
+    case .failed(let message):
       return message
     }
     let hardware = prepared.format

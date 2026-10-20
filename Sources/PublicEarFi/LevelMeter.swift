@@ -40,9 +40,9 @@ final class LevelMeter {
     guard let deviceID, AudioDeviceList.isAlive(deviceID) else { return }
     let prepared: AudioInputBind.Prepared
     switch AudioInputBind.prepare(engine: engine, deviceID: deviceID) {
-    case .success(let value):
+    case .ready(let value):
       prepared = value
-    case .failure:
+    case .failed:
       return
     }
     let hardware = prepared.format

@@ -15,24 +15,29 @@ enum AudioInputBind {
     var engine: CaptureStreamDescription
   }
 
-  static func prepare(engine: AVAudioEngine, deviceID: AudioDeviceID) -> Result<Prepared, String> {
+  enum Outcome {
+    case ready(Prepared)
+    case failed(String)
+  }
+
+  static func prepare(engine: AVAudioEngine, deviceID: AudioDeviceID) -> Outcome {
     let input = engine.inputNode
     guard let audioUnit = input.audioUnit else {
-      return .failure("The audio engine has no input.")
+      return .failed("The audio engine has no input.")
     }
     guard bind(audioUnit, deviceID: deviceID) else {
-      return .failure("Could not open the selected audio device.")
+      return .failed("Could not open the selected audio device.")
     }
     let format = input.outputFormat(forBus: 0)
     guard currentDevice(audioUnit) == deviceID else {
-      return .failure("The selected audio device did not open. Pick it again in Settings.")
+      return .failed("The selected audio device did not open. Pick it again in Settings.")
     }
     let engineDescription = describe(format)
     let native = nativeStream(deviceID: deviceID) ?? engineDescription
     guard format.sampleRate > 0, format.channelCount > 0 else {
-      return .failure(CaptureFormatPlan.impossibleMessage(deviceName: "", stream: native))
+      return .failed(CaptureFormatPlan.impossibleMessage(deviceName: "", stream: native))
     }
-    return .success(
+    return .ready(
       Prepared(
         audioUnit: audioUnit,
         format: format,
