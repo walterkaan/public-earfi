@@ -11,9 +11,8 @@ The full setup that is available today uses a **Mac as the server**. A **phone a
 - A Mac with macOS 13 Ventura or later (Apple silicon or Intel).
 - Public EarFi, installed in the Applications folder.
 - The sound source: a USB or Thunderbolt audio interface from the sound desk, or the Mac’s built-in microphone for a small room.
-- A way for the phones to reach the Mac. A pocket travel router is the reliable choice. The venue’s Wi-Fi often blocks phones from seeing each other.
-- A short Ethernet cable, so the Mac can plug into that router.
-- Power for the Mac and the router. Closing the laptop lid puts the Mac to sleep.
+- Your own small Wi-Fi network for the phones and the Mac. A portable or travel router is the reliable choice. The venue’s Wi-Fi often blocks phones from seeing each other.
+- Power for the Mac and that router. Closing the laptop lid puts the Mac to sleep.
 
 ## Two ways to run the server
 
@@ -26,41 +25,26 @@ The full setup that is available today uses a **Mac as the server**. A **phone a
 
 ## Bring your own network
 
-Venue Wi-Fi is a common reason the link fails. Guest networks often isolate each phone, so a phone can reach the internet and still be unable to reach the Mac. A separate VLAN does the same thing. You can avoid that by bringing a small network of your own.
+Venue Wi-Fi often blocks this. Guest networks isolate each phone, so a phone can reach the internet and still be unable to reach the Mac. Bring a small network of your own and the venue’s Wi-Fi no longer matters.
 
-### Pocket travel router
+Any portable or travel Wi-Fi router will do. It does not need an internet connection. Public EarFi only needs the phones and the Mac on that same private Wi-Fi.
 
-A pocket travel router (a GL.iNet model is a typical example) creates a private Wi-Fi network that belongs to you. The phones join that network. The Mac joins it too, preferably with an Ethernet cable into the router’s LAN port.
+What to look for when you buy or borrow one:
 
-The router does not need an internet connection. Leave the WAN port empty. Public EarFi never sends the audio to the internet, so a SIM card or a hotel uplink is unnecessary. The router only has to let the phones talk to the Mac.
+- It can handle about 30 devices at once, or more.
+- It can reserve a fixed address for the Mac (sometimes called a DHCP reservation, a static lease, or address binding).
 
-Set this up at home, before the event, and test it with a real phone. On the day you power the same router and the same Mac, and the poster you already printed or emailed still works.
+A phone’s personal hotspot usually stops at about 5 to 10 devices. That is fine for a rehearsal or a handful of listeners. It is too small for about 30 people.
 
-### Phone hotspot, only for a small group
+The useful part is doing this at home, before the event. Set up the router and the Mac, listen on your own phone, and confirm it works. Give the Mac a fixed address on that router so the listener link stays the same next time you power everything on. The QR code contains that address, for example `http://192.168.1.20:8889/live`. When the address stays put, you can print the poster or email the PDF days ahead, including a “join this Wi-Fi” step.
 
-A phone’s personal hotspot usually stops accepting new devices at about 5 to 10 phones. That is enough for a rehearsal or a handful of listeners. It is not enough for about 30 people. Use a travel router when the room is larger than a small group.
-
-### Fixed address, so the QR code can go out early
-
-The listen QR code contains the Mac’s address, for example `http://192.168.8.23:8889/live`. If the router gives the Mac a different address next time, the old QR code points at nothing.
-
-Give the Mac a **DHCP reservation** (also called a fixed IP, a static lease, or an IP binding) on the travel router:
-
-1. Connect the Mac to the router.
-2. Open the router’s admin page. The address, the Wi-Fi name, and the password are usually on a card on the router. On many GL.iNet routers the admin page is `http://192.168.8.1`.
-3. Find the list of connected devices and select the Mac.
-4. Reserve that device so it always receives the same address. Note the address down.
-5. In System Settings → Network on the Mac, confirm the address matches what you reserved.
-
-Then open Public EarFi, copy the listener link, and make the poster. Because the address no longer changes, you can print the poster, or email the PDF, days before the event.
-
-At a venue where you must use their network instead, ask them for the same kind of reservation for the Mac. The app also warns you if the address has changed since the poster was made.
+The app warns you if the Mac’s address has changed since the poster was made. If you have to use the venue’s network instead, ask them for a fixed address for the Mac.
 
 ### Name the Wi-Fi on the poster
 
 Listeners have to join your network before the listen QR will work. In the poster window, fill in **Wi-Fi network name**. The first printed step becomes “Join the Wi-Fi network” followed by that name. The line is hidden when the name is empty, so type the name you want people to see.
 
-**Use current network name** fills in the Wi-Fi the Mac can see. If the Mac is plugged in by Ethernet, type the travel router’s Wi-Fi name yourself.
+**Use current network name** fills in the Wi-Fi the Mac can see. If that button is missing, type the name yourself.
 
 ### Optional: a second QR code that joins the Wi-Fi
 
@@ -76,18 +60,18 @@ Replace `Interpreter` with the Wi-Fi name and `thepassword` with the password. K
 
 ## Set it up at home, then test it
 
-Do this once, on the router you will take to the venue.
+Do this once, on the Wi-Fi you will take to the venue.
 
-1. Power the travel router. Do not connect it to the internet.
-2. Plug the Mac into the router with Ethernet. Reserve the Mac’s address, as above.
+1. Turn on your router. It does not need the internet.
+2. Join the Mac to it, with the Mac’s address reserved so it stays the same.
 3. Install Public EarFi and open it (the next section). Allow the microphone. If the firewall asks, allow incoming connections for mediamtx. That program is what the phones connect to.
 4. Plug in the audio interface, or use the built-in microphone for this test. In Settings, choose the input. Leave quality on **Speech 32k** and the sample rate on **16 kHz**.
 5. Watch the level meter on the main window. Talk, or play the desk. The meter moves before you go live. If it stays empty, the Mac is listening to the wrong input.
-6. Press **Start Broadcasting**. The window should say Live, and it should show a link like `http://192.168.8.23:8889/live`.
-7. On your phone, join the travel router’s Wi-Fi. Forget the house Wi-Fi for this test, or the phone will stay on the house network and the link will fail.
+6. Press **Start Broadcasting**. The window should say Live and show a link like `http://192.168.1.20:8889/live`.
+7. On your phone, join that same Wi-Fi. A phone still on the house network will not open the link.
 8. Scan the QR code, or type the link. Tap play. If you hear nothing, unmute using the listener steps below.
 9. Fill in the poster, including the Wi-Fi name, and export the PDF. Email it to yourself and open it on the phone. The QR code in that PDF should still open the stream.
-10. Stop the broadcast. Power the router off and on, start the Mac again, and confirm the listener link is unchanged. That is the check that the reservation worked.
+10. Stop the broadcast. Power the router off and on, start the Mac again, and confirm the listener link is unchanged.
 
 Take the same router, the same Mac, and that PDF to the event.
 
@@ -174,15 +158,15 @@ Say this in the room, and leave it on the poster:
 - Keep the screen on and the browser in front. Locking the phone, or leaving the browser, may pause the audio.
 - Plug the phone in for a long session.
 
-There is no password on the stream. Anyone on that Wi-Fi who has the link can listen. On your own travel router, the Wi-Fi password is what keeps strangers out.
+There is no password on the stream. Anyone on that Wi-Fi who has the link can listen. The Wi-Fi password is what keeps strangers off your own network.
 
 ## On the day
 
-1. Power the travel router. Leave it off the internet.
-2. Plug the Mac into the router and open Public EarFi. Confirm the listener link matches the poster.
+1. Turn on your own Wi-Fi. It does not need the internet.
+2. Join the Mac to it and open Public EarFi. Confirm the listener link matches the poster.
 3. Connect the sound desk to the interface. Check the level meter.
 4. Press **Start Broadcasting**.
-5. Listen on your own phone once, on the travel-router Wi-Fi, before people arrive.
+5. Listen on your own phone once, on that Wi-Fi, before people arrive.
 6. Put the poster where people can scan it. Remind them about the Wi-Fi name and the unmute step.
 7. The main window shows how many people are listening, and one health line. **View → Show Log** (Command-L) opens the longer log if you need it.
 
@@ -206,7 +190,7 @@ About **30 listeners is about 1 Mbps** of audio. The network also carries a litt
 
 The same 30 people at Standard 64 kbps would be about 1.9 Mbps. That is why Speech stays the default for an interpreter on Wi-Fi.
 
-A travel router’s private Wi-Fi is there to avoid venue isolation. It still has to carry that 1 Mbps, plus overhead, shared among the phones. Thirty listeners is the size this setup is aimed at. A larger room needs a rehearsal on the real router before you promise it.
+Your own Wi-Fi still has to carry that 1 Mbps, plus a little overhead, shared among the phones. Thirty listeners is the size this setup is aimed at. A larger room needs a rehearsal on that same Wi-Fi before you promise it.
 
 ## Troubleshooting
 
@@ -215,11 +199,11 @@ A travel router’s private Wi-Fi is there to avoid venue isolation. It still ha
 | macOS says the app was not opened, or is from an unidentified developer | Use the Open Anyway steps above. On macOS 15, click Done first, then System Settings → Privacy & Security → Open Anyway. |
 | macOS says the app is damaged | Download it again. Drag a fresh copy to Applications. |
 | The level meter does not move | The desk is not feeding that input, or Mono / Input is the wrong channel. Try the other input number. |
-| Your test phone will not open the link | The phone is on a different Wi-Fi. Join the travel router’s network. Turn mobile data off for the test if the phone keeps leaving your network. |
-| Listeners in the venue cannot connect | They are on the venue Wi-Fi, or that Wi-Fi isolates clients. Move them to the travel router. If you must use the venue network, ask for a reservation and confirm isolation is off. |
+| Your test phone will not open the link | The phone is on a different Wi-Fi. Join the same network as the Mac. Turn mobile data off for the test if the phone keeps leaving that network. |
+| Listeners in the venue cannot connect | They are on the venue Wi-Fi, or that Wi-Fi isolates clients. Move them to your own Wi-Fi. If you must use the venue network, ask for a fixed address for the Mac. |
 | The link used to work and now times out | The Mac’s address changed. Check the reservation, then compare the on-screen link with the poster. Make a new poster if they differ. |
 | People connect and hear nothing | Tap play. Tap the speaker/mute icon on the player and in the browser tab. Turn the phone volume up. Keep the screen on. |
-| The sound breaks up | Leave quality on Speech, 16 kHz. Plug the Mac into the router with Ethernet. In Settings, try **TCP only**. |
+| The sound breaks up | Leave quality on Speech, 16 kHz. In Settings, try **TCP only**. |
 | The Mac slept | The lid was closed, or it was on battery and idle. Power is connected, the lid is open, and “Keep Mac awake while broadcasting” is on. |
 | The microphone prompt appears after an update | Expected. Allow it again. See Install and first open. |
 | You quit the app hard and it says a port is busy | Open Public EarFi again. It stops leftover helper programs it started. |
@@ -230,7 +214,7 @@ A travel router’s private Wi-Fi is there to avoid venue isolation. It still ha
 
 A future Public EarFi app on a phone would let that phone be the server: it would take the sound and serve the same kind of browser link and QR code. Listeners would still join the Wi-Fi and listen in the browser, without installing anything.
 
-That app is not available. There is nothing to download, and this manual’s install steps are for the Mac only. Use the Mac as the server, with the travel router and the home test above, for every event until a phone server is actually released.
+That app is not available. There is nothing to download, and this manual’s install steps are for the Mac only. Use the Mac as the server, with your own Wi-Fi and the home test above, for every event until a phone server is actually released.
 
 ## Limits worth knowing
 
