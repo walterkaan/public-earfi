@@ -121,12 +121,14 @@ build_ffmpeg() {
       $(grep -v '^[[:space:]]*#' "$ROOT/scripts/ffmpeg-configure-flags.txt" | tr '\n' ' ')
   make -j"$JOBS"
   cp ffmpeg "$dest"
-  python3 - config.h "$dest" << 'PY'
+  python3 - "$dest" << 'PY'
 import pathlib, sys
-text = pathlib.Path("config.h").read_text()
+text = pathlib.Path("config.h").read_text() + "\n" + pathlib.Path("config_components.h").read_text()
 needed = {
     "CONFIG_GPL": "0",
     "CONFIG_NONFREE": "0",
+    "CONFIG_LIBOPUS": "1",
+    "CONFIG_AVFOUNDATION": "1",
     "CONFIG_LIBOPUS_ENCODER": "1",
     "CONFIG_AVFOUNDATION_INDEV": "1",
     "CONFIG_RTSP_MUXER": "1",
@@ -137,8 +139,8 @@ needed = {
 }
 missing = [f"#define {key} {value}" for key, value in needed.items() if f"#define {key} {value}" not in text]
 if missing:
-    raise SystemExit(sys.argv[1] + " config.h missing " + ", ".join(missing))
-print("config.h matches the LGPL avfoundation + libopus build")
+    raise SystemExit(sys.argv[1] + " is missing " + ", ".join(missing))
+print("ffmpeg config matches the LGPL avfoundation + libopus build")
 PY
   if can_execute "$dest"; then
     "$dest" -version > "$OUT/ffmpeg-$arch-version.txt"
