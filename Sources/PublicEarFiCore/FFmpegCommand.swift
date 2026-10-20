@@ -6,16 +6,13 @@ public enum FFmpegCommand {
   public static let sampleRate = 48_000
   public static let frameDurationMilliseconds = 20
 
-  public static func arguments(deviceName: String, settings: AppSettings) -> [String] {
-    let pan = panFilter(mode: settings.channelMode, inputChannel: settings.inputChannel)
-    // AVFoundation timestamps follow the host and arrive in bursts that are
-    // not 20 ms. A USB interface clocked at 48 kHz still drifts against that
-    // timeline. WebRTC then inserts or drops a frame on a regular period,
-    // which is the click. aresample rebuilds a continuous 48 kHz timeline
-    // (async=1 fill/trim, first packet at PTS 0) before Opus packetizes it.
-    // Wall-clock timestamps are not used as well: they would feed that same
-    // burstiness back into the resampler.
-    return [
+  /// ffmpeg reads raw PCM on stdin. The app captures with Core Audio.
+  /// AVFoundation's ffmpeg device is not used: it stamps audio with the host
+  /// clock in uneven bursts, and WebRTC turns that into a regular click even
+  /// when the USB device itself is a steady 48 kHz (the same device is clean
+  /// in other apps).
+  public static func arguments(settings: AppSettings) -> [String] {
+    [
       "-hide_banner",
       "-nostdin",
       "-loglevel",
@@ -23,15 +20,13 @@ public enum FFmpegCommand {
       "-thread_queue_size",
       "1024",
       "-f",
-      "avfoundation",
-      "-i",
-      ":\(deviceName)",
-      "-af",
-      "\(pan),aresample=\(sampleRate):async=1:first_pts=0",
+      "f32le",
       "-ar",
       String(sampleRate),
       "-ac",
       String(settings.opusChannelCount),
+      "-i",
+      "pipe:0",
       "-c:a",
       "libopus",
       "-b:a",
@@ -51,14 +46,20 @@ public enum FFmpegCommand {
       "rtsp://127.0.0.1:8554/\(settings.streamName)",
     ]
   }
+}
 
-  public static func panFilter(mode: ChannelMode, inputChannel: Int) -> String {
-    let index = max(0, inputChannel - 1)
+public enum CaptureChannelMap {
+  /// Zero-based device channels to copy into the pipe.
+  /// Mono keeps the desk input chosen in Settings. Stereo takes that
+  /// channel and the next one.
+  public static func indices(mode: ChannelMode, inputChannel: Int, inputCount: Int) -> [Int] {
+    let count = max(1, inputCount)
+    let first = min(max(0, inputChannel - 1), count - 1)
     switch mode {
     case .mono:
-      return "pan=mono|c0=c\(index)"
+      return [first]
     case .stereo:
-      return "pan=stereo|c0=c\(index)|c1=c\(index + 1)"
+      return [first, min(first + 1, count - 1)]
     }
   }
 }

@@ -114,7 +114,7 @@ Open **Public EarFi → Settings…** (Command-,). Settings is in the app menu, 
 
 ## Leave the quality on Speech
 
-**Speech 32k** is the default, and it is the right preset for a live interpreter. It is mono and 32 kbps. Choosing Speech sets those. The app always sends 48 kHz audio in small 20 ms pieces. There is no sample-rate menu, and you do not change the rate in Audio MIDI Setup.
+**Speech 32k** is the default, and it is the right preset for a live interpreter. It is mono and 32 kbps. Choosing Speech sets those. The app always sends 48 kHz audio in small 20 ms pieces. There is no sample-rate menu, and you do not change the rate in Audio MIDI Setup. The app listens to the device you picked; a device that already sounds right in other programs is the one to select.
 
 That uses the least Wi-Fi. Standard and Music use more for the same number of listeners.
 

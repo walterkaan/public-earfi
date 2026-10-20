@@ -219,21 +219,20 @@ final class MediaMTXConfigTests: XCTestCase {
 }
 
 final class FFmpegCommandTests: XCTestCase {
-  func testDefaultCommandSelectsTheDeviceByName() {
-    let arguments = FFmpegCommand.arguments(deviceName: "Scarlett 2i2 USB", settings: .defaults)
+  func testDefaultCommandReadsRawPCMFromStdin() {
+    let arguments = FFmpegCommand.arguments(settings: .defaults)
     XCTAssertEqual(
       arguments,
       [
         "-hide_banner", "-nostdin", "-loglevel", "warning",
         "-thread_queue_size", "1024",
-        "-f", "avfoundation", "-i", ":Scarlett 2i2 USB",
-        "-af", "pan=mono|c0=c0,aresample=48000:async=1:first_pts=0",
-        "-ar", "48000", "-ac", "1",
+        "-f", "f32le", "-ar", "48000", "-ac", "1", "-i", "pipe:0",
         "-c:a", "libopus", "-b:a", "32k", "-application", "voip", "-frame_duration", "20",
         "-muxdelay", "0", "-muxpreload", "0",
         "-f", "rtsp", "-rtsp_transport", "tcp", "rtsp://127.0.0.1:8554/live",
       ]
     )
+    XCTAssertFalse(arguments.contains("avfoundation"))
   }
 
   func testChannelMapAndSpeechPreset() {
@@ -243,21 +242,24 @@ final class FFmpegCommandTests: XCTestCase {
     settings.applyPreset(.speech)
     settings.inputChannel = 2
     settings.streamName = "talk"
-    let arguments = FFmpegCommand.arguments(deviceName: "USB Audio", settings: settings)
-    XCTAssertTrue(arguments.contains("pan=mono|c0=c1,aresample=48000:async=1:first_pts=0"))
+    let arguments = FFmpegCommand.arguments(settings: settings)
+    XCTAssertTrue(arguments.contains("pipe:0"))
     XCTAssertTrue(arguments.contains("32k"))
     XCTAssertTrue(arguments.contains("voip"))
     XCTAssertTrue(arguments.contains("48000"))
     XCTAssertTrue(arguments.contains("rtsp://127.0.0.1:8554/talk"))
+    XCTAssertEqual(CaptureChannelMap.indices(mode: .mono, inputChannel: 2, inputCount: 4), [1])
 
     settings.channelMode = .stereo
     settings.inputChannel = 3
     settings.quality = .music
-    let stereo = FFmpegCommand.arguments(deviceName: "USB Audio", settings: settings)
-    XCTAssertTrue(stereo.contains("pan=stereo|c0=c2|c1=c3,aresample=48000:async=1:first_pts=0"))
-    XCTAssertTrue(stereo.contains("128k"))
-    XCTAssertTrue(stereo.contains("-ac"))
+    let stereo = FFmpegCommand.arguments(settings: settings)
     XCTAssertEqual(stereo[stereo.firstIndex(of: "-ac")! + 1], "2")
+    XCTAssertTrue(stereo.contains("128k"))
+    XCTAssertEqual(
+      CaptureChannelMap.indices(mode: .stereo, inputChannel: 3, inputCount: 8), [2, 3])
+    XCTAssertEqual(
+      CaptureChannelMap.indices(mode: .stereo, inputChannel: 3, inputCount: 1), [0, 0])
   }
 }
 

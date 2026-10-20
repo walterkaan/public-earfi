@@ -105,8 +105,8 @@ if [[ "$api_up" != 1 ]]; then
   exit 1
 fi
 
-# Publish realtime 48 kHz f32le (what AVFoundation emits from a 48 kHz
-# interface) as the Speech preset: mono Opus, 32 kbps, 20 ms frames.
+# Publish realtime 48 kHz f32le, the PCM the app writes from Core Audio,
+# as the Speech preset: mono Opus, 32 kbps, 20 ms frames.
 # The writer emits one 20 ms chunk per 20 ms, which is the realtime pace.
 rm -f "$WORK/pcm.pipe"
 mkfifo "$WORK/pcm.pipe"
@@ -135,11 +135,9 @@ while True:
 ' > "$WORK/pcm.pipe" &
 PYPID=$!
 
-"$FFMPEG" -hide_banner -loglevel warning \
+"$FFMPEG" -hide_banner -nostdin -loglevel warning \
   -thread_queue_size 1024 \
   -f f32le -ar 48000 -ac 1 -i pipe:0 \
-  -af "pan=mono|c0=c0,aresample=48000:async=1:first_pts=0" \
-  -ar 48000 -ac 1 \
   -c:a libopus -b:a 32k -application voip -frame_duration 20 \
   -muxdelay 0 -muxpreload 0 \
   -f rtsp -rtsp_transport tcp \

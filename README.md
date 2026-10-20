@@ -11,11 +11,11 @@ Public EarFi is free and open source (MIT). Copyright (c) 2026 Walter Kaan. It i
 ## How it works
 
 ```
-Sound desk → USB interface → ffmpeg (avfoundation, Opus)
-          → RTSP → MediaMTX → WebRTC → phone browsers
+Sound desk → USB interface → Public EarFi (Core Audio, 48 kHz)
+          → ffmpeg (Opus) → RTSP → MediaMTX → WebRTC → phone browsers
 ```
 
-Listeners open `http://<mac-ip>:8889/live`. The default is the Speech preset: Opus, mono, 32 kbps, always at 48 kHz. About 30 listeners are under 1 Mbps of audio (30 × 32 kbps = 0.96 Mbps), which is what a crowded venue access point can carry. There is no sample-rate control.
+Listeners open `http://<mac-ip>:8889/live`. The default is the Speech preset: Opus, mono, 32 kbps, always at 48 kHz. About 30 listeners are under 1 Mbps of audio (30 × 32 kbps = 0.96 Mbps), which is what a crowded venue access point can carry. There is no sample-rate control. The app captures the chosen device itself and passes raw audio to the encoder.
 
 The app bundles MediaMTX and an LGPL build of FFmpeg with libopus. You do not need Homebrew or Terminal to run it.
 
@@ -90,7 +90,7 @@ Closing the laptop lid still sleeps the Mac unless it is on power with an extern
 | No sound on a phone | Tap play. Tap the speaker/mute icon on the player or the browser tab. Turn the phone volume up. Keep the screen on. |
 | The meter shows no signal | Confirm the desk is feeding the interface, and that Mono/Input matches the channel the desk uses. |
 | Listeners cannot open the link | Same network, no client isolation, firewall allows mediamtx, and the poster matches the current address. |
-| Dropouts or a regular click | Leave quality on Speech. Wired Mac, and TCP only mode. The app always sends 48 kHz in 20 ms frames and smooths the capture clock. There is no sample-rate setting to change. |
+| Dropouts or a regular click | Leave quality on Speech. Wired Mac, and TCP only mode. The app captures the selected device and always sends 48 kHz in 20 ms frames. There is no sample-rate setting to change. |
 | Microphone prompt on every update | Expected for ad-hoc builds. See the first-open section. |
 | "Public EarFi is damaged" | Re-download. Do not run a half-copied app. |
 | The app was quit hard and the port is busy | Open it again. It stops stale mediamtx and ffmpeg processes it started. |

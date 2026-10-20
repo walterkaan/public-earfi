@@ -30,7 +30,7 @@ enum AudioDeviceList {
   }
 
   /// Changes the hardware clock. Broadcasting must not call this.
-  /// The app always encodes 48 kHz and smooths timestamps in ffmpeg.
+  /// The app captures at the device's own rate and converts to 48 kHz.
   static func setNominalSampleRate(deviceID: AudioDeviceID, rate: Double) -> Bool {
     var address = AudioObjectPropertyAddress(
       mSelector: kAudioDevicePropertyNominalSampleRate,

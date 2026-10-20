@@ -1,3 +1,4 @@
+import CoreAudio
 import Foundation
 import PublicEarFiCore
 
@@ -12,6 +13,7 @@ enum BroadcastPhase: Equatable {
 struct BroadcastLaunch {
   var settings: AppSettings
   var deviceName: String?
+  var deviceID: AudioDeviceID?
   var devicePresent: Bool
   var advertisedHost: String?
   var helpers: HelperLocations
@@ -44,6 +46,8 @@ final class BroadcastController {
   private var ffmpegPartial = ""
   private var ffmpegLog: FileHandle?
   private var ffmpegAttemptClosed = false
+  private let capture = CapturePipe()
+  private var ffmpegInput: Pipe?
 
   init(logger: FileLogger) {
     self.logger = logger
@@ -74,21 +78,24 @@ final class BroadcastController {
     }
   }
 
-  func deviceChanged(name: String?, present: Bool) {
+  func deviceChanged(name: String?, deviceID: AudioDeviceID?, present: Bool) {
     queue.async {
       guard var launch = self.launch else { return }
+      let changed = launch.deviceID != deviceID || launch.devicePresent != present
       launch.deviceName = name
+      launch.deviceID = deviceID
       launch.devicePresent = present
       self.launch = launch
       guard self.desired, !self.stopping else { return }
       if !present {
+        self.stopCapture()
         self.stopProcess(self.ffmpeg)
         self.ffmpeg = nil
         self.stall.reset()
         let label = name?.isEmpty == false ? name! : "audio interface"
         self.publish(.waitingForDevice(label))
         self.publishHealth(HealthText.waiting(deviceName: label))
-      } else if self.ffmpeg?.isRunning != true {
+      } else if changed || self.ffmpeg?.isRunning != true {
         self.startFFmpeg()
       }
     }
@@ -162,26 +169,49 @@ final class BroadcastController {
       logger.log("audio", warning)
       publishLog("audio", warning)
     }
+    stopCapture()
     stopProcess(ffmpeg)
     ffmpeg = nil
     ffmpegAttemptClosed = false
     resetFFmpegErrors()
+    guard let deviceID = launch.deviceID else {
+      noteFailure(component: "audio", detail: "No input device is available.")
+      return
+    }
+    let pipe = Pipe()
+    ffmpegInput = pipe
     let process = Process()
     process.executableURL = launch.helpers.ffmpeg
-    process.arguments = FFmpegCommand.arguments(deviceName: name, settings: launch.settings)
+    process.arguments = FFmpegCommand.arguments(settings: launch.settings)
     attach(process, source: "ffmpeg")
+    process.standardInput = pipe
     do {
       try process.run()
     } catch {
       noteFailure(component: "ffmpeg", detail: "ffmpeg failed to launch")
       return
     }
+    if let problem = capture.start(
+      deviceID: deviceID,
+      channelMode: launch.settings.channelMode,
+      inputChannel: launch.settings.inputChannel,
+      output: pipe.fileHandleForWriting
+    ) {
+      stopCapture()
+      abandon(process)
+      noteFailure(component: "audio", detail: problem)
+      return
+    }
     ffmpeg = process
     writePIDs()
-    logger.log("ffmpeg", "started pid \(process.processIdentifier)")
+    logger.log(
+      "ffmpeg",
+      "started pid \(process.processIdentifier), Core Audio \(name) at 48 kHz"
+    )
     guard waitUntilReady(stream: launch.settings.streamName) else {
       let stillRunning = process.isRunning
       let status = process.terminationStatus
+      stopCapture()
       abandon(process)
       ffmpeg = nil
       let detail =
@@ -292,6 +322,7 @@ final class BroadcastController {
     }
     if process.processIdentifier == ffmpeg?.processIdentifier {
       ffmpeg = nil
+      stopCapture()
       drainFFmpegLog()
     }
     guard desired, !stopping else { return }
@@ -479,7 +510,13 @@ final class BroadcastController {
     }
   }
 
+  private func stopCapture() {
+    capture.stop()
+    ffmpegInput = nil
+  }
+
   private func stopChildren() {
+    stopCapture()
     stopProcess(ffmpeg)
     ffmpeg = nil
     stopProcess(mediamtx)

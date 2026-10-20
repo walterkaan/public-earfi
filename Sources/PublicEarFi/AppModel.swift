@@ -254,7 +254,8 @@ final class AppModel: ObservableObject {
     restartMeter()
     if isBroadcasting {
       let device = devices.first { $0.id == uid }
-      controller.deviceChanged(name: device?.name, present: device != nil)
+      controller.deviceChanged(
+        name: device?.name, deviceID: device?.deviceID, present: device != nil)
     }
   }
 
@@ -381,14 +382,15 @@ final class AppModel: ObservableObject {
       BroadcastLaunch(
         settings: snapshot,
         deviceName: device?.name,
+        deviceID: device?.deviceID,
         devicePresent: device != nil,
         advertisedHost: host,
         helpers: helpers,
         home: FileManager.default.homeDirectoryForCurrentUser,
         prepareAudio: {
-          // Do not change the interface clock. The encode rate is always
-          // 48 kHz. aresample=async=1:first_pts=0 turns AVFoundation's
-          // uneven timestamps into a continuous 20 ms Opus timeline.
+          // The app opens this device with Core Audio and writes 48 kHz
+          // PCM to ffmpeg. Do not change the interface clock, and do not
+          // capture with ffmpeg's avfoundation device.
           guard device != nil else { return "No input device is available." }
           return nil
         }
@@ -444,10 +446,13 @@ final class AppModel: ObservableObject {
     }
     if isBroadcasting {
       if settings.inputDeviceUID == nil {
-        controller.deviceChanged(name: selectedDevice?.name, present: selectedDevice != nil)
+        controller.deviceChanged(
+          name: selectedDevice?.name, deviceID: selectedDevice?.deviceID,
+          present: selectedDevice != nil)
       } else {
         controller.deviceChanged(
-          name: remembered?.name ?? lastDeviceName, present: remembered != nil)
+          name: remembered?.name ?? lastDeviceName, deviceID: remembered?.deviceID,
+          present: remembered != nil)
       }
     }
     if startMeter {
