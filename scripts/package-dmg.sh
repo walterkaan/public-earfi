@@ -21,12 +21,26 @@ cp "$ROOT/docs/MANUAL.md" "$STAGE/User Manual.md"
 
 python3 "$ROOT/scripts/make_dmg_background.py" "$STAGE/.background/background.png"
 
-hdiutil create \
+# GitHub's macOS runners sometimes return "Resource busy" from hdiutil
+# while another image is still attached. A short retry clears it.
+attempt=1
+until hdiutil create \
   -volname "Public EarFi" \
   -srcfolder "$STAGE" \
   -ov \
   -format UDZO \
   "$DMG"
+do
+  if [[ "$attempt" -ge 5 ]]; then
+    echo "hdiutil could not create the disk image" >&2
+    exit 1
+  fi
+  echo "hdiutil was busy (attempt ${attempt}). Retrying."
+  hdiutil detach "/Volumes/Public EarFi" -force >/dev/null 2>&1 || true
+  rm -f "$DMG"
+  sleep $((attempt * 5))
+  attempt=$((attempt + 1))
+done
 
 (
   cd "$ROOT/dist"
