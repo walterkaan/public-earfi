@@ -66,7 +66,7 @@ struct PosterPage: View {
 @MainActor
 enum PosterActions {
   @MainActor
-  static func exportPDF(model: PosterRenderModel, remember: () -> Void) {
+  static func exportPDF(model: PosterRenderModel, remember: @escaping () -> Void) {
     let page = PosterPage(model: model)
     let panel = NSSavePanel()
     panel.allowedContentTypes = [.pdf]
