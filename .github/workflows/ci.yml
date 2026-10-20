@@ -25,14 +25,20 @@ jobs:
       - name: Unit tests
         run: swift test
 
-      - name: Cache bundled helpers
-        uses: actions/cache@v4
+      - name: Restore bundled helpers
+        uses: actions/cache/restore@v4
         with:
           path: build/helpers
           key: helpers-v1-${{ hashFiles('scripts/versions.env', 'scripts/ffmpeg-configure-flags.txt', 'scripts/build-helpers.sh') }}
 
       - name: Build MediaMTX and LGPL ffmpeg
         run: ./scripts/build-helpers.sh
+
+      - name: Save bundled helpers
+        uses: actions/cache/save@v4
+        with:
+          path: build/helpers
+          key: helpers-v1-${{ hashFiles('scripts/versions.env', 'scripts/ffmpeg-configure-flags.txt', 'scripts/build-helpers.sh') }}
 
       - name: Check MediaMTX accepts the generated config
         run: MEDIAMTX_BIN="$PWD/build/helpers/mediamtx" swift test --filter MediaMTXConfigTests/testRealMediaMTXAcceptsGeneratedConfig

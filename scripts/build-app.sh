@@ -33,13 +33,6 @@ chmod +x "$APP/Contents/Helpers/ffmpeg" "$APP/Contents/Helpers/mediamtx"
 mkdir -p "$APP/Contents/Resources/Licenses"
 cp -R "$ROOT/Sources/PublicEarFi/Resources/Licenses/." "$APP/Contents/Resources/Licenses/"
 
-# SwiftPM also emits a resource bundle. Keep it next to the executable so Bundle.module resolves.
-for bundle in "$ROOT/build/swift-arm64/release"/*.bundle; do
-  if [[ -d "$bundle" ]]; then
-    cp -R "$bundle" "$APP/Contents/MacOS/"
-  fi
-done
-
 mkdir -p "$ROOT/build"
 if python3 "$ROOT/scripts/make_icon.py" "$ROOT/build/AppIcon.icns"; then
   cp "$ROOT/build/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"

@@ -33,10 +33,6 @@ enum HelperLocator {
 enum BundledResources {
   static func licensesDirectory() -> URL? {
     var candidates: [URL] = []
-    if let resources = Bundle.module.resourceURL {
-      candidates.append(resources.appendingPathComponent("Licenses"))
-      candidates.append(resources.appendingPathComponent("Resources/Licenses"))
-    }
     if let resources = Bundle.main.resourceURL {
       candidates.append(resources.appendingPathComponent("Licenses"))
       candidates.append(resources.appendingPathComponent("Resources/Licenses"))
@@ -45,6 +41,14 @@ enum BundledResources {
     if let executable = Bundle.main.executableURL?.deletingLastPathComponent() {
       candidates.append(
         executable.appendingPathComponent("../Resources/Licenses").standardizedFileURL)
+      let siblings =
+        (try? FileManager.default.contentsOfDirectory(
+          at: executable, includingPropertiesForKeys: nil)) ?? []
+      for bundle in siblings where bundle.pathExtension == "bundle" {
+        candidates.append(bundle.appendingPathComponent("Licenses"))
+        candidates.append(bundle.appendingPathComponent("Resources/Licenses"))
+        candidates.append(bundle.appendingPathComponent("Contents/Resources/Licenses"))
+      }
     }
     return candidates.first {
       FileManager.default.fileExists(atPath: $0.appendingPathComponent("credits.json").path)
