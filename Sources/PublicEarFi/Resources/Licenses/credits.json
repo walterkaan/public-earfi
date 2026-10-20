@@ -1,0 +1,55 @@
+{
+  "components": [
+    {
+      "id": "public-earfi",
+      "name": "Public EarFi",
+      "version": "1.0.0",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 Walter Kaan",
+      "url": "https://github.com/walterkaan/public-earfi",
+      "licenseFile": "PublicEarFi-LICENSE",
+      "notes": "App code."
+    },
+    {
+      "id": "mediamtx",
+      "name": "MediaMTX",
+      "version": "1.21.2",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2019 aler9",
+      "url": "https://github.com/bluenviron/mediamtx",
+      "licenseFile": "MediaMTX-LICENSE",
+      "notes": "Unmodified release binary."
+    },
+    {
+      "id": "ffmpeg",
+      "name": "FFmpeg",
+      "version": "9.0.2",
+      "license": "LGPL-2.1-or-later",
+      "copyright": "The FFmpeg developers",
+      "url": "https://ffmpeg.org",
+      "licenseFile": "FFmpeg-COPYING.LGPLv2.1",
+      "notes": "This software uses code of FFmpeg (ffmpeg.org) licensed under the LGPL v2.1 or later. It is built without GPL or non-free components. Its exact source code and build script are available at https://github.com/walterkaan/public-earfi/releases (assets ffmpeg-9.0.2-source.tar.xz and scripts/build-helpers.sh, also in the repository). FFmpeg 9.0.2. libopus 1.6.1 is statically linked.",
+      "configureFlags": "--disable-shared --enable-static --disable-gpl --disable-nonfree --disable-everything --disable-autodetect --disable-doc --disable-debug --disable-ffplay --disable-ffprobe --disable-x86asm --enable-avfoundation --enable-indev=avfoundation --enable-filter=aresample,pan,astats --enable-encoder=libopus --enable-muxer=rtsp --enable-libopus --enable-small --pkg-config-flags=--static"
+    },
+    {
+      "id": "libopus",
+      "name": "libopus",
+      "version": "1.6.1",
+      "license": "BSD-3-Clause",
+      "copyright": "Copyright 2001-2023 Xiph.Org, Skype Limited, Octasic,\n                    Jean-Marc Valin, Timothy B. Terriberry,\n                    CSIRO, Gregory Maxwell, Mark Borgerding,\n                    Erik de Castro Lopo, Mozilla, Amazon",
+      "url": "https://opus-codec.org",
+      "licenseFile": "opus-COPYING",
+      "notes": "Statically linked into the FFmpeg executable. Copyright notice copied from the opus 1.6.1 COPYING file."
+    },
+    {
+      "id": "qr",
+      "name": "QR codes",
+      "version": "",
+      "license": "Apple",
+      "copyright": "Apple CoreImage (CIQRCodeGenerator)",
+      "url": "",
+      "licenseFile": "",
+      "notes": "System framework, no third-party licence. CoreImage CIQRCodeGenerator."
+    }
+  ]
+}

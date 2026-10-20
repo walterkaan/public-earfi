@@ -1,0 +1,30 @@
+Public EarFi — first open
+
+Drag Public EarFi to the Applications folder. Do not run it from this disk
+or from Downloads. macOS quarantines apps that are opened from there.
+
+Then open Public EarFi from Applications.
+
+macOS 15 Sequoia and later
+1. A dialog says "Public EarFi" Not Opened — Apple could not verify it.
+   Click Done. Do not click Move to Trash.
+2. Open System Settings → Privacy & Security.
+3. Scroll to Security, find "Public EarFi was blocked", and click Open Anyway.
+4. Confirm with your password or Touch ID, then click Open.
+Right-click → Open does not bypass this on macOS 15 or later.
+
+macOS 13 and 14
+Control-click (right-click) Public EarFi → Open → Open.
+Or use the Open Anyway button in System Settings → Privacy & Security.
+
+Then allow the microphone. If the firewall is on, allow incoming connections
+for mediamtx. That program is the listener server.
+
+After every update, repeat these steps. Each download is quarantined again.
+
+If macOS says the app "is damaged", the download or the signature is broken.
+Download it again. If it still fails, report it as a bug and include
+Copy diagnostics from the Running tab.
+
+Advanced alternative:
+  xattr -dr com.apple.quarantine "/Applications/Public EarFi.app"
