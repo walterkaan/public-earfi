@@ -17,6 +17,7 @@ mkdir -p "$STAGE/.background"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 cp "$ROOT/docs/FIRST-OPEN.txt" "$STAGE/Read Me First.txt"
+cp "$ROOT/docs/MANUAL.md" "$STAGE/User Manual.md"
 
 python3 "$ROOT/scripts/make_dmg_background.py" "$STAGE/.background/background.png"
 

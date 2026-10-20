@@ -4,6 +4,8 @@ Stream live audio from a Mac to phone browsers on the same Wi-Fi. The main use i
 
 Public EarFi is free and open source (MIT). Copyright (c) 2026 Walter Kaan. It is local only: the audio does not go to the internet.
 
+**Event organisers:** the user manual is [docs/MANUAL.md](docs/MANUAL.md). It covers install and first open, the Speech preset, the poster, listener unmute tips, bandwidth for about 30 phones, and bringing a travel router so venue Wi-Fi isolation does not matter.
+
 ![Running window, Settings, Poster, and Credits](docs/mockup.png)
 
 ## How it works
