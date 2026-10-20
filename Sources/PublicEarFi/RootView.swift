@@ -3,48 +3,26 @@ import SwiftUI
 
 struct RootView: View {
   @EnvironmentObject private var model: AppModel
-  @State private var tab = 0
 
   var body: some View {
-    VStack(spacing: 0) {
-      Picker("Tab", selection: $tab) {
-        Text("Running").tag(0)
-        Text("Settings").tag(1)
-        Text("Poster").tag(2)
-      }
-      .pickerStyle(.segmented)
-      .frame(maxWidth: 360)
-      .padding(.top, 8)
-      .padding(.bottom, 10)
-      Group {
-        switch tab {
-        case 1:
-          SettingsTab()
-        case 2:
-          PosterTab()
-        default:
-          RunningTab()
-        }
-      }
+    RunningTab()
+      .padding(.horizontal, 16)
+      .padding(.top, 12)
+      .padding(.bottom, 12)
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-    .padding(.horizontal, 16)
-    .padding(.bottom, 12)
-    .background(Color(nsColor: .windowBackgroundColor))
-    .onAppear { model.onAppear() }
-    .sheet(isPresented: $model.showCredits) { CreditsSheet() }
-    .sheet(isPresented: $model.showLog) { LogSheet() }
-    .sheet(isPresented: $model.showFirstRun) { FirstRunSheet() }
-    .sheet(isPresented: $model.showWhy) { WhySheet() }
-    .sheet(isPresented: $model.showQR) { QRSheet() }
-    .alert("Allow incoming connections?", isPresented: $model.showFirewall) {
-      Button("Continue") { model.confirmFirewallAndStart() }
-      Button("Cancel", role: .cancel) {}
-    } message: {
-      Text(
-        "If the macOS firewall is on, it will ask to allow incoming connections for mediamtx. That is the listener server. Choose Allow. If phones cannot connect later, check System Settings → Network → Firewall."
-      )
-    }
+      .background(Color(nsColor: .windowBackgroundColor))
+      .onAppear { model.onAppear() }
+      .sheet(isPresented: $model.showFirstRun) { FirstRunSheet() }
+      .sheet(isPresented: $model.showWhy) { WhySheet() }
+      .sheet(isPresented: $model.showQR) { QRSheet() }
+      .alert("Allow incoming connections?", isPresented: $model.showFirewall) {
+        Button("Continue") { model.confirmFirewallAndStart() }
+        Button("Cancel", role: .cancel) {}
+      } message: {
+        Text(
+          "If the macOS firewall is on, it will ask to allow incoming connections for mediamtx. That is the listener server. Choose Allow. If phones cannot connect later, check System Settings → Network → Firewall."
+        )
+      }
   }
 }
 
@@ -174,17 +152,15 @@ struct RunningTab: View {
 
       Card {
         SectionLabel(text: "Health")
-        Text(model.health)
+        Text(model.healthLine)
           .font(.system(.caption, design: .monospaced))
-          .fixedSize(horizontal: false, vertical: true)
+          .lineLimit(1)
+          .truncationMode(.tail)
           .padding(6)
           .frame(maxWidth: .infinity, alignment: .leading)
           .background(Color.yellow.opacity(0.18))
           .clipShape(RoundedRectangle(cornerRadius: 5))
-        HStack {
-          Button("Show full log…") { model.showLog = true }
-          Button("Copy diagnostics") { model.copyDiagnostics() }
-        }
+        Button("Copy diagnostics") { model.copyDiagnostics() }
       }
       if model.hasPendingChanges {
         WarningBanner(
@@ -453,6 +429,9 @@ struct SettingsTab: View {
       }
       .padding(.bottom, 8)
     }
+    .padding(16)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .sheet(isPresented: $model.showCredits) { CreditsSheet() }
     .confirmationDialog(
       "Reset every setting, including the poster text?", isPresented: $confirmReset
     ) {

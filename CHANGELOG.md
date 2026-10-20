@@ -4,7 +4,8 @@
 
 First MVP build of Public EarFi.
 
-- SwiftUI app with Running, Settings, and Poster tabs, plus the Credits sheet.
+- SwiftUI app. The main window is the broadcast. Settings opens with Cmd-, from the app menu. The poster and the log are their own windows. Credits stays in Settings and About.
+- App icon: Walter's yellow loudhailer on purple, masked to a squircle with transparent corners.
 - Bundled MediaMTX 1.21.2 and an LGPL FFmpeg 9.0.2 with libopus 1.6.1, built from pinned source.
 - Generated `mediamtx.yml`, device selection by name, defaults from the spec, and Reset.
 - Start/stop supervision, auto-restart, stall detection, LAN address selection, and file logging.

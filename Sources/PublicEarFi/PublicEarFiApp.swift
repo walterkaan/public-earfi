@@ -14,11 +14,69 @@ struct PublicEarFiApp: App {
     }
     .defaultSize(width: 880, height: 720)
     .commands {
-      CommandGroup(replacing: .appInfo) {
-        Button("About Public EarFi") {
-          model.showAboutPanel()
-        }
+      AppMenus(model: model)
+    }
+
+    Settings {
+      SettingsTab()
+        .environmentObject(model)
+    }
+
+    Window("Poster", id: "poster") {
+      PosterTab()
+        .environmentObject(model)
+        .frame(minWidth: 860, minHeight: 640)
+    }
+    .defaultSize(width: 980, height: 720)
+
+    Window("Log", id: "log") {
+      LogWindow()
+        .environmentObject(model)
+        .frame(minWidth: 520, minHeight: 320)
+    }
+    .defaultSize(width: 720, height: 480)
+  }
+}
+
+struct AppMenus: Commands {
+  @ObservedObject var model: AppModel
+  @Environment(\.openWindow) private var openWindow
+
+  var body: some Commands {
+    CommandGroup(replacing: .appInfo) {
+      Button("About Public EarFi") {
+        model.showAboutPanel()
       }
+    }
+    // Settings is the scene below the app name (Cmd-,). It is not in File.
+    CommandGroup(replacing: .newItem) {}
+    CommandGroup(replacing: .printItem) {
+      Button("Print Poster…") {
+        openWindow(id: "poster")
+      }
+      .keyboardShortcut("p", modifiers: [.command])
+    }
+    CommandGroup(replacing: .importExport) {
+      Button("Export Poster PDF…") {
+        model.exportPosterPDF()
+      }
+      .keyboardShortcut("e", modifiers: [.command, .shift])
+    }
+    CommandGroup(after: .pasteboard) {
+      Button("Copy Listener Link") {
+        model.copyLink()
+      }
+      .disabled(model.listenerURL == nil)
+      Button("Copy QR Image") {
+        model.copyQRImage()
+      }
+      .disabled(model.listenerURL == nil)
+    }
+    CommandGroup(after: .toolbar) {
+      Button("Show Log") {
+        openWindow(id: "log")
+      }
+      .keyboardShortcut("l", modifiers: [.command])
     }
   }
 }

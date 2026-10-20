@@ -1,6 +1,36 @@
 import PublicEarFiCore
 import SwiftUI
 
+enum PosterDocument {
+  @MainActor
+  static func renderModel(from model: AppModel, highResolutionQR: Bool) -> PosterRenderModel {
+    let paper = model.settings.resolvedPaperSize(
+      regionCode: Locale.current.region?.identifier,
+      measurementSystemIsUS: Locale.current.measurementSystem == .us
+    )
+    var page = PosterRenderModel(
+      header: model.settings.posterHeader,
+      description: model.settings.posterDescription,
+      steps: PosterBuilder.steps(
+        instructions: model.settings.posterInstructions,
+        show: model.settings.posterShowInstructions,
+        networkName: model.settings.posterNetworkName
+      ),
+      url: model.listenerURL
+        ?? "http://<this-mac>:\(model.settings.listenerPort)/\(model.settings.streamName)",
+      qr: model.qrImage,
+      showFooter: model.settings.posterUseFooter,
+      paper: model.settings.posterPaperSize ?? paper
+    )
+    if highResolutionQR, let url = model.listenerURL,
+      let image = QRCodeMaker.image(text: url, side: 2048)
+    {
+      page.qr = image
+    }
+    return page
+  }
+}
+
 struct PosterTab: View {
   @EnvironmentObject private var model: AppModel
 
@@ -57,7 +87,7 @@ struct PosterTab: View {
           HStack {
             Button("Export PDF…") { export() }
             Button("Print…") { printPoster() }
-            Button("Copy QR image") { copyQR() }
+            Button("Copy QR image") { model.copyQRImage() }
           }
         }
       }
@@ -72,27 +102,13 @@ struct PosterTab: View {
           .foregroundStyle(.secondary)
       }
     }
+    .padding(12)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .sheet(isPresented: $model.showWhy) { WhySheet() }
   }
 
   private var renderModel: PosterRenderModel {
-    let paper = model.settings.resolvedPaperSize(
-      regionCode: Locale.current.region?.identifier,
-      measurementSystemIsUS: Locale.current.measurementSystem == .us
-    )
-    return PosterRenderModel(
-      header: model.settings.posterHeader,
-      description: model.settings.posterDescription,
-      steps: PosterBuilder.steps(
-        instructions: model.settings.posterInstructions,
-        show: model.settings.posterShowInstructions,
-        networkName: model.settings.posterNetworkName
-      ),
-      url: model.listenerURL
-        ?? "http://<this-mac>:\(model.settings.listenerPort)/\(model.settings.streamName)",
-      qr: model.qrImage,
-      showFooter: model.settings.posterUseFooter,
-      paper: model.settings.posterPaperSize ?? paper
-    )
+    PosterDocument.renderModel(from: model, highResolutionQR: false)
   }
 
   private var preview: some View {
@@ -123,16 +139,7 @@ struct PosterTab: View {
   }
 
   private var printModel: PosterRenderModel {
-    var page = renderModel
-    if let url = model.listenerURL, let image = QRCodeMaker.image(text: url, side: 2048) {
-      page.qr = image
-    }
-    return page
-  }
-
-  private func copyQR() {
-    guard let url = model.listenerURL, let data = QRCodeMaker.pngData(text: url) else { return }
-    Clipboard.copyPNG(data)
+    PosterDocument.renderModel(from: model, highResolutionQR: true)
   }
 
   private var headerBinding: Binding<String> {
@@ -259,9 +266,8 @@ struct CreditsSheet: View {
   }
 }
 
-struct LogSheet: View {
+struct LogWindow: View {
   @EnvironmentObject private var model: AppModel
-  @Environment(\.dismiss) private var dismiss
 
   var body: some View {
     VStack(alignment: .leading) {
@@ -275,11 +281,10 @@ struct LogSheet: View {
       HStack {
         Button("Copy diagnostics") { model.copyDiagnostics() }
         Spacer()
-        Button("Done") { dismiss() }
       }
     }
     .padding(16)
-    .frame(width: 640, height: 420)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 

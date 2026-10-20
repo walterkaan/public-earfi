@@ -17,7 +17,6 @@ final class AppModel: ObservableObject {
   @Published var noSignal = false
   @Published var logLines: [String] = []
   @Published var showCredits = false
-  @Published var showLog = false
   @Published var showFirstRun = false
   @Published var showFirewall = false
   @Published var showWhy = false
@@ -283,6 +282,24 @@ final class AppModel: ObservableObject {
   func copyLink() {
     guard let listenerURL else { return }
     Clipboard.copy(listenerURL)
+  }
+
+  func copyQRImage() {
+    guard let listenerURL, let data = QRCodeMaker.pngData(text: listenerURL) else { return }
+    Clipboard.copyPNG(data)
+  }
+
+  func exportPosterPDF() {
+    PosterActions.exportPDF(
+      model: PosterDocument.renderModel(from: self, highResolutionQR: true)
+    ) {
+      self.rememberPoster()
+    }
+  }
+
+  var healthLine: String {
+    let line = health.split(whereSeparator: \.isNewline).first.map(String.init) ?? health
+    return line.isEmpty ? "Ready" : line
   }
 
   func copyDiagnostics() {

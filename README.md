@@ -4,7 +4,7 @@ Stream live audio from a Mac to phone browsers on the same Wi-Fi. People scan a 
 
 Public EarFi is free and open source (MIT). Copyright (c) 2026 Walter Kaan. It is local only: the audio does not go to the internet.
 
-![Running, Settings, Poster, and Credits](docs/mockup.png)
+![Running window, Settings, Poster, and Credits](docs/mockup.png)
 
 ## How it works
 
@@ -69,11 +69,13 @@ The same steps are in `docs/FIRST-OPEN.txt`, which is copied onto the DMG.
 
 ## Using the app
 
-**Running.** Start and Stop, a level meter (it works before you go live), the listener URL, a QR code, how many people are listening, and the latest health line. Show full log and Copy diagnostics are there when something is wrong. Click the QR code to show it full screen.
+The main window is the broadcast. Settings, the poster, and the log each open in their own window.
 
-**Settings.** Input device, mono or stereo and which channel, Speech 32k / Standard 64k / Music 96k (Music is 96 kbps mono or 128 kbps stereo), stream name, port, and network mode. Keep the Mac awake while broadcasting. Launch at login and start-on-open are off by default. Reset to defaults restores every setting, including the poster text, and does not delete logs. If you change a broadcast setting while live, the app offers to apply it with a brief interruption.
+**Running.** Start and Stop, a level meter (it works before you go live), the listener URL, a QR code, how many people are listening, and the latest health line. Copy diagnostics is on that window. Click the QR code to show it full screen. **View → Show Log** (Cmd-L) opens the full log.
 
-**Poster.** Header, description, instructions, optional Wi-Fi name, A4 or Letter, and IP or `.local`. The default paper size is Letter in the US and Canada and A4 elsewhere. Export PDF, Print, or copy the QR image. The default instructions include: *No sound? Tap the speaker/mute icon on the player or in your browser tab, and turn up your phone volume.*
+**Settings.** **Public EarFi → Settings…** (Cmd-,). Input device, mono or stereo and which channel, Speech 32k / Standard 64k / Music 96k (Music is 96 kbps mono or 128 kbps stereo), stream name, port, and network mode. Keep the Mac awake while broadcasting. Launch at login and start-on-open are off by default. Reset to defaults restores every setting, including the poster text, and does not delete logs. If you change a broadcast setting while live, the app offers to apply it with a brief interruption.
+
+**Poster.** **File → Print Poster…** (Cmd-P) opens the poster window. **File → Export Poster PDF…** (Cmd-Shift-E) saves a PDF without opening that window. The poster window still has Export PDF, Print, and Copy QR image. **Edit** has Copy Listener Link and Copy QR Image. Header, description, instructions, optional Wi-Fi name, A4 or Letter, and IP or `.local`. The default paper size is Letter in the US and Canada and A4 elsewhere. The default instructions include: *No sound? Tap the speaker/mute icon on the player or in your browser tab, and turn up your phone volume.*
 
 **Credits.** Settings → Credits…, and the About menu, list MediaMTX, FFmpeg, libopus, and the system QR code generator, with their licences.
 
