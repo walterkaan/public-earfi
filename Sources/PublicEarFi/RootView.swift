@@ -91,12 +91,15 @@ struct RunningTab: View {
           Text(levelText).foregroundStyle(.secondary).frame(width: 64, alignment: .trailing)
         }
         HStack {
-          Text("Gain").foregroundStyle(.secondary).frame(width: 90, alignment: .leading)
+          Text("Volume").foregroundStyle(.secondary).frame(width: 90, alignment: .leading)
           Slider(value: gainBinding, in: InputGain.minimumDB...InputGain.maximumDB)
           Text(InputGain.label(model.settings.inputGainDB))
             .foregroundStyle(.secondary)
             .frame(width: 64, alignment: .trailing)
         }
+        .help(
+          "Volume, from -12 dB to +24 dB. 0 dB leaves the desk unchanged. Changes apply immediately, including while you are live."
+        )
         Text("0 dB leaves the desk unchanged. Raise it when the interpreter is quiet.")
           .font(.caption)
           .foregroundStyle(.secondary)

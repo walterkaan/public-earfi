@@ -365,7 +365,7 @@ public enum SettingsRepair {
       || !(InputGain.minimumDB...InputGain.maximumDB).contains(settings.inputGainDB)
     {
       settings.inputGainDB = InputGain.defaultDB
-      fields.append("input gain")
+      fields.append("volume")
     }
     if !(16...256).contains(settings.customBitrateKbps) {
       settings.customBitrateKbps = min(256, max(16, settings.customBitrateKbps))

@@ -736,7 +736,7 @@ final class APIAndCreditsTests: XCTestCase {
     XCTAssertEqual(resolved.settings.inputGainDB, 0)
     XCTAssertEqual(
       resolved.notice,
-      "Saved settings were invalid (input gain) and were reset. Check Settings, then press Start."
+      "Saved settings were invalid (volume) and were reset. Check Settings, then press Start."
     )
   }
 
@@ -825,6 +825,33 @@ final class APIAndCreditsTests: XCTestCase {
     capped.reset()
     XCTAssertEqual(capped.remainder, "")
     XCTAssertEqual(capped.excerpt, "")
+  }
+
+  func testPCMCopyStaysInsideTheBuffersItWasGiven() {
+    XCTAssertEqual(
+      PCMCopy.interleavedSampleCount(byteSize: 64, frameCount: 4, channelCount: 2), 8)
+    XCTAssertEqual(
+      PCMCopy.interleavedSampleCount(byteSize: 12, frameCount: 4, channelCount: 2), 3)
+    XCTAssertEqual(PCMCopy.interleavedSampleCount(byteSize: 0, frameCount: 4, channelCount: 2), 0)
+    XCTAssertEqual(PCMCopy.interleavedSampleCount(byteSize: 16, frameCount: 0, channelCount: 2), 0)
+    XCTAssertEqual(PCMCopy.planarFrameCount(frameLength: 8, stride: 3), 3)
+    XCTAssertEqual(PCMCopy.planarFrameCount(frameLength: 2, stride: 8), 2)
+    XCTAssertEqual(PCMCopy.planarFrameCount(frameLength: 4, stride: 0), 0)
+
+    let mixed = PCMCopy.interleave(
+      channels: [
+        [1, 2, 3, 4],
+        [10, 20],
+      ],
+      frameCount: 4
+    )
+    XCTAssertEqual(mixed, [1, 10, 2, 20, 3, 0, 4, 0])
+    XCTAssertEqual(
+      MonoDownmix.average(interleaved: mixed, channelCount: 2),
+      [5.5, 11, 1.5, 2]
+    )
+    XCTAssertEqual(PCMCopy.interleave(channels: [[0.5, 0.25]], frameCount: 2), [0.5, 0.25])
+    XCTAssertEqual(PCMCopy.interleave(channels: [], frameCount: 4), [])
   }
 
   func testSupportPaths() {

@@ -38,7 +38,12 @@ let testTarget: Target = .testTarget(
       .copy("Resources")
     ]
   )
-  let targets = [coreTarget, appTarget, testTarget]
+  let audioTestTarget: Target = .testTarget(
+    name: "PublicEarFiAudioTests",
+    dependencies: ["PublicEarFi", "PublicEarFiCore"],
+    path: "Tests/PublicEarFiAudioTests"
+  )
+  let targets = [coreTarget, appTarget, testTarget, audioTestTarget]
 #else
   let targets = [coreTarget, testTarget]
 #endif

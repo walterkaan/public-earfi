@@ -75,7 +75,7 @@ public enum DiagnosticsReport {
     [
       "device UID: \(settings.inputDeviceUID ?? "(auto)")",
       "channels: \(settings.channelMode == .mono ? "mono (all inputs mixed)" : "stereo from input \(settings.inputChannel)")",
-      "input gain: \(InputGain.label(settings.inputGainDB))",
+      "volume: \(InputGain.label(settings.inputGainDB))",
       "quality: \(settings.quality.rawValue) \(settings.resolvedBitrateKbps) kbps \(settings.opusApplication)",
       "sample rate: \(FFmpegCommand.sampleRate) Hz, \(FFmpegCommand.frameDurationMilliseconds) ms frames",
       "stream: \(settings.streamName)",

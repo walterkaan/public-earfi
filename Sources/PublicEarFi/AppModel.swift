@@ -45,6 +45,7 @@ final class AppModel: ObservableObject {
   private var lastAnnouncedIP: String?
   private var lastDeviceName = "audio interface"
   private var timer: Timer?
+  private var meterTimer: Timer?
 
   init() {
     let home = FileManager.default.homeDirectoryForCurrentUser
@@ -68,12 +69,6 @@ final class AppModel: ObservableObject {
     }
     controller.onStray = { [weak self] stray in
       Task { @MainActor in self?.strayHelper = stray }
-    }
-    meter.onLevel = { [weak self] decibels, fraction in
-      Task { @MainActor in
-        self?.levelDB = decibels
-        self?.levelFraction = fraction
-      }
     }
     let located = HelperLocator.locate()
     let helperPaths = located.map { [$0.mediamtx.path, $0.ffmpeg.path] } ?? []
@@ -106,6 +101,10 @@ final class AppModel: ObservableObject {
     }
     timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
       Task { @MainActor in self?.tick() }
+    }
+    meterTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) {
+      [weak self] _ in
+      Task { @MainActor in self?.pollMeter() }
     }
     Self.shared = self
     knownSSID = InterfaceEnumerator.currentSSID()
@@ -216,6 +215,10 @@ final class AppModel: ObservableObject {
   }
 
   func shutdown() {
+    timer?.invalidate()
+    timer = nil
+    meterTimer?.invalidate()
+    meterTimer = nil
     controller.stopAndWait()
     sleepAssertion.release()
     meter.stop()
@@ -496,6 +499,12 @@ final class AppModel: ObservableObject {
       live = false
     }
     sleepAssertion.set(enabled: live && settings.keepAwake)
+  }
+
+  private func pollMeter() {
+    let reading = meter.latest()
+    levelDB = reading.decibels
+    levelFraction = reading.fraction
   }
 
   private func tick() {

@@ -25,6 +25,12 @@ jobs:
       - name: Unit tests
         run: swift test
 
+      - name: Address sanitizer
+        run: swift test --sanitize=address --filter PublicEarFiCoreTests
+
+      - name: Thread sanitizer
+        run: swift test --sanitize=thread --filter PublicEarFiCoreTests
+
       - name: Restore bundled helpers
         uses: actions/cache/restore@v4
         with:

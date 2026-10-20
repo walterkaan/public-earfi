@@ -35,6 +35,10 @@ final class CapturePipe {
   private var downmixToMono = false
   private let gainLock = NSLock()
   private var gainDB = InputGain.defaultDB
+  private let callbackLock = NSLock()
+  private var accepting = false
+  private var inFlight = 0
+  private var tapInstalled = false
 
   func setGainDB(_ db: Double) {
     gainLock.lock()
@@ -135,10 +139,14 @@ final class CapturePipe {
     input.installTap(onBus: 0, bufferSize: 960, format: hardware) { [weak self] buffer, _ in
       self?.consume(buffer)
     }
+    tapInstalled = true
     do {
       engine.prepare()
       try engine.start()
+      callbackLock.lock()
+      accepting = true
       running = true
+      callbackLock.unlock()
       return nil
     } catch {
       stop()
@@ -147,15 +155,24 @@ final class CapturePipe {
   }
 
   func stop() {
+    callbackLock.lock()
+    accepting = false
+    let hadTap = tapInstalled
+    let wasRunning = running
+    tapInstalled = false
+    running = false
+    callbackLock.unlock()
+    waitUntilIdle()
     stopWriter = true
     outputFD = -1
     condition.lock()
     condition.broadcast()
     condition.unlock()
-    if running {
+    if hadTap {
       engine.inputNode.removeTap(onBus: 0)
+    }
+    if wasRunning {
       engine.stop()
-      running = false
     }
     if writerRunning {
       _ = writerDone?.wait(timeout: .now() + 2)
@@ -176,16 +193,28 @@ final class CapturePipe {
   }
 
   private func consume(_ buffer: AVAudioPCMBuffer) {
-    guard let converter, let targetFormat, let converted = convertedBuffer else { return }
-    let ratio = targetFormat.sampleRate / buffer.format.sampleRate
+    guard beginCallback() else { return }
+    defer { endCallback() }
+    guard let samples = renderWhileAccepted(buffer) else { return }
+    emit(samples)
+  }
+
+  /// Converter and the converted buffer stay alive until `stop` has seen
+  /// `inFlight` drop to zero. The copy is bounded by the buffer's own size.
+  private func renderWhileAccepted(_ buffer: AVAudioPCMBuffer) -> [Float]? {
+    callbackLock.lock()
+    defer { callbackLock.unlock() }
+    guard accepting, let converter, let targetFormat else { return nil }
+    let ratio = targetFormat.sampleRate / max(buffer.format.sampleRate, 1)
     let needed = AVAudioFrameCount(ceil(Double(buffer.frameLength) * ratio) + 32)
     let output: AVAudioPCMBuffer
-    if needed <= converted.frameCapacity {
+    if let converted = convertedBuffer, needed <= converted.frameCapacity {
       output = converted
     } else if let larger = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: needed) {
+      convertedBuffer = larger
       output = larger
     } else {
-      return
+      return nil
     }
     output.frameLength = 0
     var consumed = false
@@ -199,25 +228,33 @@ final class CapturePipe {
       outStatus.pointee = .haveData
       return buffer
     }
-    guard error == nil, status != .error, output.frameLength > 0 else { return }
-    let list = output.audioBufferList.pointee
-    if list.mNumberBuffers == 1, let raw = list.mBuffers.mData, list.mBuffers.mDataByteSize > 0 {
-      let sampleCount = Int(list.mBuffers.mDataByteSize) / MemoryLayout<Float>.size
-      let pointer = raw.bindMemory(to: Float.self, capacity: sampleCount)
-      emit(Array(UnsafeBufferPointer(start: pointer, count: sampleCount)))
-      return
+    guard error == nil, status != .error, output.frameLength > 0 else { return nil }
+    return CapturePCM.interleavedFloats(from: output)
+  }
+
+  private func beginCallback() -> Bool {
+    callbackLock.lock()
+    defer { callbackLock.unlock() }
+    guard accepting else { return false }
+    inFlight += 1
+    return true
+  }
+
+  private func endCallback() {
+    callbackLock.lock()
+    inFlight -= 1
+    callbackLock.unlock()
+  }
+
+  private func waitUntilIdle() {
+    let deadline = Date().addingTimeInterval(1)
+    while Date() < deadline {
+      callbackLock.lock()
+      let busy = inFlight
+      callbackLock.unlock()
+      if busy == 0 { return }
+      Thread.sleep(forTimeInterval: 0.001)
     }
-    guard let channels = output.floatChannelData else { return }
-    let frameCount = Int(output.frameLength)
-    let channelCount = Int(output.format.channelCount)
-    guard frameCount > 0, channelCount > 0 else { return }
-    var interleaved = [Float](repeating: 0, count: frameCount * channelCount)
-    for channel in 0..<channelCount {
-      for frame in 0..<frameCount {
-        interleaved[frame * channelCount + channel] = channels[channel][frame]
-      }
-    }
-    emit(interleaved)
   }
 
   private func emit(_ samples: [Float]) {
