@@ -90,8 +90,18 @@ struct RunningTab: View {
           LevelBar(fraction: model.levelFraction)
           Text(levelText).foregroundStyle(.secondary).frame(width: 64, alignment: .trailing)
         }
+        HStack {
+          Text("Gain").foregroundStyle(.secondary).frame(width: 90, alignment: .leading)
+          Slider(value: gainBinding, in: InputGain.minimumDB...InputGain.maximumDB)
+          Text(InputGain.label(model.settings.inputGainDB))
+            .foregroundStyle(.secondary)
+            .frame(width: 64, alignment: .trailing)
+        }
+        Text("0 dB leaves the desk unchanged. Raise it when the interpreter is quiet.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
         if model.noSignal {
-          Text("No signal for about 10 seconds. Check the desk feed and the channel.")
+          Text("No signal for about 10 seconds. Check the desk feed.")
             .font(.caption)
             .foregroundStyle(.orange)
         }
@@ -219,6 +229,13 @@ struct RunningTab: View {
     return String(format: "%.0f dB", model.levelDB)
   }
 
+  private var gainBinding: Binding<Double> {
+    Binding(
+      get: { model.settings.inputGainDB },
+      set: { model.setInputGain($0) }
+    )
+  }
+
   private var addressBinding: Binding<String?> {
     Binding(
       get: { model.settings.advertisedAddress },
@@ -312,13 +329,18 @@ struct SettingsTab: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 150)
-            Picker("Input", selection: channelBinding) {
-              ForEach(1...channelUpper, id: \.self) { channel in
-                Text("Input \(channel)").tag(channel)
+            if model.settings.channelMode == .stereo {
+              Picker("Input", selection: channelBinding) {
+                ForEach(1...channelUpper, id: \.self) { channel in
+                  Text("Input \(channel)").tag(channel)
+                }
               }
+              .labelsHidden()
+              .frame(width: 110)
+            } else {
+              Text("All inputs mixed")
+                .foregroundStyle(.secondary)
             }
-            .labelsHidden()
-            .frame(width: 110)
           }
           LabeledRow(title: "Quality") {
             Picker("Quality", selection: qualityBinding) {

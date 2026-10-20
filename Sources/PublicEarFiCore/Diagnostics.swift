@@ -23,17 +23,23 @@ public enum AppPaths {
 public struct SupervisedPIDs: Codable, Equatable {
   public var mediamtx: Int32?
   public var ffmpeg: Int32?
+  public var mediamtxGroup: Int32?
+  public var ffmpegGroup: Int32?
   public var mediamtxExecutable: String?
   public var ffmpegExecutable: String?
 
   public init(
     mediamtx: Int32? = nil,
     ffmpeg: Int32? = nil,
+    mediamtxGroup: Int32? = nil,
+    ffmpegGroup: Int32? = nil,
     mediamtxExecutable: String? = nil,
     ffmpegExecutable: String? = nil
   ) {
     self.mediamtx = mediamtx
     self.ffmpeg = ffmpeg
+    self.mediamtxGroup = mediamtxGroup
+    self.ffmpegGroup = ffmpegGroup
     self.mediamtxExecutable = mediamtxExecutable
     self.ffmpegExecutable = ffmpegExecutable
   }
@@ -68,7 +74,8 @@ public enum DiagnosticsReport {
   public static func settingsSummary(_ settings: AppSettings) -> String {
     [
       "device UID: \(settings.inputDeviceUID ?? "(auto)")",
-      "channels: \(settings.channelMode.rawValue) from input \(settings.inputChannel)",
+      "channels: \(settings.channelMode == .mono ? "mono (all inputs mixed)" : "stereo from input \(settings.inputChannel)")",
+      "input gain: \(InputGain.label(settings.inputGainDB))",
       "quality: \(settings.quality.rawValue) \(settings.resolvedBitrateKbps) kbps \(settings.opusApplication)",
       "sample rate: \(FFmpegCommand.sampleRate) Hz, \(FFmpegCommand.frameDurationMilliseconds) ms frames",
       "stream: \(settings.streamName)",

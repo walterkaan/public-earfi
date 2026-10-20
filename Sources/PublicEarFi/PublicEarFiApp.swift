@@ -82,6 +82,13 @@ struct AppMenus: Commands {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    MainActor.assumeIsolated {
+      AppModel.shared?.shutdown()
+    }
+    return .terminateNow
+  }
+
   func applicationWillTerminate(_ notification: Notification) {
     MainActor.assumeIsolated {
       AppModel.shared?.shutdown()

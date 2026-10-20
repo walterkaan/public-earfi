@@ -86,6 +86,16 @@ enum PortProbe {
     let descriptor = socket(family, kind, 0)
     guard descriptor >= 0 else { return false }
     defer { _ = Darwin.close(descriptor) }
+    if BindCheck.reuseAddress(tcp: tcp) {
+      var reuse: Int32 = 1
+      _ = setsockopt(
+        descriptor,
+        SOL_SOCKET,
+        SO_REUSEADDR,
+        &reuse,
+        socklen_t(MemoryLayout<Int32>.size)
+      )
+    }
     if ipv6 {
       var only: Int32 = 1
       _ = setsockopt(

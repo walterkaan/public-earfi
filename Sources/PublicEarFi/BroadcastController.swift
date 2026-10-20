@@ -1,4 +1,5 @@
 import CoreAudio
+import Darwin
 import Foundation
 import PublicEarFiCore
 
@@ -31,6 +32,8 @@ final class BroadcastController {
   var onStray: ((StrayHelper?) -> Void)?
 
   private let queue = DispatchQueue(label: "earfi.supervisor")
+  private let haltLock = NSLock()
+  private var halt = false
   private var desired = false
   private var stopping = false
   private var mediamtx: Process?
@@ -64,8 +67,13 @@ final class BroadcastController {
     self.logger = logger
   }
 
+  func setInputGain(_ db: Double) {
+    capture.setGainDB(db)
+  }
+
   func start(_ launch: BroadcastLaunch) {
     queue.async {
+      self.clearHalt()
       self.pendingRestart?.cancel()
       self.launch = launch
       self.helperPaths = [launch.helpers.mediamtx.path, launch.helpers.ffmpeg.path]
@@ -100,12 +108,14 @@ final class BroadcastController {
   }
 
   func stop() {
+    requestHalt()
     queue.async {
       self.finish(reportStopped: true)
     }
   }
 
   func stopAndWait() {
+    requestHalt()
     queue.sync {
       self.finish(reportStopped: true)
     }
@@ -119,7 +129,7 @@ final class BroadcastController {
       launch.deviceID = deviceID
       launch.devicePresent = present
       self.launch = launch
-      guard self.desired, !self.stopping else { return }
+      guard self.desired, !self.stopping, !self.isHalted() else { return }
       if !present {
         self.stopCapture()
         self.stopProcess(self.ffmpeg)
@@ -134,20 +144,20 @@ final class BroadcastController {
     }
   }
 
-  func reapStaleChildren() {
+  func reapStaleChildren(settings: AppSettings, helperPaths: [String]) {
     queue.sync {
-      let url = AppPaths.pidFile(home: FileManager.default.homeDirectoryForCurrentUser)
-      guard let data = try? Data(contentsOf: url),
-        let recorded = try? JSONDecoder().decode(SupervisedPIDs.self, from: data)
-      else { return }
-      reap(recorded.mediamtx, expected: recorded.mediamtxExecutable)
-      reap(recorded.ffmpeg, expected: recorded.ffmpegExecutable)
-      try? FileManager.default.removeItem(at: url)
+      self.helperPaths = helperPaths
+      self.reapRecorded()
+      if let found = PortProbe.conflict(settings: settings, helperPaths: helperPaths),
+        let stray = found.stray
+      {
+        _ = self.terminateStray(stray)
+      }
     }
   }
 
   private func launchPipeline() {
-    guard desired, !stopping, let launch else { return }
+    guard desired, !stopping, !isHalted(), let launch else { return }
     resetMediaMTXLog()
     publish(.starting)
     guard FileManager.default.isExecutableFile(atPath: launch.helpers.mediamtx.path),
@@ -234,7 +244,7 @@ final class BroadcastController {
     attach(process, source: "ffmpeg")
     process.standardInput = pipe
     do {
-      try process.run()
+      try runInOwnGroup(process)
     } catch {
       noteFailure(component: "ffmpeg", detail: "ffmpeg failed to launch")
       return
@@ -286,7 +296,7 @@ final class BroadcastController {
     process.currentDirectoryURL = configURL.deletingLastPathComponent()
     attach(process, source: "mediamtx")
     do {
-      try process.run()
+      try runInOwnGroup(process)
     } catch {
       return false
     }
@@ -409,7 +419,7 @@ final class BroadcastController {
       stopCapture()
       drainFFmpegLog()
     }
-    guard desired, !stopping else { return }
+    guard desired, !stopping, !isHalted() else { return }
     let status = process.terminationStatus
     logger.log(source, "exited with status \(status)")
     if source == "mediamtx" {
@@ -436,17 +446,7 @@ final class BroadcastController {
 
   private func abandon(_ process: Process?) {
     guard let process else { return }
-    ignoredPIDs.insert(process.processIdentifier)
-    guard process.isRunning else { return }
-    process.interrupt()
-    let grace = Date().addingTimeInterval(3)
-    while process.isRunning && Date() < grace {
-      Thread.sleep(forTimeInterval: 0.05)
-    }
-    if process.isRunning {
-      kill(process.processIdentifier, SIGKILL)
-      process.waitUntilExit()
-    }
+    signalAndWait([process])
     drainFFmpegLog()
   }
 
@@ -501,13 +501,18 @@ final class BroadcastController {
       logger.log("supervisor", "refused to stop pid \(helper.pid); it is not a Public EarFi helper")
       return false
     }
-    kill(helper.pid, SIGTERM)
-    let grace = Date().addingTimeInterval(2)
+    let target = ChildStop.Target(pid: helper.pid, group: getpgid(helper.pid))
+    kill(target.signalTarget, ChildStop.termSignal)
+    let grace = Date().addingTimeInterval(ChildStop.grace)
     while processIsAlive(helper.pid) && Date() < grace {
       Thread.sleep(forTimeInterval: 0.05)
     }
     if processIsAlive(helper.pid) {
-      kill(helper.pid, SIGKILL)
+      kill(target.signalTarget, ChildStop.killSignal)
+      let hard = Date().addingTimeInterval(1)
+      while processIsAlive(helper.pid) && Date() < hard {
+        Thread.sleep(forTimeInterval: 0.05)
+      }
     }
     let stopped = !processIsAlive(helper.pid)
     if stopped {
@@ -546,7 +551,7 @@ final class BroadcastController {
   }
 
   private func noteFailure(component: String, detail: String) {
-    guard desired, !stopping else { return }
+    guard desired, !stopping, !isHalted() else { return }
     if component == "mediamtx", let conflict = bindConflict() {
       halt(conflict)
       return
@@ -575,7 +580,7 @@ final class BroadcastController {
     publishHealth(health)
     let delay = RestartBackoff.delay(forFailureCount: failures)
     let work = DispatchWorkItem { [weak self] in
-      guard let self, self.desired, !self.stopping else { return }
+      guard let self, self.desired, !self.stopping, !self.isHalted() else { return }
       if component == "ffmpeg", self.mediamtx?.isRunning == true {
         self.startFFmpeg()
       } else {
@@ -604,7 +609,7 @@ final class BroadcastController {
   }
 
   private func poll() {
-    guard desired, !stopping, let settings = launch?.settings else { return }
+    guard desired, !stopping, !isHalted(), let settings = launch?.settings else { return }
     guard let data = httpGet(MediaMTXAPI.pathGetPath(streamName: settings.streamName)),
       let snapshot = try? MediaMTXAPI.parsePath(data)
     else {
@@ -638,7 +643,7 @@ final class BroadcastController {
   private func waitUntilReady(stream: String) -> Bool {
     let deadline = Date().addingTimeInterval(5)
     while Date() < deadline {
-      if !desired || stopping { return false }
+      if !desired || stopping || isHalted() { return false }
       if ffmpeg?.isRunning != true { return false }
       if pathIsReady(stream) { return true }
       Thread.sleep(forTimeInterval: 0.2)
@@ -656,10 +661,11 @@ final class BroadcastController {
   private func waitUntil(timeout: TimeInterval, _ probe: () -> Bool) -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {
-      if !desired || stopping { return false }
+      if !desired || stopping || isHalted() { return false }
       if probe() { return true }
       Thread.sleep(forTimeInterval: 0.2)
     }
+    if !desired || stopping || isHalted() { return false }
     return probe()
   }
 
@@ -685,8 +691,12 @@ final class BroadcastController {
     pendingRestart?.cancel()
     stopPoller()
     stopChildren()
-    try? FileManager.default.removeItem(
-      at: AppPaths.pidFile(home: launch?.home ?? FileManager.default.homeDirectoryForCurrentUser))
+    let home = launch?.home ?? FileManager.default.homeDirectoryForCurrentUser
+    if ffmpeg == nil && mediamtx == nil {
+      try? FileManager.default.removeItem(at: AppPaths.pidFile(home: home))
+    } else {
+      writePIDs()
+    }
     if reportStopped {
       publish(.stopped)
     }
@@ -699,24 +709,66 @@ final class BroadcastController {
 
   private func stopChildren() {
     stopCapture()
-    stopProcess(ffmpeg)
-    ffmpeg = nil
-    stopProcess(mediamtx)
-    mediamtx = nil
+    ffmpegLog?.readabilityHandler = nil
+    mediamtxLog?.readabilityHandler = nil
+    signalAndWait([ffmpeg, mediamtx].compactMap { $0 })
+    if ffmpeg?.isRunning != true { ffmpeg = nil }
+    if mediamtx?.isRunning != true { mediamtx = nil }
   }
 
   private func stopProcess(_ process: Process?) {
-    guard let process, process.isRunning else { return }
-    ignoredPIDs.insert(process.processIdentifier)
-    process.interrupt()
-    let grace = Date().addingTimeInterval(3)
-    while process.isRunning && Date() < grace {
+    guard let process else { return }
+    signalAndWait([process])
+  }
+
+  /// SIGTERM the helper and its process group, then SIGKILL if it is still
+  /// alive. The group is signaled only when the helper leads it.
+  private func signalAndWait(_ processes: [Process]) {
+    let live = processes.filter { $0.processIdentifier > 1 }
+    for process in live {
+      ignoredPIDs.insert(process.processIdentifier)
+      let target = ChildStop.Target(
+        pid: process.processIdentifier, group: getpgid(process.processIdentifier))
+      kill(target.signalTarget, ChildStop.termSignal)
+    }
+    let deadline = Date().addingTimeInterval(ChildStop.grace)
+    while Date() < deadline && live.contains(where: { $0.isRunning }) {
       Thread.sleep(forTimeInterval: 0.05)
     }
-    if process.isRunning {
-      kill(process.processIdentifier, SIGKILL)
+    for process in live where process.isRunning {
+      let target = ChildStop.Target(
+        pid: process.processIdentifier, group: getpgid(process.processIdentifier))
+      kill(target.signalTarget, ChildStop.killSignal)
+    }
+    for process in live where process.isRunning {
       process.waitUntilExit()
     }
+  }
+
+  private func runInOwnGroup(_ process: Process) throws {
+    try process.run()
+    let pid = process.processIdentifier
+    if pid > 1 {
+      _ = setpgid(pid, pid)
+    }
+  }
+
+  private func requestHalt() {
+    haltLock.lock()
+    halt = true
+    haltLock.unlock()
+  }
+
+  private func clearHalt() {
+    haltLock.lock()
+    halt = false
+    haltLock.unlock()
+  }
+
+  private func isHalted() -> Bool {
+    haltLock.lock()
+    defer { haltLock.unlock() }
+    return halt
   }
 
   private func writePIDs() {
@@ -724,6 +776,8 @@ final class BroadcastController {
     let recorded = SupervisedPIDs(
       mediamtx: mediamtx?.isRunning == true ? mediamtx?.processIdentifier : nil,
       ffmpeg: ffmpeg?.isRunning == true ? ffmpeg?.processIdentifier : nil,
+      mediamtxGroup: recordedGroup(mediamtx),
+      ffmpegGroup: recordedGroup(ffmpeg),
       mediamtxExecutable: launch.helpers.mediamtx.path,
       ffmpegExecutable: launch.helpers.ffmpeg.path
     )
@@ -733,13 +787,49 @@ final class BroadcastController {
     }
   }
 
-  private func reap(_ pid: Int32?, expected: String?) {
-    guard let pid, pid > 0 else { return }
+  private func recordedGroup(_ process: Process?) -> Int32? {
+    guard let process, process.isRunning else { return nil }
+    let pid = process.processIdentifier
+    let group = getpgid(pid)
+    return group == pid ? group : nil
+  }
+
+  private func reapRecorded() {
+    let url = AppPaths.pidFile(home: FileManager.default.homeDirectoryForCurrentUser)
+    guard let data = try? Data(contentsOf: url),
+      let recorded = try? JSONDecoder().decode(SupervisedPIDs.self, from: data)
+    else { return }
+    let stopped = recorded.reapTargets.allSatisfy { target in
+      reap(pid: target.pid, group: target.group, expected: target.executable)
+    }
+    if stopped {
+      try? FileManager.default.removeItem(at: url)
+    }
+  }
+
+  private func reap(pid: Int32, group: Int32, expected: String?) -> Bool {
     let path = ProcessPath.executablePath(pid: pid)
-    if let expected, let path, path != expected { return }
-    if path == nil { return }
-    kill(pid, SIGKILL)
-    logger.log("supervisor", "cleared stale process \(pid)")
+    guard ChildStop.shouldReap(pid: pid, actualPath: path, expectedPath: expected) else {
+      return true
+    }
+    let target = ChildStop.Target(pid: pid, group: group)
+    kill(target.signalTarget, ChildStop.termSignal)
+    let deadline = Date().addingTimeInterval(ChildStop.grace)
+    while Date() < deadline && processIsAlive(pid) {
+      Thread.sleep(forTimeInterval: 0.05)
+    }
+    if processIsAlive(pid) {
+      kill(target.signalTarget, ChildStop.killSignal)
+      let hard = Date().addingTimeInterval(1)
+      while Date() < hard && processIsAlive(pid) {
+        Thread.sleep(forTimeInterval: 0.05)
+      }
+    }
+    let stopped = !processIsAlive(pid)
+    if stopped {
+      logger.log("supervisor", "cleared stale process \(pid)")
+    }
+    return stopped
   }
 
   private func publish(_ phase: BroadcastPhase) {

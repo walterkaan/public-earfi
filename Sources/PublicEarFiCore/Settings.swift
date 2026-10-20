@@ -34,6 +34,9 @@ public struct AppSettings: Codable, Equatable {
   public var inputDeviceUID: String?
   public var channelMode: ChannelMode
   public var inputChannel: Int
+  /// Live boost in dB. Not part of the broadcast signature: it applies
+  /// without restarting ffmpeg.
+  public var inputGainDB: Double
   public var quality: QualityPreset
   public var customBitrateKbps: Int
   public var streamName: String
@@ -59,6 +62,7 @@ public struct AppSettings: Codable, Equatable {
     inputDeviceUID: String? = nil,
     channelMode: ChannelMode = .mono,
     inputChannel: Int = 1,
+    inputGainDB: Double = InputGain.defaultDB,
     quality: QualityPreset = .speech,
     customBitrateKbps: Int = 64,
     streamName: String = "live",
@@ -83,6 +87,7 @@ public struct AppSettings: Codable, Equatable {
     self.inputDeviceUID = inputDeviceUID
     self.channelMode = channelMode
     self.inputChannel = inputChannel
+    self.inputGainDB = inputGainDB
     self.quality = quality
     self.customBitrateKbps = customBitrateKbps
     self.streamName = streamName
@@ -356,6 +361,12 @@ public enum SettingsRepair {
       settings.inputChannel = 1
       fields.append("input channel")
     }
+    if !settings.inputGainDB.isFinite
+      || !(InputGain.minimumDB...InputGain.maximumDB).contains(settings.inputGainDB)
+    {
+      settings.inputGainDB = InputGain.defaultDB
+      fields.append("input gain")
+    }
     if !(16...256).contains(settings.customBitrateKbps) {
       settings.customBitrateKbps = min(256, max(16, settings.customBitrateKbps))
       fields.append("bitrate")
@@ -408,6 +419,7 @@ private struct StoredSettings: Codable {
   var inputDeviceUID: String?
   var channelMode: ChannelMode?
   var inputChannel: Int?
+  var inputGainDB: Double?
   var quality: QualityPreset?
   var customBitrateKbps: Int?
   var streamName: String?
@@ -482,6 +494,7 @@ public struct SettingsStore {
     settings.inputDeviceUID = stored.inputDeviceUID
     if let value = stored.channelMode { settings.channelMode = value }
     if let value = stored.inputChannel { settings.inputChannel = value }
+    if let value = stored.inputGainDB { settings.inputGainDB = value }
     if let value = stored.quality { settings.quality = value }
     if let value = stored.customBitrateKbps { settings.customBitrateKbps = value }
     if let value = stored.streamName { settings.streamName = value }

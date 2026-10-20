@@ -2,11 +2,20 @@ import AVFoundation
 import AudioToolbox
 import CoreAudio
 import Foundation
+import PublicEarFiCore
 
 final class LevelMeter {
   private let engine = AVAudioEngine()
   private var running = false
+  private let gainLock = NSLock()
+  private var gainDB = InputGain.defaultDB
   var onLevel: ((Double, Double) -> Void)?
+
+  func setGainDB(_ db: Double) {
+    gainLock.lock()
+    gainDB = InputGain.clamped(db)
+    gainLock.unlock()
+  }
 
   func start(deviceID: AudioDeviceID?) {
     stop()
@@ -50,17 +59,31 @@ final class LevelMeter {
   }
 
   private func measure(_ buffer: AVAudioPCMBuffer) {
-    guard let samples = buffer.floatChannelData?[0] else { return }
+    guard let channels = buffer.floatChannelData else { return }
     let frames = Int(buffer.frameLength)
-    guard frames > 0 else { return }
-    var sum: Float = 0
-    for index in 0..<frames {
-      let sample = samples[index]
-      sum += sample * sample
+    let channelCount = Int(buffer.format.channelCount)
+    guard frames > 0, channelCount > 0 else { return }
+    var interleaved = [Float](repeating: 0, count: frames * channelCount)
+    for channel in 0..<channelCount {
+      for frame in 0..<frames {
+        interleaved[frame * channelCount + channel] = channels[channel][frame]
+      }
     }
-    let rms = sqrt(sum / Float(frames))
-    let decibels = Double(20 * log10(max(rms, 1e-7)))
+    let gain = currentGain()
+    let rendered = InputGain.render(
+      interleaved: interleaved,
+      channelCount: channelCount,
+      downmixToMono: true,
+      gainDB: gain
+    )
+    let decibels = SignalLevel.decibels(rendered)
     let fraction = min(1, max(0, (decibels + 60) / 60))
     onLevel?(decibels, fraction)
+  }
+
+  private func currentGain() -> Double {
+    gainLock.lock()
+    defer { gainLock.unlock() }
+    return gainDB
   }
 }

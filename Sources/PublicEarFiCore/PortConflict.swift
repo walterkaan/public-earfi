@@ -16,6 +16,16 @@ public struct WatchedPort: Equatable {
   }
 }
 
+public enum BindCheck {
+  /// TCP probes set SO_REUSEADDR. A listener that has just exited leaves the
+  /// port in TIME_WAIT, and without this flag bind reports it as busy for
+  /// half a minute. An active listener still fails the bind. UDP must not
+  /// set the flag: on macOS it would hide a live ICE socket on 8189.
+  public static func reuseAddress(tcp: Bool) -> Bool {
+    tcp
+  }
+}
+
 public enum WatchedPorts {
   public static let rtsp = 8554
   public static let api = 9997

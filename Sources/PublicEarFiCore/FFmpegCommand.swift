@@ -49,16 +49,16 @@ public enum FFmpegCommand {
 }
 
 public enum CaptureChannelMap {
-  /// Zero-based device channels to copy into the pipe.
-  /// Mono keeps the desk input chosen in Settings. Stereo takes that
-  /// channel and the next one.
+  /// Zero-based device channels to copy into the converter.
+  /// Mono keeps every channel so the capture path can average them.
+  /// Stereo takes the desk input chosen in Settings and the next one.
   public static func indices(mode: ChannelMode, inputChannel: Int, inputCount: Int) -> [Int] {
     let count = max(1, inputCount)
-    let first = min(max(0, inputChannel - 1), count - 1)
     switch mode {
     case .mono:
-      return [first]
+      return Array(0..<count)
     case .stereo:
+      let first = min(max(0, inputChannel - 1), count - 1)
       return [first, min(first + 1, count - 1)]
     }
   }

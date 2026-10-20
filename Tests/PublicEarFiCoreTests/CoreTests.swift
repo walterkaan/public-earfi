@@ -8,6 +8,7 @@ final class SettingsTests: XCTestCase {
     XCTAssertNil(settings.inputDeviceUID)
     XCTAssertEqual(settings.channelMode, .mono)
     XCTAssertEqual(settings.inputChannel, 1)
+    XCTAssertEqual(settings.inputGainDB, 0)
     XCTAssertEqual(FFmpegCommand.sampleRate, 48_000)
     XCTAssertEqual(settings.quality, .speech)
     XCTAssertEqual(settings.resolvedBitrateKbps, 32)
@@ -119,6 +120,7 @@ final class SettingsTests: XCTestCase {
     settings.posterHeader = "Welcome"
     settings.posterDescription = "Hall"
     settings.keepAwake = false
+    settings.inputGainDB = 18
     XCTAssertEqual(BroadcastSignature(settings), before)
     settings.listenerPort = 8890
     XCTAssertNotEqual(BroadcastSignature(settings), before)
@@ -294,7 +296,9 @@ final class FFmpegCommandTests: XCTestCase {
     XCTAssertTrue(arguments.contains("voip"))
     XCTAssertTrue(arguments.contains("48000"))
     XCTAssertTrue(arguments.contains("rtsp://127.0.0.1:8554/talk"))
-    XCTAssertEqual(CaptureChannelMap.indices(mode: .mono, inputChannel: 2, inputCount: 4), [1])
+    XCTAssertEqual(
+      CaptureChannelMap.indices(mode: .mono, inputChannel: 2, inputCount: 4), [0, 1, 2, 3])
+    XCTAssertEqual(CaptureChannelMap.indices(mode: .mono, inputChannel: 1, inputCount: 1), [0])
 
     settings.channelMode = .stereo
     settings.inputChannel = 3
@@ -672,6 +676,102 @@ final class APIAndCreditsTests: XCTestCase {
     XCTAssertFalse(report.contains("line 1\n"))
     XCTAssertTrue(report.contains("stream: live"))
     XCTAssertTrue(report.contains("Recent log (200 lines)"))
+  }
+
+  func testMonoDownmixGainAndSoftLimit() {
+    XCTAssertEqual(MonoDownmix.average(interleaved: [1, 3, 5, 7], channelCount: 2), [2, 6])
+    XCTAssertEqual(MonoDownmix.average(interleaved: [1, 2, 3], channelCount: 3), [2])
+    XCTAssertEqual(MonoDownmix.average(interleaved: [0.5], channelCount: 1), [0.5])
+    XCTAssertEqual(MonoDownmix.average(interleaved: [], channelCount: 2), [])
+    XCTAssertEqual(MonoDownmix.average(interleaved: [1, 2], channelCount: 0), [])
+
+    XCTAssertEqual(InputGain.clamped(80), 24)
+    XCTAssertEqual(InputGain.clamped(-40), -12)
+    XCTAssertEqual(InputGain.clamped(.nan), 0)
+    XCTAssertEqual(InputGain.label(6), "+6 dB")
+    XCTAssertEqual(InputGain.label(-12), "-12 dB")
+
+    let quiet = InputGain.apply([0.25, -0.25], gainDB: 0)
+    XCTAssertEqual(quiet[0], 0.25, accuracy: 0.0001)
+    XCTAssertEqual(quiet[1], -0.25, accuracy: 0.0001)
+
+    let mild = InputGain.softLimit(1.05)
+    let hotter = InputGain.softLimit(1.5)
+    XCTAssertGreaterThan(mild, 0.9)
+    XCTAssertLessThan(mild, hotter)
+    XCTAssertLessThan(hotter, 1)
+    XCTAssertLessThanOrEqual(InputGain.softLimit(100), 1)
+
+    let boosted = InputGain.render(
+      interleaved: [0.2, 0.4],
+      channelCount: 2,
+      downmixToMono: true,
+      gainDB: 12
+    )
+    XCTAssertEqual(boosted.count, 1)
+    XCTAssertGreaterThan(boosted[0], 0.9)
+    XCTAssertLessThan(boosted[0], 1)
+
+    let negative = InputGain.softLimit(-1.5)
+    XCTAssertGreaterThan(negative, -1)
+    XCTAssertLessThan(negative, -0.9)
+
+    let level = SignalLevel.decibels([1, -1, 1, -1])
+    XCTAssertEqual(level, 0, accuracy: 0.01)
+  }
+
+  func testInputGainIsPersistedAndOutOfRangeValuesReset() {
+    let suite = "public-earfi-gain-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defaults.removePersistentDomain(forName: suite)
+    let store = SettingsStore(userDefaults: defaults)
+    var settings = AppSettings.defaults
+    settings.inputGainDB = 12
+    store.save(settings)
+    XCTAssertEqual(store.load().inputGainDB, 12)
+
+    settings.inputGainDB = 48
+    store.save(settings)
+    let resolved = store.loadResolved()
+    XCTAssertEqual(resolved.settings.inputGainDB, 0)
+    XCTAssertEqual(
+      resolved.notice,
+      "Saved settings were invalid (input gain) and were reset. Check Settings, then press Start."
+    )
+  }
+
+  func testChildStopSignalsOnlyTheHelperGroup() {
+    XCTAssertEqual(ChildStop.Target(pid: 400, group: 400).signalTarget, -400)
+    XCTAssertEqual(ChildStop.Target(pid: 400, group: 20).signalTarget, 400)
+    XCTAssertEqual(ChildStop.Target(pid: 400, group: 0).signalTarget, 400)
+    XCTAssertEqual(ChildStop.termSignal, 15)
+    XCTAssertEqual(ChildStop.killSignal, 9)
+    XCTAssertFalse(ChildStop.shouldReap(pid: 1, actualPath: "/tmp/mediamtx", expectedPath: nil))
+    XCTAssertFalse(ChildStop.shouldReap(pid: 40, actualPath: nil, expectedPath: "/bin/mediamtx"))
+    XCTAssertFalse(
+      ChildStop.shouldReap(
+        pid: 40, actualPath: "/opt/homebrew/bin/mediamtx", expectedPath: "/app/mediamtx")
+    )
+    XCTAssertTrue(
+      ChildStop.shouldReap(
+        pid: 40, actualPath: "/app/mediamtx", expectedPath: "/app/mediamtx"))
+    let recorded = SupervisedPIDs(
+      mediamtx: 10,
+      ffmpeg: 11,
+      mediamtxGroup: 10,
+      ffmpegGroup: nil,
+      mediamtxExecutable: "/app/mediamtx",
+      ffmpegExecutable: "/app/ffmpeg"
+    )
+    XCTAssertEqual(
+      recorded.reapTargets,
+      [
+        .init(pid: 10, group: 10, executable: "/app/mediamtx"),
+        .init(pid: 11, group: 0, executable: "/app/ffmpeg"),
+      ]
+    )
+    XCTAssertTrue(BindCheck.reuseAddress(tcp: true))
+    XCTAssertFalse(BindCheck.reuseAddress(tcp: false))
   }
 
   func testChunkedFFmpegStderrWithCarriageReturnsAndPartialUTF8() throws {

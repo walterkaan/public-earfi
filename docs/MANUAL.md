@@ -109,8 +109,9 @@ If macOS says the app **is damaged**, the download or the signature is broken. D
 Open **Public EarFi → Settings…** (Command-,). Settings is in the app menu, under the Public EarFi name. It is not in the File menu.
 
 - **Device.** Pick the USB interface. If you have not chosen one yet, the app prefers a USB interface over the built-in microphone.
-- **Channels.** For an interpreter feed, leave this on **Mono** and choose the input the desk is using, often Input 1. Stereo is for a left-and-right feed.
-- **Level meter.** It is on the main window, and it works before Start. No movement means the desk is not reaching that input, or the channel number is wrong.
+- **Channels.** For an interpreter feed, leave this on **Mono**. Mono mixes every input on the device into one stream, so a stereo desk is heard even when the voice is only on one side. Stereo uses the input you choose and the next one.
+- **Gain.** The slider on the main window goes from -12 dB to +24 dB. Leave it at 0 dB unless the interpreter is quiet. It changes immediately, including while you are live. A loud boost is softened so it does not crackle.
+- **Level meter.** It is on the main window, next to the gain slider, and it works before Start. No movement means the desk is not reaching the interface.
 
 ## Leave the quality on Speech
 
@@ -198,7 +199,7 @@ Your own Wi-Fi still has to carry that 1 Mbps, plus a little overhead, shared am
 |---|---|
 | macOS says the app was not opened, or is from an unidentified developer | Use the Open Anyway steps above. On macOS 15, click Done first, then System Settings → Privacy & Security → Open Anyway. |
 | macOS says the app is damaged | Download it again. Drag a fresh copy to Applications. |
-| The level meter does not move | The desk is not feeding that input, or Mono / Input is the wrong channel. Try the other input number. |
+| The level meter does not move | The desk is not feeding the interface. Mono already mixes every input. Raise Gain if the voice is quiet. |
 | Your test phone will not open the link | The phone is on a different Wi-Fi. Join the same network as the Mac. Turn mobile data off for the test if the phone keeps leaving that network. |
 | Listeners in the venue cannot connect | They are on the venue Wi-Fi, or that Wi-Fi isolates clients. Move them to your own Wi-Fi. If you must use the venue network, ask for a fixed address for the Mac. |
 | The link used to work and now times out | The Mac’s address changed. Check the reservation, then compare the on-screen link with the poster. Make a new poster if they differ. |

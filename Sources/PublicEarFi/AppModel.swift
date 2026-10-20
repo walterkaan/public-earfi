@@ -75,13 +75,15 @@ final class AppModel: ObservableObject {
         self?.levelFraction = fraction
       }
     }
-    controller.reapStaleChildren()
+    let located = HelperLocator.locate()
+    let helperPaths = located.map { [$0.mediamtx.path, $0.ffmpeg.path] } ?? []
+    controller.reapStaleChildren(settings: settings, helperPaths: helperPaths)
     var notices: [String] = []
     if let notice = resolved.notice {
       notices.append(notice)
     }
     notices += adoptDeviceList(AudioDeviceList.inputs())
-    if let helpers = HelperLocator.locate(),
+    if let helpers = located,
       let conflict = controller.bundledConflict(
         settings: settings,
         helperPaths: [helpers.mediamtx.path, helpers.ffmpeg.path]
@@ -277,6 +279,13 @@ final class AppModel: ObservableObject {
     mutate { $0.posterNetworkName = knownSSID }
   }
 
+  func setInputGain(_ db: Double) {
+    let clamped = InputGain.clamped(db)
+    mutate { $0.inputGainDB = clamped }
+    meter.setGainDB(clamped)
+    controller.setInputGain(clamped)
+  }
+
   func chooseDevice(_ uid: String?) {
     let trimmed = uid?.trimmingCharacters(in: .whitespacesAndNewlines)
     let stored = (trimmed?.isEmpty == false) ? trimmed : nil
@@ -439,6 +448,7 @@ final class AppModel: ObservableObject {
     let host = snapshot.advertisedAddress
     runningSignature = BroadcastSignature(snapshot)
     restartMeter()
+    controller.setInputGain(snapshot.inputGainDB)
     controller.start(
       BroadcastLaunch(
         settings: snapshot,
@@ -600,6 +610,7 @@ final class AppModel: ObservableObject {
   }
 
   private func restartMeter() {
+    meter.setGainDB(settings.inputGainDB)
     meter.start(deviceID: selectedDevice?.deviceID)
   }
 

@@ -31,6 +31,16 @@ final class CapturePipe {
   private var writePos = 0
   private var stored = 0
   private var frameBytes = MemoryLayout<Float>.size
+  private var captureChannels = 1
+  private var downmixToMono = false
+  private let gainLock = NSLock()
+  private var gainDB = InputGain.defaultDB
+
+  func setGainDB(_ db: Double) {
+    gainLock.lock()
+    gainDB = InputGain.clamped(db)
+    gainLock.unlock()
+  }
 
   /// Starts capture. Returns an error string the UI can show.
   func start(
@@ -64,6 +74,7 @@ final class CapturePipe {
       return "The audio device has no input stream."
     }
     let inputCount = Int(hardware.channelCount)
+    let mono = channelMode == .mono
     let map = CaptureChannelMap.indices(
       mode: channelMode,
       inputChannel: inputChannel,
@@ -72,7 +83,8 @@ final class CapturePipe {
     guard !map.isEmpty, map.allSatisfy({ $0 >= 0 && $0 < inputCount }) else {
       return "Could not map the selected input channel."
     }
-    let channels = AVAudioChannelCount(map.count)
+    let convertCount = mono ? inputCount : map.count
+    let channels = AVAudioChannelCount(convertCount)
     guard
       let target = AVAudioFormat(
         commonFormat: .pcmFormatFloat32,
@@ -87,6 +99,8 @@ final class CapturePipe {
       return "Could not convert the device audio to 48 kHz."
     }
     converter.channelMap = map.map { NSNumber(value: $0) }
+    downmixToMono = mono
+    captureChannels = convertCount
     let ratio = Double(FFmpegCommand.sampleRate) / hardware.sampleRate
     let capacity = AVAudioFrameCount(ceil(8_192 * ratio) + 32)
     guard let converted = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else {
@@ -98,7 +112,8 @@ final class CapturePipe {
       _ = fcntl(descriptor, F_SETFL, flags | O_NONBLOCK)
     }
     condition.lock()
-    frameBytes = max(MemoryLayout<Float>.size, Int(channels) * MemoryLayout<Float>.size)
+    let pipeChannels = mono ? 1 : map.count
+    frameBytes = max(MemoryLayout<Float>.size, pipeChannels * MemoryLayout<Float>.size)
     readPos = 0
     writePos = 0
     stored = 0
@@ -187,7 +202,9 @@ final class CapturePipe {
     guard error == nil, status != .error, output.frameLength > 0 else { return }
     let list = output.audioBufferList.pointee
     if list.mNumberBuffers == 1, let raw = list.mBuffers.mData, list.mBuffers.mDataByteSize > 0 {
-      enqueue(raw, count: Int(list.mBuffers.mDataByteSize))
+      let sampleCount = Int(list.mBuffers.mDataByteSize) / MemoryLayout<Float>.size
+      let pointer = raw.bindMemory(to: Float.self, capacity: sampleCount)
+      emit(Array(UnsafeBufferPointer(start: pointer, count: sampleCount)))
       return
     }
     guard let channels = output.floatChannelData else { return }
@@ -200,10 +217,27 @@ final class CapturePipe {
         interleaved[frame * channelCount + channel] = channels[channel][frame]
       }
     }
-    interleaved.withUnsafeBytes { raw in
+    emit(interleaved)
+  }
+
+  private func emit(_ samples: [Float]) {
+    let rendered = InputGain.render(
+      interleaved: samples,
+      channelCount: captureChannels,
+      downmixToMono: downmixToMono,
+      gainDB: currentGain()
+    )
+    guard !rendered.isEmpty else { return }
+    rendered.withUnsafeBytes { raw in
       guard let base = raw.baseAddress else { return }
       enqueue(base, count: raw.count)
     }
+  }
+
+  private func currentGain() -> Double {
+    gainLock.lock()
+    defer { gainLock.unlock() }
+    return gainDB
   }
 
   private func enqueue(_ raw: UnsafeRawPointer, count: Int) {
