@@ -1,6 +1,6 @@
 # Public EarFi
 
-Stream live audio from a Mac to phone browsers on the same Wi-Fi. People scan a QR code and listen. They do not install an app or sign in.
+Stream live audio from a Mac to phone browsers on the same Wi-Fi. The main use is a live interpreter: about 30 listeners on phones, over venue Wi-Fi. People scan a QR code and listen. They do not install an app or sign in.
 
 Public EarFi is free and open source (MIT). Copyright (c) 2026 Walter Kaan. It is local only: the audio does not go to the internet.
 
@@ -13,7 +13,7 @@ Sound desk → USB interface → ffmpeg (avfoundation, Opus)
           → RTSP → MediaMTX → WebRTC → phone browsers
 ```
 
-Listeners open `http://<mac-ip>:8889/live`. The default is the Speech preset: Opus at 16 kHz, 32 kbps, mono, so 50 listeners are about 1.6 Mbps of audio. That is much lighter on a crowded venue access point than uncompressed audio. The interface can stay at its native 44.1 or 48 kHz; ffmpeg resamples.
+Listeners open `http://<mac-ip>:8889/live`. The default is the Speech preset: Opus at 16 kHz, 32 kbps, mono. About 30 listeners at that rate are under 1 Mbps of audio (30 × 32 kbps = 0.96 Mbps), which is what a crowded venue access point can carry. The interface can stay at its native 44.1 or 48 kHz; ffmpeg resamples.
 
 The app bundles MediaMTX and an LGPL build of FFmpeg with libopus. You do not need Homebrew or Terminal to run it.
 
@@ -65,7 +65,7 @@ The same steps are in `docs/FIRST-OPEN.txt`, which is copied onto the DMG.
 - If listeners cannot connect, check System Settings → Network → Firewall. RTSP and the control API stay on 127.0.0.1 and do not need a firewall exception.
 - **TCP only** in Settings is the Wi-Fi-friendly mode. Try it if listeners hear dropouts.
 - Ask listeners to keep the phone screen on and the browser in front. Plug phones in for a long session.
-- A busy access point has limited airtime. The default Speech preset is 32 kbps, about 1.6 Mbps for 50 listeners (a bit more with network overhead). Standard 64 kbps is about 3.2 Mbps for 50 people. 100 listeners at Speech is about 3.2 Mbps.
+- A busy access point has limited airtime. The target is about 30 phones at the default Speech preset: 0.96 Mbps of audio, a bit more with network overhead. Standard 64 kbps is about 1.9 Mbps for the same 30 people.
 
 ## Using the app
 
@@ -73,7 +73,7 @@ The main window is the broadcast. Settings, the poster, and the log each open in
 
 **Running.** Start and Stop, a level meter (it works before you go live), the listener URL, a QR code, how many people are listening, and the latest health line. Copy diagnostics is on that window. Click the QR code to show it full screen. **View → Show Log** (Cmd-L) opens the full log.
 
-**Settings.** **Public EarFi → Settings…** (Cmd-,). Input device, mono or stereo and which channel, Speech 32k / Standard 64k / Music 96k (Music is 96 kbps mono or 128 kbps stereo), and an Opus sample rate (8, 12, 16, 24, or 48 kHz). Speech is the default: mono, 16 kHz, 32 kbps. Choosing Speech sets those three. The interface is left at its native rate; ffmpeg's aresample converts. Stream name, port, and network mode are here too. Keep the Mac awake while broadcasting. Launch at login and start-on-open are off by default. Reset to defaults restores every setting, including the poster text, and does not delete logs. If you change a broadcast setting while live, the app offers to apply it with a brief interruption.
+**Settings.** **Public EarFi → Settings…** (Cmd-,). Input device, mono or stereo and which channel, Speech 32k / Standard 64k / Music 96k (Music is 96 kbps mono or 128 kbps stereo), and an Opus sample rate (8, 12, 16, 24, or 48 kHz). Speech is the default, and it is the preset for a live interpreter: mono, 16 kHz, 32 kbps, sized for about 30 phones. Choosing Speech sets those three. The interface is left at its native rate; ffmpeg's aresample converts. Stream name, port, and network mode are here too. Keep the Mac awake while broadcasting. Launch at login and start-on-open are off by default. Reset to defaults restores every setting, including the poster text, and does not delete logs. If you change a broadcast setting while live, the app offers to apply it with a brief interruption.
 
 **Poster.** **File → Print Poster…** (Cmd-P) opens the poster window. **File → Export Poster PDF…** (Cmd-Shift-E) saves a PDF without opening that window. The poster window still has Export PDF, Print, and Copy QR image. **Edit** has Copy Listener Link and Copy QR Image. Header, description, instructions, optional Wi-Fi name, A4 or Letter, and IP or `.local`. The default paper size is Letter in the US and Canada and A4 elsewhere. The default instructions include: *No sound? Tap the speaker/mute icon on the player or in your browser tab, and turn up your phone volume.*
 
@@ -119,5 +119,5 @@ Each GitHub release attaches the matching FFmpeg source tarball and `scripts/bui
 ## Known limits
 
 - Phone operating systems may pause or stop WebRTC audio when the screen locks or the browser is in the background.
-- Every listener is their own stream. Plan on about 1.6 Mbps for 50 people at the default Speech preset, plus some protocol overhead. Standard 64 kbps is about 3.2 Mbps.
-- A 50-listener, 2-hour session on a wired Mac is the acceptance target. It still has to be tried at a real venue.
+- Every listener is their own stream. Plan on about 1 Mbps for 30 people at the default Speech preset, plus some protocol overhead. Standard 64 kbps is about 1.9 Mbps for the same 30.
+- About 30 listeners, phones on venue Wi-Fi, for a live interpreter, is the target. It still has to be tried at a real venue.

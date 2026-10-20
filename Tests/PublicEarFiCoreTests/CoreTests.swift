@@ -30,7 +30,8 @@ final class SettingsTests: XCTestCase {
     XCTAssertEqual(settings.posterNetworkName, "")
     XCTAssertNil(settings.posterPaperSize)
     XCTAssertTrue(settings.posterUseFooter)
-    XCTAssertEqual(settings.bandwidthHint, "50 listeners ≈ 1.6 Mbps")
+    XCTAssertEqual(AppSettings.listenerTarget, 30)
+    XCTAssertEqual(settings.bandwidthHint, "30 listeners ≈ 0.96 Mbps")
     XCTAssertTrue(validate(settings).isEmpty)
   }
 
@@ -41,7 +42,8 @@ final class SettingsTests: XCTestCase {
     XCTAssertEqual(settings.sampleRate, 16_000)
     XCTAssertEqual(settings.resolvedBitrateKbps, 32)
     XCTAssertEqual(settings.opusApplication, "voip")
-    XCTAssertEqual(settings.bandwidthHint, "50 listeners ≈ 1.6 Mbps")
+    XCTAssertEqual(AppSettings.listenerTarget, 30)
+    XCTAssertEqual(settings.bandwidthHint, "30 listeners ≈ 0.96 Mbps")
     settings.sampleRate = 48_000
     XCTAssertTrue(validate(settings).isEmpty)
     settings.sampleRate = 44_100

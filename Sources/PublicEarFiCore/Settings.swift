@@ -153,6 +153,9 @@ public struct AppSettings: Codable, Equatable {
     quality == .speech ? "voip" : "audio"
   }
 
+  /// Live interpreter: about 30 phones on venue Wi-Fi. The bandwidth hint uses this.
+  public static let listenerTarget = 30
+
   /// Speech is the verified preset: mono, 16 kHz, 32 kbps. Choosing it sets those.
   public mutating func applyPreset(_ preset: QualityPreset) {
     quality = preset
@@ -167,7 +170,7 @@ public struct AppSettings: Codable, Equatable {
   }
 
   public var bandwidthHint: String {
-    let listeners = 50
+    let listeners = Self.listenerTarget
     let text = formatMbps(estimatedMegabits(listeners: listeners))
     return "\(listeners) listeners ≈ \(text) Mbps"
   }
