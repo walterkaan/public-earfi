@@ -228,7 +228,7 @@ enum AudioInputBind {
         UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
       )
       if status == noErr {
-        setIdentityChannelMap(audioUnit, channels: channels)
+        setIdentityChannelMap(audioUnit: audioUnit, channels: channels)
         return format
       }
     }
