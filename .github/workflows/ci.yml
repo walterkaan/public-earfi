@@ -60,6 +60,9 @@ jobs:
           "dist/Public EarFi.app/Contents/Helpers/ffmpeg" -version | grep -- '--enable-libopus'
           "dist/Public EarFi.app/Contents/Helpers/ffmpeg" -hide_banner -buildconf | grep -q -- '--disable-gpl'
 
+      - name: Smoke test pcm_f32le publish to MediaMTX
+        run: ./scripts/smoke-rtsp.sh "dist/Public EarFi.app"
+
       - name: Package a DMG
         run: ./scripts/package-dmg.sh
 

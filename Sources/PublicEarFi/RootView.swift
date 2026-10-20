@@ -176,6 +176,7 @@ struct RunningTab: View {
         SectionLabel(text: "Health")
         Text(model.health)
           .font(.system(.caption, design: .monospaced))
+          .fixedSize(horizontal: false, vertical: true)
           .padding(6)
           .frame(maxWidth: .infinity, alignment: .leading)
           .background(Color.yellow.opacity(0.18))

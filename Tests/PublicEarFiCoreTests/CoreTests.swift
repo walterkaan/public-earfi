@@ -375,6 +375,29 @@ final class PosterAndSupervisorTests: XCTestCase {
       HealthText.restarted(component: "ffmpeg", count: 1, limit: 5, time: "11:47:20"),
       "11:47:20 ffmpeg restarted after exit (1/5) — OK"
     )
+    XCTAssertEqual(
+      HealthText.retrying(
+        component: "ffmpeg",
+        detail: "the stream was not ready within 5 s",
+        count: 1,
+        limit: 5,
+        time: "11:47:20",
+        extra: "Decoding requested, but no decoder found for: pcm_f32le"
+      ),
+      """
+      11:47:20 ffmpeg: the stream was not ready within 5 s (1/5). Retrying.
+      Decoding requested, but no decoder found for: pcm_f32le
+      """
+    )
+    XCTAssertTrue(
+      HealthText.retrying(
+        component: "ffmpeg", detail: "exited with status 234", count: 5, limit: 5,
+        time: "11:47:20", extra: nil
+      ).contains("Still retrying every 30 s.")
+    )
+    XCTAssertTrue(StreamLog.isFailure("no decoder found for: pcm_f32le"))
+    XCTAssertTrue(StreamLog.isFailure("Error opening output files: Invalid argument"))
+    XCTAssertFalse(StreamLog.isFailure("configuration loaded"))
     XCTAssertTrue(StreamLog.isFrameDrop("Thread message queue blocking"))
     XCTAssertTrue(StreamLog.isFrameDrop("aresample drift detected"))
     XCTAssertFalse(StreamLog.isFrameDrop("configuration loaded"))
@@ -439,11 +462,25 @@ final class APIAndCreditsTests: XCTestCase {
     XCTAssertTrue(ffmpeg.notes.contains(CreditsRules.ffmpegStatement))
     XCTAssertTrue(ffmpeg.notes.contains("ffmpeg-9.0.2-source.tar.xz"))
     let flags = try XCTUnwrap(ffmpeg.configureFlags)
+    let flagFile = root.appendingPathComponent("scripts/ffmpeg-configure-flags.txt")
+    let expectedFlags = try String(contentsOf: flagFile, encoding: .utf8)
+      .split(whereSeparator: \.isNewline)
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+      .filter { !$0.isEmpty && !$0.hasPrefix("#") }
+      .joined(separator: " ")
+    XCTAssertEqual(flags, expectedFlags)
     XCTAssertTrue(flags.contains("--disable-gpl"))
     XCTAssertTrue(flags.contains("--disable-nonfree"))
     XCTAssertTrue(flags.contains("--enable-libopus"))
     XCTAssertTrue(flags.contains("--enable-avfoundation"))
-    XCTAssertFalse(flags.contains("--enable-gpl"))
+    XCTAssertTrue(flags.contains("pcm_f32le"))
+    XCTAssertTrue(flags.contains("pcm_s16le"))
+    XCTAssertTrue(flags.contains("pcm_s24le"))
+    XCTAssertTrue(flags.contains("pcm_s32le"))
+    XCTAssertTrue(flags.contains("pcm_f64le"))
+    XCTAssertTrue(flags.contains("--enable-filter=aresample,pan,astats,aformat"))
+    XCTAssertTrue(flags.contains("--enable-protocol=tcp,udp,rtp,http"))
+    XCTAssertFalse(flags.contains(" --enable-gpl"))
     XCTAssertFalse(flags.contains("--enable-nonfree"))
     let lgpl = try String(
       contentsOf: licenses.appendingPathComponent(ffmpeg.licenseFile), encoding: .utf8)

@@ -64,6 +64,30 @@ public enum HealthText {
   public static func problem(component: String) -> String {
     "\(component) keeps stopping. Still retrying every 30 s."
   }
+
+  /// Shown on every failed attempt, including the 5 s "stream not ready" timeout.
+  /// The recovered "— OK" line is only for a restart that has not failed again.
+  public static func retrying(
+    component: String,
+    detail: String,
+    count: Int,
+    limit: Int,
+    time: String,
+    extra: String?
+  ) -> String {
+    var lines = ["\(time) \(component): \(detail) (\(count)/\(limit)). Retrying."]
+    if let extra {
+      let trimmed = extra.trimmingCharacters(in: .whitespacesAndNewlines)
+      if !trimmed.isEmpty {
+        let cap = 220
+        lines.append(trimmed.count > cap ? String(trimmed.prefix(cap)) + "…" : trimmed)
+      }
+    }
+    if count >= limit {
+      lines.append("Still retrying every 30 s.")
+    }
+    return lines.joined(separator: "\n")
+  }
 }
 
 public enum StreamLog {
@@ -73,6 +97,15 @@ public enum StreamLog {
     if folded.contains("aresample") && (folded.contains("drift") || folded.contains("queue")) {
       return true
     }
+    return false
+  }
+
+  public static func isFailure(_ line: String) -> Bool {
+    let folded = line.lowercased()
+    if folded.contains("no decoder") { return true }
+    if folded.contains("error") { return true }
+    if folded.contains("invalid argument") { return true }
+    if folded.contains("failed") { return true }
     return false
   }
 }

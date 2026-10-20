@@ -39,6 +39,11 @@ final class BroadcastController {
   private var launch: BroadcastLaunch?
   private let logger: FileLogger
   private var frameDrops = 0
+  private let logLock = NSLock()
+  private var lastFFmpegError: String?
+  private var ffmpegPartial = ""
+  private var ffmpegLog: FileHandle?
+  private var ffmpegAttemptClosed = false
 
   init(logger: FileLogger) {
     self.logger = logger
@@ -159,6 +164,8 @@ final class BroadcastController {
     }
     stopProcess(ffmpeg)
     ffmpeg = nil
+    ffmpegAttemptClosed = false
+    resetFFmpegErrors()
     let process = Process()
     process.executableURL = launch.helpers.ffmpeg
     process.arguments = FFmpegCommand.arguments(deviceName: name, settings: launch.settings)
@@ -173,7 +180,15 @@ final class BroadcastController {
     writePIDs()
     logger.log("ffmpeg", "started pid \(process.processIdentifier)")
     guard waitUntilReady(stream: launch.settings.streamName) else {
-      noteFailure(component: "ffmpeg", detail: "the stream was not ready within 5 s")
+      let stillRunning = process.isRunning
+      let status = process.terminationStatus
+      abandon(process)
+      ffmpeg = nil
+      let detail =
+        stillRunning
+        ? "the stream was not ready within 5 s"
+        : "exited with status \(status)"
+      noteFailure(component: "ffmpeg", detail: detail)
       return
     }
     becameLive()
@@ -201,9 +216,15 @@ final class BroadcastController {
     process.standardOutput = pipe
     process.standardError = pipe
     process.standardInput = FileHandle.nullDevice
+    if source == "ffmpeg" {
+      ffmpegLog = pipe.fileHandleForReading
+    }
     pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
       let data = handle.availableData
       guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+      if source == "ffmpeg" {
+        self?.noteFFmpegOutput(text)
+      }
       self?.queue.async {
         self?.ingest(text, source: source)
       }
@@ -227,6 +248,40 @@ final class BroadcastController {
     }
   }
 
+  private func resetFFmpegErrors() {
+    logLock.lock()
+    lastFFmpegError = nil
+    ffmpegPartial = ""
+    logLock.unlock()
+  }
+
+  /// Records ffmpeg failures as bytes arrive, including while the supervisor
+  /// queue is blocked inside the 5 s ready wait.
+  private func noteFFmpegOutput(_ text: String) {
+    logLock.lock()
+    defer { logLock.unlock() }
+    ffmpegPartial += text
+    while let newline = ffmpegPartial.firstIndex(of: "\n") {
+      let line = String(ffmpegPartial[..<newline])
+      ffmpegPartial.removeSubrange(...ffmpegPartial.index(after: newline))
+      rememberFailure(line)
+    }
+  }
+
+  private func rememberFailure(_ line: String) {
+    let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+    if StreamLog.isFailure(trimmed) {
+      lastFFmpegError = trimmed
+    }
+  }
+
+  private func ffmpegErrorLine() -> String? {
+    logLock.lock()
+    defer { logLock.unlock() }
+    rememberFailure(ffmpegPartial)
+    return lastFFmpegError
+  }
+
   private func handleExit(_ process: Process, source: String) {
     if ignoredPIDs.contains(process.processIdentifier) {
       ignoredPIDs.remove(process.processIdentifier)
@@ -237,14 +292,40 @@ final class BroadcastController {
     }
     if process.processIdentifier == ffmpeg?.processIdentifier {
       ffmpeg = nil
+      drainFFmpegLog()
     }
     guard desired, !stopping else { return }
-    logger.log(source, "exited with status \(process.terminationStatus)")
+    let status = process.terminationStatus
+    logger.log(source, "exited with status \(status)")
     if source == "mediamtx" {
-      noteFailure(component: "mediamtx", detail: "mediamtx exited")
+      noteFailure(component: "mediamtx", detail: "mediamtx exited with status \(status)")
     } else {
-      noteFailure(component: "ffmpeg", detail: "ffmpeg exited")
+      noteFailure(component: "ffmpeg", detail: "exited with status \(status)")
     }
+  }
+
+  private func drainFFmpegLog() {
+    guard let handle = ffmpegLog else { return }
+    let data = handle.availableData
+    guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+    noteFFmpegOutput(text)
+    ingest(text, source: "ffmpeg")
+  }
+
+  private func abandon(_ process: Process?) {
+    guard let process else { return }
+    ignoredPIDs.insert(process.processIdentifier)
+    guard process.isRunning else { return }
+    process.interrupt()
+    let grace = Date().addingTimeInterval(3)
+    while process.isRunning && Date() < grace {
+      Thread.sleep(forTimeInterval: 0.05)
+    }
+    if process.isRunning {
+      kill(process.processIdentifier, SIGKILL)
+      process.waitUntilExit()
+    }
+    drainFFmpegLog()
   }
 
   private func becameLive() {
@@ -257,26 +338,28 @@ final class BroadcastController {
 
   private func noteFailure(component: String, detail: String) {
     guard desired, !stopping else { return }
+    if component == "ffmpeg" {
+      if ffmpegAttemptClosed { return }
+      ffmpegAttemptClosed = true
+    }
     failures += 1
     stableSince = nil
     stopPoller()
     logger.log(component, detail)
     let time = clock(Date())
-    if RestartBackoff.showsProblem(failureCount: failures) {
-      let message = HealthText.problem(component: component)
-      publish(.problem(message))
-      publishHealth("\(time) \(message)")
-    } else {
-      publishHealth(
-        HealthText.restarted(
-          component: component,
-          count: failures,
-          limit: RestartBackoff.problemAfter,
-          time: time
-        )
-      )
-      publish(.starting)
-    }
+    let health = HealthText.retrying(
+      component: component,
+      detail: detail,
+      count: failures,
+      limit: RestartBackoff.problemAfter,
+      time: time,
+      extra: component == "ffmpeg" ? ffmpegErrorLine() : nil
+    )
+    let status =
+      RestartBackoff.showsProblem(failureCount: failures)
+      ? HealthText.problem(component: component) : detail
+    publish(.problem(status))
+    publishHealth(health)
     let delay = RestartBackoff.delay(forFailureCount: failures)
     let work = DispatchWorkItem { [weak self] in
       guard let self, self.desired, !self.stopping else { return }
@@ -340,12 +423,21 @@ final class BroadcastController {
   }
 
   private func waitUntilReady(stream: String) -> Bool {
-    waitUntil(timeout: 5) {
-      guard let data = self.httpGet(MediaMTXAPI.pathGetPath(streamName: stream)),
-        let snapshot = try? MediaMTXAPI.parsePath(data)
-      else { return false }
-      return snapshot.ready
+    let deadline = Date().addingTimeInterval(5)
+    while Date() < deadline {
+      if !desired || stopping { return false }
+      if ffmpeg?.isRunning != true { return false }
+      if pathIsReady(stream) { return true }
+      Thread.sleep(forTimeInterval: 0.2)
     }
+    return ffmpeg?.isRunning == true && pathIsReady(stream)
+  }
+
+  private func pathIsReady(_ stream: String) -> Bool {
+    guard let data = httpGet(MediaMTXAPI.pathGetPath(streamName: stream)),
+      let snapshot = try? MediaMTXAPI.parsePath(data)
+    else { return false }
+    return snapshot.ready
   }
 
   private func waitUntil(timeout: TimeInterval, _ probe: () -> Bool) -> Bool {

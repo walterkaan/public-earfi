@@ -135,7 +135,22 @@ needed = {
     "CONFIG_RTP_MUXER": "1",
     "CONFIG_PAN_FILTER": "1",
     "CONFIG_ARESAMPLE_FILTER": "1",
+    "CONFIG_AFORMAT_FILTER": "1",
     "CONFIG_TCP_PROTOCOL": "1",
+    "CONFIG_UDP_PROTOCOL": "1",
+    "CONFIG_RTP_PROTOCOL": "1",
+    "CONFIG_HTTP_PROTOCOL": "1",
+    "CONFIG_PCM_F32LE_DECODER": "1",
+    "CONFIG_PCM_F32BE_DECODER": "1",
+    "CONFIG_PCM_F64LE_DECODER": "1",
+    "CONFIG_PCM_F64BE_DECODER": "1",
+    "CONFIG_PCM_S16LE_DECODER": "1",
+    "CONFIG_PCM_S16BE_DECODER": "1",
+    "CONFIG_PCM_S24LE_DECODER": "1",
+    "CONFIG_PCM_S24BE_DECODER": "1",
+    "CONFIG_PCM_S32LE_DECODER": "1",
+    "CONFIG_PCM_S32BE_DECODER": "1",
+    "CONFIG_PCM_F32LE_DEMUXER": "1",
 }
 missing = [f"#define {key} {value}" for key, value in needed.items() if f"#define {key} {value}" not in text]
 if missing:
