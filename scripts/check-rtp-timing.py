@@ -18,7 +18,10 @@ FRAME_SAMPLES = 960  # 20 ms at 48 kHz
 WARMUP_SECONDS = 1.0
 MIN_PACKETS = 1_400  # 28 s at 50 packets/s
 MIN_SPAN_SECONDS = 28.0
-MAX_ARRIVAL_GAP_SECONDS = 0.15
+# A missing frame shows up as a sequence or timestamp jump. Arrival time is
+# only a backstop: the macOS CI runner has delayed a single packet by about
+# 170 ms while the RTP timestamp stayed exact, and that is not a click.
+MAX_ARRIVAL_GAP_SECONDS = 0.5
 
 
 def assess(packets):
@@ -218,7 +221,7 @@ def self_test():
         raise SystemExit("self-test missed a timestamp gap")
     late = list(good)
     arrival, sequence, timestamp = late[200]
-    late[200] = (arrival + 0.25, sequence, timestamp)
+    late[200] = (arrival + 0.6, sequence, timestamp)
     if assess(late) is None:
         raise SystemExit("self-test missed a late packet")
     print("RTP timing self-test passed")
