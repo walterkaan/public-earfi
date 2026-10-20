@@ -1,4 +1,5 @@
 import Foundation
+import PublicEarFiCore
 
 enum BroadcastPhase: Equatable {
   case stopped

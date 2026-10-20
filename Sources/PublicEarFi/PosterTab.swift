@@ -1,3 +1,4 @@
+import PublicEarFiCore
 import SwiftUI
 
 struct PosterTab: View {

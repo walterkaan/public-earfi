@@ -2,6 +2,7 @@ import CoreWLAN
 import Darwin
 import Foundation
 import Network
+import PublicEarFiCore
 import SystemConfiguration
 
 enum InterfaceEnumerator {
@@ -32,7 +33,7 @@ enum InterfaceEnumerator {
   }
 
   static func currentSSID() -> String? {
-    guard let data = CWWiFiClient.shared().interface()?.ssidData else { return nil }
+    guard let data = CWWiFiClient.shared().interface()?.ssidData() else { return nil }
     return String(data: data, encoding: .utf8)
   }
 

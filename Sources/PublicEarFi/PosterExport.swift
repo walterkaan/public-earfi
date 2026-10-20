@@ -1,4 +1,5 @@
 import AppKit
+import PublicEarFiCore
 import SwiftUI
 import UniformTypeIdentifiers
 

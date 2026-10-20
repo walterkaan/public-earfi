@@ -1,3 +1,4 @@
+import PublicEarFiCore
 import SwiftUI
 
 struct RootView: View {

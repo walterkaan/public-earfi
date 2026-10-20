@@ -1,6 +1,7 @@
 import AVFoundation
 import AppKit
 import Foundation
+import PublicEarFiCore
 import SwiftUI
 
 @MainActor

@@ -1,4 +1,5 @@
 import Foundation
+import PublicEarFiCore
 
 struct HelperLocations: Equatable {
   var mediamtx: URL
