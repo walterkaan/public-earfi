@@ -674,6 +674,59 @@ final class APIAndCreditsTests: XCTestCase {
     XCTAssertTrue(report.contains("Recent log (200 lines)"))
   }
 
+  func testChunkedFFmpegStderrWithCarriageReturnsAndPartialUTF8() throws {
+    var buffer = ProcessOutputBuffer(historyLimit: 64)
+    XCTAssertEqual(buffer.append(Data()), [])
+
+    var lines: [String] = []
+    let hello = Data("hello\n".utf8)
+    for byte in hello {
+      lines.append(contentsOf: buffer.append(Data([byte])))
+    }
+    XCTAssertEqual(lines, ["hello"])
+    XCTAssertEqual(buffer.remainder, "")
+
+    XCTAssertEqual(
+      buffer.append(Data("frame= 1 fps=0.0 size= 0kB speed=1.0x\r".utf8)),
+      ["frame= 1 fps=0.0 size= 0kB speed=1.0x"]
+    )
+    XCTAssertEqual(
+      buffer.append(Data("frame= 2 fps=0.0 size= 1kB speed=1.0x\r".utf8)),
+      ["frame= 2 fps=0.0 size= 1kB speed=1.0x"]
+    )
+    XCTAssertEqual(buffer.append(Data("\n".utf8)), [])
+
+    let cafe = [UInt8]("café failed\n".utf8)
+    let split = try XCTUnwrap(cafe.firstIndex(of: 0xC3))
+    XCTAssertEqual(buffer.append(Data(cafe[..<(split + 1)])), [])
+    XCTAssertEqual(
+      buffer.append(Data(cafe[(split + 1)...])),
+      ["café failed"]
+    )
+    XCTAssertEqual(buffer.remainder, "")
+
+    XCTAssertEqual(buffer.append(Data("Error opening ".utf8)), [])
+    XCTAssertEqual(buffer.remainder, "Error opening ")
+    XCTAssertEqual(
+      buffer.append(Data("output files: Invalid argument\r\n".utf8)),
+      ["Error opening output files: Invalid argument"]
+    )
+
+    XCTAssertEqual(
+      buffer.append(Data([0x62, 0x61, 0x64, 0xFF, 0x0A])),
+      ["bad\u{FFFD}"]
+    )
+
+    var capped = ProcessOutputBuffer(historyLimit: 32)
+    _ = capped.append(Data(String(repeating: "a", count: 100).utf8) + Data([0x0A]))
+    _ = capped.append(Data("listen tcp :8889: bind: address already in use\n".utf8))
+    XCTAssertLessThanOrEqual(capped.excerpt.utf8.count, 32)
+    XCTAssertTrue(capped.excerpt.hasSuffix("address already in use\n"))
+    capped.reset()
+    XCTAssertEqual(capped.remainder, "")
+    XCTAssertEqual(capped.excerpt, "")
+  }
+
   func testSupportPaths() {
     let home = URL(fileURLWithPath: "/Users/volunteer")
     XCTAssertEqual(

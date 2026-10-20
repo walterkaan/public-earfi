@@ -44,16 +44,21 @@ final class BroadcastController {
   private var launch: BroadcastLaunch?
   private let logger: FileLogger
   private var frameDrops = 0
-  private let logLock = NSLock()
+  /// Serializes helper stdout/stderr. The file-handle callback is a different
+  /// queue, and the supervisor queue is blocked during the ready wait.
+  private let outputQueue = DispatchQueue(label: "earfi.output")
+  private let epochLock = NSLock()
+  private var ffmpegEpoch = 0
+  private var mediamtxEpoch = 0
   private var lastFFmpegError: String?
-  private var ffmpegPartial = ""
+  private var ffmpegOutput = ProcessOutputBuffer()
+  private var mediamtxOutput = ProcessOutputBuffer()
   private var ffmpegLog: FileHandle?
   private var ffmpegAttemptClosed = false
   private let capture = CapturePipe()
   private var ffmpegInput: Pipe?
   private var helperPaths: [String] = []
   private var mediamtxLog: FileHandle?
-  private var mediamtxLogTail = ""
 
   init(logger: FileLogger) {
     self.logger = logger
@@ -296,24 +301,24 @@ final class BroadcastController {
     process.standardOutput = pipe
     process.standardError = pipe
     process.standardInput = FileHandle.nullDevice
+    let reading = pipe.fileHandleForReading
     if source == "ffmpeg" {
-      ffmpegLog = pipe.fileHandleForReading
+      ffmpegLog = reading
     }
     if source == "mediamtx" {
-      mediamtxLog = pipe.fileHandleForReading
+      mediamtxLog = reading
       resetMediaMTXLog()
     }
-    pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+    let epoch = beginEpoch(source)
+    reading.readabilityHandler = { [weak self] handle in
       let data = handle.availableData
-      guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
-      if source == "ffmpeg" {
-        self?.noteFFmpegOutput(text)
+      if data.isEmpty {
+        handle.readabilityHandler = nil
+        return
       }
-      if source == "mediamtx" {
-        self?.rememberMediaMTX(text)
-      }
-      self?.queue.async {
-        self?.ingest(text, source: source)
+      self?.outputQueue.async {
+        guard let self, self.epochMatches(source, epoch) else { return }
+        self.consume(data, source: source)
       }
     }
     process.terminationHandler = { [weak self] process in
@@ -323,35 +328,39 @@ final class BroadcastController {
     }
   }
 
-  private func ingest(_ text: String, source: String) {
-    for raw in text.split(separator: "\n") {
-      let line = String(raw)
-      logger.log(source, line)
-      publishLog(source, line)
-      if source == "ffmpeg" && StreamLog.isFrameDrop(line) {
-        frameDrops += 1
-        publishHealth("\(clock(Date())) frame drops: \(frameDrops)")
-      }
+  /// Runs on `outputQueue`. Line breaks are bytes, so a chunk that ends on
+  /// `\n` or a `\r` progress line cannot trip `String.index(after:)`.
+  private func consume(_ data: Data, source: String) {
+    let lines: [String]
+    if source == "ffmpeg" {
+      lines = ffmpegOutput.append(data)
+    } else {
+      lines = mediamtxOutput.append(data)
+    }
+    for line in lines {
+      accept(line, source: source)
+    }
+  }
+
+  private func accept(_ line: String, source: String) {
+    logger.log(source, line)
+    publishLog(source, line)
+    guard source == "ffmpeg" else { return }
+    rememberFailure(line)
+    guard StreamLog.isFrameDrop(line) else { return }
+    queue.async { [weak self] in
+      guard let self else { return }
+      self.frameDrops += 1
+      self.publishHealth("\(self.clock(Date())) frame drops: \(self.frameDrops)")
     }
   }
 
   private func resetFFmpegErrors() {
-    logLock.lock()
-    lastFFmpegError = nil
-    ffmpegPartial = ""
-    logLock.unlock()
-  }
-
-  /// Records ffmpeg failures as bytes arrive, including while the supervisor
-  /// queue is blocked inside the 5 s ready wait.
-  private func noteFFmpegOutput(_ text: String) {
-    logLock.lock()
-    defer { logLock.unlock() }
-    ffmpegPartial += text
-    while let newline = ffmpegPartial.firstIndex(of: "\n") {
-      let line = String(ffmpegPartial[..<newline])
-      ffmpegPartial.removeSubrange(...ffmpegPartial.index(after: newline))
-      rememberFailure(line)
+    ffmpegLog?.readabilityHandler = nil
+    _ = beginEpoch("ffmpeg")
+    outputQueue.sync {
+      self.lastFFmpegError = nil
+      self.ffmpegOutput.reset()
     }
   }
 
@@ -363,10 +372,28 @@ final class BroadcastController {
   }
 
   private func ffmpegErrorLine() -> String? {
-    logLock.lock()
-    defer { logLock.unlock() }
-    rememberFailure(ffmpegPartial)
-    return lastFFmpegError
+    outputQueue.sync {
+      self.rememberFailure(self.ffmpegOutput.remainder)
+      return self.lastFFmpegError
+    }
+  }
+
+  private func beginEpoch(_ source: String) -> Int {
+    epochLock.lock()
+    defer { epochLock.unlock() }
+    if source == "ffmpeg" {
+      ffmpegEpoch += 1
+      return ffmpegEpoch
+    }
+    mediamtxEpoch += 1
+    return mediamtxEpoch
+  }
+
+  private func epochMatches(_ source: String, _ epoch: Int) -> Bool {
+    epochLock.lock()
+    defer { epochLock.unlock() }
+    let current = source == "ffmpeg" ? ffmpegEpoch : mediamtxEpoch
+    return current == epoch
   }
 
   private func handleExit(_ process: Process, source: String) {
@@ -399,10 +426,12 @@ final class BroadcastController {
 
   private func drainFFmpegLog() {
     guard let handle = ffmpegLog else { return }
+    handle.readabilityHandler = nil
     let data = handle.availableData
-    guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
-    noteFFmpegOutput(text)
-    ingest(text, source: "ffmpeg")
+    guard !data.isEmpty else { return }
+    outputQueue.sync {
+      self.consume(data, source: "ffmpeg")
+    }
   }
 
   private func abandon(_ process: Process?) {
@@ -492,33 +521,28 @@ final class BroadcastController {
     kill(pid, 0) == 0
   }
 
-  private func rememberMediaMTX(_ text: String) {
-    logLock.lock()
-    mediamtxLogTail += text
-    if mediamtxLogTail.count > 4_000 {
-      mediamtxLogTail.removeFirst(mediamtxLogTail.count - 4_000)
-    }
-    logLock.unlock()
-  }
-
   private func resetMediaMTXLog() {
-    logLock.lock()
-    mediamtxLogTail = ""
-    logLock.unlock()
+    mediamtxLog?.readabilityHandler = nil
+    _ = beginEpoch("mediamtx")
+    outputQueue.sync {
+      self.mediamtxOutput.reset()
+    }
   }
 
   private func mediamtxExcerpt() -> String {
-    logLock.lock()
-    defer { logLock.unlock() }
-    return mediamtxLogTail
+    outputQueue.sync {
+      self.mediamtxOutput.excerpt
+    }
   }
 
   private func drainMediaMTXLog() {
     guard let handle = mediamtxLog else { return }
+    handle.readabilityHandler = nil
     let data = handle.availableData
-    guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
-    rememberMediaMTX(text)
-    ingest(text, source: "mediamtx")
+    guard !data.isEmpty else { return }
+    outputQueue.sync {
+      self.consume(data, source: "mediamtx")
+    }
   }
 
   private func noteFailure(component: String, detail: String) {
