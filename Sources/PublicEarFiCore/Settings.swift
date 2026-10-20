@@ -12,26 +12,6 @@ public enum QualityPreset: String, Codable, CaseIterable, Equatable {
   case custom
 }
 
-/// Rates libopus can encode. 44.1 kHz is not one of them.
-public enum OpusSampleRate {
-  public static let allowed: [Int] = [8_000, 12_000, 16_000, 24_000, 48_000]
-
-  public static func isAllowed(_ rate: Int) -> Bool {
-    allowed.contains(rate)
-  }
-
-  public static func label(_ rate: Int) -> String {
-    "\(rate / 1000) kHz"
-  }
-
-  /// Saved settings from the old 44.1/48 picker stay usable. 44.1 kHz becomes 48 kHz.
-  public static func normalized(_ rate: Int) -> Int {
-    if isAllowed(rate) { return rate }
-    if rate == 44_100 { return 48_000 }
-    return 16_000
-  }
-}
-
 public enum NetworkMode: String, Codable, CaseIterable, Equatable {
   case auto
   case udpOnly
@@ -56,7 +36,6 @@ public struct AppSettings: Codable, Equatable {
   public var inputChannel: Int
   public var quality: QualityPreset
   public var customBitrateKbps: Int
-  public var sampleRate: Int
   public var streamName: String
   public var listenerPort: Int
   public var icePort: Int
@@ -82,7 +61,6 @@ public struct AppSettings: Codable, Equatable {
     inputChannel: Int = 1,
     quality: QualityPreset = .speech,
     customBitrateKbps: Int = 64,
-    sampleRate: Int = 16_000,
     streamName: String = "live",
     listenerPort: Int = 8889,
     icePort: Int = 8189,
@@ -107,7 +85,6 @@ public struct AppSettings: Codable, Equatable {
     self.inputChannel = inputChannel
     self.quality = quality
     self.customBitrateKbps = customBitrateKbps
-    self.sampleRate = sampleRate
     self.streamName = streamName
     self.listenerPort = listenerPort
     self.icePort = icePort
@@ -156,12 +133,11 @@ public struct AppSettings: Codable, Equatable {
   /// Live interpreter: about 30 phones on venue Wi-Fi. The bandwidth hint uses this.
   public static let listenerTarget = 30
 
-  /// Speech is the verified preset: mono, 16 kHz, 32 kbps. Choosing it sets those.
+  /// Speech is the interpreter preset: mono, 32 kbps. The encode rate stays 48 kHz.
   public mutating func applyPreset(_ preset: QualityPreset) {
     quality = preset
     if preset == .speech {
       channelMode = .mono
-      sampleRate = 16_000
     }
   }
 
@@ -190,7 +166,6 @@ public struct BroadcastSignature: Equatable {
   public var inputChannel: Int
   public var quality: QualityPreset
   public var customBitrateKbps: Int
-  public var sampleRate: Int
   public var streamName: String
   public var listenerPort: Int
   public var icePort: Int
@@ -205,7 +180,6 @@ public struct BroadcastSignature: Equatable {
     inputChannel = settings.inputChannel
     quality = settings.quality
     customBitrateKbps = settings.customBitrateKbps
-    sampleRate = settings.sampleRate
     streamName = settings.streamName
     listenerPort = settings.listenerPort
     icePort = settings.icePort
@@ -266,14 +240,6 @@ public func validate(_ settings: AppSettings) -> [SettingsIssue] {
   if settings.inputChannel < 1 {
     issues.append(
       SettingsIssue(field: "inputChannel", message: "Input channel must be 1 or higher."))
-  }
-  if !OpusSampleRate.isAllowed(settings.sampleRate) {
-    issues.append(
-      SettingsIssue(
-        field: "sampleRate",
-        message: "Sample rate must be an Opus rate: 8000, 12000, 16000, 24000, or 48000 Hz."
-      )
-    )
   }
   return issues
 }
@@ -340,7 +306,6 @@ private struct StoredSettings: Codable {
   var inputChannel: Int?
   var quality: QualityPreset?
   var customBitrateKbps: Int?
-  var sampleRate: Int?
   var streamName: String?
   var listenerPort: Int?
   var icePort: Int?
@@ -384,7 +349,6 @@ public struct SettingsStore {
     if let value = stored.inputChannel { settings.inputChannel = value }
     if let value = stored.quality { settings.quality = value }
     if let value = stored.customBitrateKbps { settings.customBitrateKbps = value }
-    if let value = stored.sampleRate { settings.sampleRate = OpusSampleRate.normalized(value) }
     if let value = stored.streamName { settings.streamName = value }
     if let value = stored.listenerPort { settings.listenerPort = value }
     if let value = stored.icePort { settings.icePort = value }

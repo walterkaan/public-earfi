@@ -1,27 +1,35 @@
 import Foundation
 
 public enum FFmpegCommand {
+  /// Opus RTP always uses a 48 kHz clock (RFC 7587). The app encodes only at
+  /// that rate, in 20 ms frames, so listeners never pick a sample rate.
+  public static let sampleRate = 48_000
+  public static let frameDurationMilliseconds = 20
+
   public static func arguments(deviceName: String, settings: AppSettings) -> [String] {
     let pan = panFilter(mode: settings.channelMode, inputChannel: settings.inputChannel)
-    // aresample converts the interface's native rate (often 44.1 or 48 kHz
-    // float) to an Opus rate. async= is omitted: async=1 fill-and-trims for
-    // about one sample of clock skew, and that garbled a 44.1 kHz device
-    // that had been forced to 48 kHz. The device rate is left alone.
+    // AVFoundation timestamps follow the host and arrive in bursts that are
+    // not 20 ms. A USB interface clocked at 48 kHz still drifts against that
+    // timeline. WebRTC then inserts or drops a frame on a regular period,
+    // which is the click. aresample rebuilds a continuous 48 kHz timeline
+    // (async=1 fill/trim, first packet at PTS 0) before Opus packetizes it.
+    // Wall-clock timestamps are not used as well: they would feed that same
+    // burstiness back into the resampler.
     return [
       "-hide_banner",
       "-nostdin",
       "-loglevel",
       "warning",
       "-thread_queue_size",
-      "4096",
+      "1024",
       "-f",
       "avfoundation",
       "-i",
       ":\(deviceName)",
       "-af",
-      "\(pan),aresample=\(settings.sampleRate)",
+      "\(pan),aresample=\(sampleRate):async=1:first_pts=0",
       "-ar",
-      String(settings.sampleRate),
+      String(sampleRate),
       "-ac",
       String(settings.opusChannelCount),
       "-c:a",
@@ -31,7 +39,11 @@ public enum FFmpegCommand {
       "-application",
       settings.opusApplication,
       "-frame_duration",
-      "20",
+      String(frameDurationMilliseconds),
+      "-muxdelay",
+      "0",
+      "-muxpreload",
+      "0",
       "-f",
       "rtsp",
       "-rtsp_transport",

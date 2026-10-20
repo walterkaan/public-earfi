@@ -386,12 +386,9 @@ final class AppModel: ObservableObject {
         helpers: helpers,
         home: FileManager.default.homeDirectoryForCurrentUser,
         prepareAudio: {
-          // Leave the interface at its native rate (often 44.1 or 48 kHz
-          // float). The earlier default asked Core Audio for 48 kHz and
-          // then ran aresample=async=1. On a 44.1 kHz USB device that
-          // either refuses 48 kHz or keeps its own clock, async fill-and-trim
-          // inserts and drops samples continuously. aresample converts
-          // to the selected Opus rate at a fixed ratio instead.
+          // Do not change the interface clock. The encode rate is always
+          // 48 kHz. aresample=async=1:first_pts=0 turns AVFoundation's
+          // uneven timestamps into a continuous 20 ms Opus timeline.
           guard device != nil else { return "No input device is available." }
           return nil
         }

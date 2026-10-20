@@ -56,6 +56,10 @@ public enum MediaMTXConfigWriter {
     if let advertisedHost, isSafeHost(advertisedHost) {
       lines.append("webrtcAdditionalHosts: ['\(advertisedHost)']")
     }
+    // writeQueueSize stays at MediaMTX's default (512 packets, about 10 s of
+    // 20 ms audio). That queue is not what inserts the regular click.
+    // useAbsoluteTimestamp stays off so RTSP keeps the publisher's timeline
+    // instead of restamping onto the wall clock.
     lines += [
       "paths:",
       "  \(settings.streamName):",

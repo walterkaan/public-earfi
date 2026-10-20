@@ -65,7 +65,7 @@ Do this once, on the Wi-Fi you will take to the venue.
 1. Turn on your router. It does not need the internet.
 2. Join the Mac to it, with the Mac’s address reserved so it stays the same.
 3. Install Public EarFi and open it (the next section). Allow the microphone. If the firewall asks, allow incoming connections for mediamtx. That program is what the phones connect to.
-4. Plug in the audio interface, or use the built-in microphone for this test. In Settings, choose the input. Leave quality on **Speech 32k** and the sample rate on **16 kHz**.
+4. Plug in the audio interface, or use the built-in microphone for this test. In Settings, choose the input. Leave quality on **Speech 32k**.
 5. Watch the level meter on the main window. Talk, or play the desk. The meter moves before you go live. If it stays empty, the Mac is listening to the wrong input.
 6. Press **Start Broadcasting**. The window should say Live and show a link like `http://192.168.1.20:8889/live`.
 7. On your phone, join that same Wi-Fi. A phone still on the house network will not open the link.
@@ -114,9 +114,9 @@ Open **Public EarFi → Settings…** (Command-,). Settings is in the app menu, 
 
 ## Leave the quality on Speech
 
-**Speech 32k** is the default, and it is the right preset for a live interpreter. It is mono, 16 kHz, 32 kbps. Choosing Speech in the quality control sets those three.
+**Speech 32k** is the default, and it is the right preset for a live interpreter. It is mono and 32 kbps. Choosing Speech sets those. The app always sends 48 kHz audio in small 20 ms pieces. There is no sample-rate menu, and you do not change the rate in Audio MIDI Setup.
 
-That is the setting that was checked by hand, and it uses the least Wi-Fi. The sample-rate menu can also show 8, 12, 24, or 48 kHz. Leave it on **16 kHz** unless you have a reason to change it. The Mac’s audio interface can stay at its own rate (often 44.1 or 48 kHz). The app converts. You do not set the interface to 48 kHz yourself.
+That uses the least Wi-Fi. Standard and Music use more for the same number of listeners.
 
 Standard (64 kbps) and Music (96 kbps mono, or 128 kbps stereo) use more of the Wi-Fi for the same number of listeners. Speech is the one sized for about 30 phones.
 
@@ -203,7 +203,7 @@ Your own Wi-Fi still has to carry that 1 Mbps, plus a little overhead, shared am
 | Listeners in the venue cannot connect | They are on the venue Wi-Fi, or that Wi-Fi isolates clients. Move them to your own Wi-Fi. If you must use the venue network, ask for a fixed address for the Mac. |
 | The link used to work and now times out | The Mac’s address changed. Check the reservation, then compare the on-screen link with the poster. Make a new poster if they differ. |
 | People connect and hear nothing | Tap play. Tap the speaker/mute icon on the player and in the browser tab. Turn the phone volume up. Keep the screen on. |
-| The sound breaks up | Leave quality on Speech, 16 kHz. In Settings, try **TCP only**. |
+| The sound breaks up, or you hear a regular click | Leave quality on Speech. In Settings, try **TCP only**. |
 | The Mac slept | The lid was closed, or it was on battery and idle. Power is connected, the lid is open, and “Keep Mac awake while broadcasting” is on. |
 | The microphone prompt appears after an update | Expected. Allow it again. See Install and first open. |
 | You quit the app hard and it says a port is busy | Open Public EarFi again. It stops leftover helper programs it started. |

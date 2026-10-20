@@ -15,7 +15,7 @@ Sound desk → USB interface → ffmpeg (avfoundation, Opus)
           → RTSP → MediaMTX → WebRTC → phone browsers
 ```
 
-Listeners open `http://<mac-ip>:8889/live`. The default is the Speech preset: Opus at 16 kHz, 32 kbps, mono. About 30 listeners at that rate are under 1 Mbps of audio (30 × 32 kbps = 0.96 Mbps), which is what a crowded venue access point can carry. The interface can stay at its native 44.1 or 48 kHz; ffmpeg resamples.
+Listeners open `http://<mac-ip>:8889/live`. The default is the Speech preset: Opus, mono, 32 kbps, always at 48 kHz. About 30 listeners are under 1 Mbps of audio (30 × 32 kbps = 0.96 Mbps), which is what a crowded venue access point can carry. There is no sample-rate control.
 
 The app bundles MediaMTX and an LGPL build of FFmpeg with libopus. You do not need Homebrew or Terminal to run it.
 
@@ -75,7 +75,7 @@ The main window is the broadcast. Settings, the poster, and the log each open in
 
 **Running.** Start and Stop, a level meter (it works before you go live), the listener URL, a QR code, how many people are listening, and the latest health line. Copy diagnostics is on that window. Click the QR code to show it full screen. **View → Show Log** (Cmd-L) opens the full log.
 
-**Settings.** **Public EarFi → Settings…** (Cmd-,). Input device, mono or stereo and which channel, Speech 32k / Standard 64k / Music 96k (Music is 96 kbps mono or 128 kbps stereo), and an Opus sample rate (8, 12, 16, 24, or 48 kHz). Speech is the default, and it is the preset for a live interpreter: mono, 16 kHz, 32 kbps, sized for about 30 phones. Choosing Speech sets those three. The interface is left at its native rate; ffmpeg's aresample converts. Stream name, port, and network mode are here too. Keep the Mac awake while broadcasting. Launch at login and start-on-open are off by default. Reset to defaults restores every setting, including the poster text, and does not delete logs. If you change a broadcast setting while live, the app offers to apply it with a brief interruption.
+**Settings.** **Public EarFi → Settings…** (Cmd-,). Input device, mono or stereo and which channel, and Speech 32k / Standard 64k / Music 96k (Music is 96 kbps mono or 128 kbps stereo). Speech is the default, and it is the preset for a live interpreter: mono, 32 kbps, sized for about 30 phones. The encode rate is always 48 kHz in 20 ms frames. Choosing Speech sets mono and 32 kbps. Stream name, port, and network mode are here too. Keep the Mac awake while broadcasting. Launch at login and start-on-open are off by default. Reset to defaults restores every setting, including the poster text, and does not delete logs. If you change a broadcast setting while live, the app offers to apply it with a brief interruption.
 
 **Poster.** **File → Print Poster…** (Cmd-P) opens the poster window. **File → Export Poster PDF…** (Cmd-Shift-E) saves a PDF without opening that window. The poster window still has Export PDF, Print, and Copy QR image. **Edit** has Copy Listener Link and Copy QR Image. Header, description, instructions, optional Wi-Fi name, A4 or Letter, and IP or `.local`. The default paper size is Letter in the US and Canada and A4 elsewhere. The default instructions include: *No sound? Tap the speaker/mute icon on the player or in your browser tab, and turn up your phone volume.*
 
@@ -90,7 +90,7 @@ Closing the laptop lid still sleeps the Mac unless it is on power with an extern
 | No sound on a phone | Tap play. Tap the speaker/mute icon on the player or the browser tab. Turn the phone volume up. Keep the screen on. |
 | The meter shows no signal | Confirm the desk is feeding the interface, and that Mono/Input matches the channel the desk uses. |
 | Listeners cannot open the link | Same network, no client isolation, firewall allows mediamtx, and the poster matches the current address. |
-| Dropouts or garbled audio | Use Speech (16 kHz). Wired Mac, and TCP only mode. The app leaves the interface at its native rate and resamples in ffmpeg. Forcing a 44.1 kHz USB device to 48 kHz, then compensating with `aresample=async=1`, was the combination that garbled audio in testing. |
+| Dropouts or a regular click | Leave quality on Speech. Wired Mac, and TCP only mode. The app always sends 48 kHz in 20 ms frames and smooths the capture clock. There is no sample-rate setting to change. |
 | Microphone prompt on every update | Expected for ad-hoc builds. See the first-open section. |
 | "Public EarFi is damaged" | Re-download. Do not run a half-copied app. |
 | The app was quit hard and the port is busy | Open it again. It stops stale mediamtx and ffmpeg processes it started. |

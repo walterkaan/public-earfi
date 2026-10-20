@@ -81,10 +81,6 @@ webrtcIPsFromInterfaces: yes
 paths:
   live:
     source: publisher
-  speech:
-    source: publisher
-  native:
-    source: publisher
 EOF
 
 "$MEDIAMTX" "$WORK/mediamtx.yml" > "$WORK/mediamtx.log" 2>&1 &
@@ -109,86 +105,93 @@ if [[ "$api_up" != 1 ]]; then
   exit 1
 fi
 
-# Publish paced f32le PCM (the codec avfoundation emits) and require the
-# path to come up. in_rate is the device clock; out_rate is the Opus rate.
-publish() {
-  local in_rate="$1" out_rate="$2" bitrate="$3" application="$4" path="$5"
-  rm -f "$WORK/pcm.pipe"
-  mkfifo "$WORK/pcm.pipe"
-  python3 -u -c '
+# Publish realtime 48 kHz f32le (what AVFoundation emits from a 48 kHz
+# interface) as the Speech preset: mono Opus, 32 kbps, 20 ms frames.
+# The writer emits one 20 ms chunk per 20 ms, which is the realtime pace.
+rm -f "$WORK/pcm.pipe"
+mkfifo "$WORK/pcm.pipe"
+python3 -u -c '
 import math, struct, sys, time
-rate = int(sys.argv[1])
+rate = 48000
+frames = rate // 50
 index = 0
+started = time.monotonic()
+sent = 0
 while True:
     chunk = bytearray()
-    for step in range(rate):
+    for step in range(frames):
         sample = math.sin(2 * math.pi * 440 * (index + step) / rate) * 0.2
         chunk += struct.pack("<f", sample)
-    index += rate
+    index += frames
+    sent += 1
+    wait = started + sent * 0.02 - time.monotonic()
+    if wait > 0:
+        time.sleep(wait)
     try:
         sys.stdout.buffer.write(chunk)
         sys.stdout.buffer.flush()
     except BrokenPipeError:
         break
-    time.sleep(0.8)
-' "$in_rate" > "$WORK/pcm.pipe" &
-  PYPID=$!
+' > "$WORK/pcm.pipe" &
+PYPID=$!
 
-  "$FFMPEG" -hide_banner -loglevel info \
-    -f f32le -ar "$in_rate" -ac 1 -i pipe:0 \
-    -af "pan=mono|c0=c0,aresample=${out_rate}" \
-    -ar "$out_rate" -ac 1 \
-    -c:a libopus -b:a "$bitrate" -application "$application" -frame_duration 20 \
-    -f rtsp -rtsp_transport tcp \
-    "rtsp://127.0.0.1:${RTSP_PORT}/${path}" \
-    < "$WORK/pcm.pipe" > "$WORK/ffmpeg.log" 2>&1 &
-  FFPID=$!
+"$FFMPEG" -hide_banner -loglevel warning \
+  -thread_queue_size 1024 \
+  -f f32le -ar 48000 -ac 1 -i pipe:0 \
+  -af "pan=mono|c0=c0,aresample=48000:async=1:first_pts=0" \
+  -ar 48000 -ac 1 \
+  -c:a libopus -b:a 32k -application voip -frame_duration 20 \
+  -muxdelay 0 -muxpreload 0 \
+  -f rtsp -rtsp_transport tcp \
+  "rtsp://127.0.0.1:${RTSP_PORT}/live" \
+  < "$WORK/pcm.pipe" > "$WORK/ffmpeg.log" 2>&1 &
+FFPID=$!
 
-  local ready=0
-  for _ in $(seq 1 60); do
-    if curl -sf "http://127.0.0.1:${API_PORT}/v3/paths/get/${path}" -o "$WORK/path.json"; then
-      if python3 - "$WORK/path.json" << 'PY'
+ready=0
+for _ in $(seq 1 60); do
+  if curl -sf "http://127.0.0.1:${API_PORT}/v3/paths/get/live" -o "$WORK/path.json"; then
+    if python3 - "$WORK/path.json" << 'PY'
 import json, sys
 document = json.load(open(sys.argv[1]))
 online = bool(document.get("ready") or document.get("online"))
 received = document.get("inboundBytes", document.get("bytesReceived", 0)) or 0
 sys.exit(0 if online and int(received) > 0 else 1)
 PY
-      then
-        ready=1
-        break
-      fi
+    then
+      ready=1
+      break
     fi
-    if ! kill -0 "$FFPID" 2>/dev/null; then
-      echo "ffmpeg exited before ${path} was ready (${in_rate} -> ${out_rate})" >&2
-      cat "$WORK/ffmpeg.log" >&2
-      exit 1
-    fi
-    sleep 0.25
-  done
-  if [[ "$ready" != 1 ]]; then
-    echo "MediaMTX path ${path} did not become ready (${in_rate} -> ${out_rate})" >&2
-    echo "---- ffmpeg ----" >&2
-    cat "$WORK/ffmpeg.log" >&2 || true
-    echo "---- mediamtx ----" >&2
-    cat "$WORK/mediamtx.log" >&2 || true
-    echo "---- path ----" >&2
-    cat "$WORK/path.json" >&2 || true
+  fi
+  if ! kill -0 "$FFPID" 2>/dev/null; then
+    echo "ffmpeg exited before live was ready" >&2
+    cat "$WORK/ffmpeg.log" >&2
     exit 1
   fi
-  echo "RTSP smoke test passed for ${path} (${in_rate} Hz f32le -> ${out_rate} Hz opus)"
-  python3 -c 'import json,sys; print(json.load(open(sys.argv[1])))' "$WORK/path.json"
-  kill "$FFPID" 2>/dev/null || true
-  wait "$FFPID" 2>/dev/null || true
-  FFPID=""
-  kill "$PYPID" 2>/dev/null || true
-  wait "$PYPID" 2>/dev/null || true
-  PYPID=""
-}
+  sleep 0.25
+done
+if [[ "$ready" != 1 ]]; then
+  echo "MediaMTX path live did not become ready" >&2
+  echo "---- ffmpeg ----" >&2
+  cat "$WORK/ffmpeg.log" >&2 || true
+  echo "---- mediamtx ----" >&2
+  cat "$WORK/mediamtx.log" >&2 || true
+  echo "---- path ----" >&2
+  cat "$WORK/path.json" >&2 || true
+  exit 1
+fi
+echo "RTSP smoke test passed for live (48000 Hz f32le -> 48000 Hz opus, 20 ms)"
+python3 -c 'import json,sys; print(json.load(open(sys.argv[1])))' "$WORK/path.json"
 
-# Same-rate publish keeps the pcm_f32le decoder regression.
-publish 48000 48000 64k audio live
-# Device-like 48 kHz float down to the Speech preset (16 kHz, 32 kbps).
-publish 48000 16000 32k voip speech
-# 44.1 kHz is a common USB native rate and is not a legal Opus rate.
-publish 44100 16000 32k voip native
+# 32 s covers a 1 s warmup plus 30 s of packets that must stay on a 20 ms grid.
+if ! python3 "$ROOT/scripts/check-rtp-timing.py" 127.0.0.1 "$RTSP_PORT" live 32; then
+  echo "---- ffmpeg ----" >&2
+  cat "$WORK/ffmpeg.log" >&2 || true
+  echo "---- mediamtx ----" >&2
+  cat "$WORK/mediamtx.log" >&2 || true
+  exit 1
+fi
+if ! kill -0 "$FFPID" 2>/dev/null; then
+  echo "ffmpeg exited during the RTP timing check" >&2
+  cat "$WORK/ffmpeg.log" >&2
+  exit 1
+fi

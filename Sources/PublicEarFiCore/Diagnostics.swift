@@ -70,7 +70,7 @@ public enum DiagnosticsReport {
       "device UID: \(settings.inputDeviceUID ?? "(auto)")",
       "channels: \(settings.channelMode.rawValue) from input \(settings.inputChannel)",
       "quality: \(settings.quality.rawValue) \(settings.resolvedBitrateKbps) kbps \(settings.opusApplication)",
-      "sample rate: \(settings.sampleRate)",
+      "sample rate: \(FFmpegCommand.sampleRate) Hz, \(FFmpegCommand.frameDurationMilliseconds) ms frames",
       "stream: \(settings.streamName)",
       "listener port: \(settings.listenerPort)",
       "ICE port: \(settings.icePort)",

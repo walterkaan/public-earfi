@@ -319,20 +319,11 @@ struct SettingsTab: View {
             .pickerStyle(.segmented)
             .labelsHidden()
           }
-          LabeledRow(title: "Sample rate") {
-            Picker("Rate", selection: rateBinding) {
-              ForEach(OpusSampleRate.allowed, id: \.self) { rate in
-                Text(OpusSampleRate.label(rate)).tag(rate)
-              }
-            }
-            .labelsHidden()
-            .frame(width: 120)
-          }
           Text(model.settings.bandwidthHint)
             .font(.caption)
             .foregroundStyle(.secondary)
           Text(
-            "Speech is mono, 16 kHz, 32 kbps. The interface can stay at 44.1 or 48 kHz; ffmpeg resamples. Music is 96 kbps mono or 128 kbps stereo."
+            "Speech is mono, 32 kbps, for about 30 phones. The stream is always 48 kHz. Music is 96 kbps mono or 128 kbps stereo."
           )
           .font(.caption)
           .foregroundStyle(.secondary)
@@ -490,10 +481,6 @@ struct SettingsTab: View {
     Binding(
       get: { model.settings.startWhenAppOpens },
       set: { value in model.mutate { $0.startWhenAppOpens = value } })
-  }
-  private var rateBinding: Binding<Int> {
-    Binding(
-      get: { model.settings.sampleRate }, set: { value in model.mutate { $0.sampleRate = value } })
   }
   private var iceBinding: Binding<Int> {
     Binding(get: { model.settings.icePort }, set: { value in model.mutate { $0.icePort = value } })
