@@ -386,13 +386,14 @@ final class AppModel: ObservableObject {
         helpers: helpers,
         home: FileManager.default.homeDirectoryForCurrentUser,
         prepareAudio: {
-          guard let device else { return "No input device is available." }
-          let accepted = AudioDeviceList.setNominalSampleRate(
-            deviceID: device.deviceID,
-            rate: Double(snapshot.sampleRate)
-          )
-          return accepted
-            ? nil : "The audio interface refused \(snapshot.sampleRate) Hz. ffmpeg will resample."
+          // Leave the interface at its native rate (often 44.1 or 48 kHz
+          // float). The earlier default asked Core Audio for 48 kHz and
+          // then ran aresample=async=1. On a 44.1 kHz USB device that
+          // either refuses 48 kHz or keeps its own clock, async fill-and-trim
+          // inserts and drops samples continuously. aresample converts
+          // to the selected Opus rate at a fixed ratio instead.
+          guard device != nil else { return "No input device is available." }
+          return nil
         }
       )
     )

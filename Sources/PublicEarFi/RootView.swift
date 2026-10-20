@@ -319,11 +319,20 @@ struct SettingsTab: View {
             .pickerStyle(.segmented)
             .labelsHidden()
           }
+          LabeledRow(title: "Sample rate") {
+            Picker("Rate", selection: rateBinding) {
+              ForEach(OpusSampleRate.allowed, id: \.self) { rate in
+                Text(OpusSampleRate.label(rate)).tag(rate)
+              }
+            }
+            .labelsHidden()
+            .frame(width: 120)
+          }
           Text(model.settings.bandwidthHint)
             .font(.caption)
             .foregroundStyle(.secondary)
           Text(
-            "Music is 96 kbps mono or 128 kbps stereo. Opus stays compressed for every listener."
+            "Speech is mono, 16 kHz, 32 kbps. The interface can stay at 44.1 or 48 kHz; ffmpeg resamples. Music is 96 kbps mono or 128 kbps stereo."
           )
           .font(.caption)
           .foregroundStyle(.secondary)
@@ -365,14 +374,6 @@ struct SettingsTab: View {
           }
         }
         DisclosureGroup("Advanced") {
-          LabeledRow(title: "Sample rate") {
-            Picker("Rate", selection: rateBinding) {
-              Text("48 kHz").tag(48_000)
-              Text("44.1 kHz").tag(44_100)
-            }
-            .labelsHidden()
-            .frame(width: 140)
-          }
           LabeledRow(title: "ICE port") {
             TextField("8189", value: iceBinding, format: .number).frame(width: 80)
           }
@@ -459,7 +460,7 @@ struct SettingsTab: View {
   private var qualityBinding: Binding<QualityPreset> {
     Binding(
       get: { model.settings.quality == .custom ? .standard : model.settings.quality },
-      set: { value in model.mutate { $0.quality = value } }
+      set: { value in model.mutate { $0.applyPreset(value) } }
     )
   }
   private var streamBinding: Binding<String> {

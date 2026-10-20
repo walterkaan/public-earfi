@@ -29,6 +29,9 @@ enum AudioDeviceList {
     return identifiers.compactMap(makeDevice)
   }
 
+  /// Changes the hardware clock. Broadcasting must not call this: a 44.1 kHz
+  /// USB device forced to 48 kHz, then resampled with async compensation,
+  /// is what garbled the earlier 48 kHz builds. ffmpeg's aresample converts.
   static func setNominalSampleRate(deviceID: AudioDeviceID, rate: Double) -> Bool {
     var address = AudioObjectPropertyAddress(
       mSelector: kAudioDevicePropertyNominalSampleRate,

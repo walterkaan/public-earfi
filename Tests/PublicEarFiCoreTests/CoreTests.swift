@@ -8,10 +8,10 @@ final class SettingsTests: XCTestCase {
     XCTAssertNil(settings.inputDeviceUID)
     XCTAssertEqual(settings.channelMode, .mono)
     XCTAssertEqual(settings.inputChannel, 1)
-    XCTAssertEqual(settings.sampleRate, 48_000)
-    XCTAssertEqual(settings.quality, .standard)
-    XCTAssertEqual(settings.resolvedBitrateKbps, 64)
-    XCTAssertEqual(settings.opusApplication, "audio")
+    XCTAssertEqual(settings.sampleRate, 16_000)
+    XCTAssertEqual(settings.quality, .speech)
+    XCTAssertEqual(settings.resolvedBitrateKbps, 32)
+    XCTAssertEqual(settings.opusApplication, "voip")
     XCTAssertEqual(settings.streamName, "live")
     XCTAssertEqual(settings.listenerPort, 8889)
     XCTAssertEqual(settings.icePort, 8189)
@@ -30,16 +30,28 @@ final class SettingsTests: XCTestCase {
     XCTAssertEqual(settings.posterNetworkName, "")
     XCTAssertNil(settings.posterPaperSize)
     XCTAssertTrue(settings.posterUseFooter)
-    XCTAssertEqual(settings.bandwidthHint, "50 listeners ≈ 3.2 Mbps")
+    XCTAssertEqual(settings.bandwidthHint, "50 listeners ≈ 1.6 Mbps")
     XCTAssertTrue(validate(settings).isEmpty)
   }
 
   func testQualityBitrates() {
     var settings = AppSettings.defaults
-    settings.quality = .speech
+    settings.applyPreset(.speech)
+    XCTAssertEqual(settings.channelMode, .mono)
+    XCTAssertEqual(settings.sampleRate, 16_000)
     XCTAssertEqual(settings.resolvedBitrateKbps, 32)
     XCTAssertEqual(settings.opusApplication, "voip")
     XCTAssertEqual(settings.bandwidthHint, "50 listeners ≈ 1.6 Mbps")
+    settings.sampleRate = 48_000
+    XCTAssertTrue(validate(settings).isEmpty)
+    settings.sampleRate = 44_100
+    XCTAssertTrue(validate(settings).contains { $0.field == "sampleRate" })
+    XCTAssertEqual(OpusSampleRate.normalized(44_100), 48_000)
+    XCTAssertEqual(OpusSampleRate.normalized(22_050), 16_000)
+    for rate in OpusSampleRate.allowed {
+      settings.sampleRate = rate
+      XCTAssertTrue(validate(settings).isEmpty, "\(rate)")
+    }
 
     settings.quality = .music
     settings.channelMode = .mono
@@ -105,8 +117,13 @@ final class SettingsTests: XCTestCase {
     settings.inputDeviceUID = "AppleUSBAudioEngine:Focusrite:Scarlett"
     settings.posterPaperSize = .letter
     settings.urlStyle = .localHostname
+    settings.sampleRate = 24_000
     store.save(settings)
     XCTAssertEqual(store.load(), settings)
+
+    settings.sampleRate = 44_100
+    store.save(settings)
+    XCTAssertEqual(store.load().sampleRate, 48_000)
   }
 
   func testBroadcastSignatureIgnoresPosterText() {
@@ -223,9 +240,9 @@ final class FFmpegCommandTests: XCTestCase {
         "-hide_banner", "-nostdin", "-loglevel", "warning",
         "-thread_queue_size", "4096",
         "-f", "avfoundation", "-i", ":Scarlett 2i2 USB",
-        "-af", "pan=mono|c0=c0,aresample=async=1",
-        "-ar", "48000", "-ac", "1",
-        "-c:a", "libopus", "-b:a", "64k", "-application", "audio", "-frame_duration", "20",
+        "-af", "pan=mono|c0=c0,aresample=16000",
+        "-ar", "16000", "-ac", "1",
+        "-c:a", "libopus", "-b:a", "32k", "-application", "voip", "-frame_duration", "20",
         "-f", "rtsp", "-rtsp_transport", "tcp", "rtsp://127.0.0.1:8554/live",
       ]
     )
@@ -235,21 +252,22 @@ final class FFmpegCommandTests: XCTestCase {
     var settings = AppSettings.defaults
     settings.channelMode = .mono
     settings.inputChannel = 2
-    settings.quality = .speech
+    settings.applyPreset(.speech)
+    settings.inputChannel = 2
     settings.streamName = "talk"
-    settings.sampleRate = 44_100
     let arguments = FFmpegCommand.arguments(deviceName: "USB Audio", settings: settings)
-    XCTAssertTrue(arguments.contains("pan=mono|c0=c1,aresample=async=1"))
+    XCTAssertTrue(arguments.contains("pan=mono|c0=c1,aresample=16000"))
     XCTAssertTrue(arguments.contains("32k"))
     XCTAssertTrue(arguments.contains("voip"))
-    XCTAssertTrue(arguments.contains("44100"))
+    XCTAssertTrue(arguments.contains("16000"))
     XCTAssertTrue(arguments.contains("rtsp://127.0.0.1:8554/talk"))
 
     settings.channelMode = .stereo
     settings.inputChannel = 3
     settings.quality = .music
+    settings.sampleRate = 48_000
     let stereo = FFmpegCommand.arguments(deviceName: "USB Audio", settings: settings)
-    XCTAssertTrue(stereo.contains("pan=stereo|c0=c2|c1=c3,aresample=async=1"))
+    XCTAssertTrue(stereo.contains("pan=stereo|c0=c2|c1=c3,aresample=48000"))
     XCTAssertTrue(stereo.contains("128k"))
     XCTAssertTrue(stereo.contains("-ac"))
     XCTAssertEqual(stereo[stereo.firstIndex(of: "-ac")! + 1], "2")

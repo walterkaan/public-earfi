@@ -81,6 +81,10 @@ webrtcIPsFromInterfaces: yes
 paths:
   live:
     source: publisher
+  speech:
+    source: publisher
+  native:
+    source: publisher
 EOF
 
 "$MEDIAMTX" "$WORK/mediamtx.yml" > "$WORK/mediamtx.log" 2>&1 &
@@ -105,12 +109,15 @@ if [[ "$api_up" != 1 ]]; then
   exit 1
 fi
 
-# A paced pipe of little-endian float PCM. That is the codec avfoundation
-# emits as pcm_f32le. lavfi would already be decoded and would miss this.
-mkfifo "$WORK/pcm.pipe"
-python3 -u -c '
+# Publish paced f32le PCM (the codec avfoundation emits) and require the
+# path to come up. in_rate is the device clock; out_rate is the Opus rate.
+publish() {
+  local in_rate="$1" out_rate="$2" bitrate="$3" application="$4" path="$5"
+  rm -f "$WORK/pcm.pipe"
+  mkfifo "$WORK/pcm.pipe"
+  python3 -u -c '
 import math, struct, sys, time
-rate = 48000
+rate = int(sys.argv[1])
 index = 0
 while True:
     chunk = bytearray()
@@ -124,53 +131,64 @@ while True:
     except BrokenPipeError:
         break
     time.sleep(0.8)
-' > "$WORK/pcm.pipe" &
-PYPID=$!
+' "$in_rate" > "$WORK/pcm.pipe" &
+  PYPID=$!
 
-# -nostdin is not used: pipe:0 is the PCM input.
-"$FFMPEG" -hide_banner -loglevel info \
-  -f f32le -ar 48000 -ac 1 -i pipe:0 \
-  -af "pan=mono|c0=c0,aresample=async=1" \
-  -ar 48000 -ac 1 \
-  -c:a libopus -b:a 64k -application audio -frame_duration 20 \
-  -f rtsp -rtsp_transport tcp \
-  "rtsp://127.0.0.1:${RTSP_PORT}/live" \
-  < "$WORK/pcm.pipe" > "$WORK/ffmpeg.log" 2>&1 &
-FFPID=$!
+  "$FFMPEG" -hide_banner -loglevel info \
+    -f f32le -ar "$in_rate" -ac 1 -i pipe:0 \
+    -af "pan=mono|c0=c0,aresample=${out_rate}" \
+    -ar "$out_rate" -ac 1 \
+    -c:a libopus -b:a "$bitrate" -application "$application" -frame_duration 20 \
+    -f rtsp -rtsp_transport tcp \
+    "rtsp://127.0.0.1:${RTSP_PORT}/${path}" \
+    < "$WORK/pcm.pipe" > "$WORK/ffmpeg.log" 2>&1 &
+  FFPID=$!
 
-ready=0
-for _ in $(seq 1 60); do
-  if curl -sf "http://127.0.0.1:${API_PORT}/v3/paths/get/live" -o "$WORK/path.json"; then
-    if python3 - "$WORK/path.json" << 'PY'
+  local ready=0
+  for _ in $(seq 1 60); do
+    if curl -sf "http://127.0.0.1:${API_PORT}/v3/paths/get/${path}" -o "$WORK/path.json"; then
+      if python3 - "$WORK/path.json" << 'PY'
 import json, sys
 document = json.load(open(sys.argv[1]))
 online = bool(document.get("ready") or document.get("online"))
 received = document.get("inboundBytes", document.get("bytesReceived", 0)) or 0
 sys.exit(0 if online and int(received) > 0 else 1)
 PY
-    then
-      ready=1
-      break
+      then
+        ready=1
+        break
+      fi
     fi
-  fi
-  if ! kill -0 "$FFPID" 2>/dev/null; then
-    echo "ffmpeg exited before the path was ready" >&2
-    cat "$WORK/ffmpeg.log" >&2
+    if ! kill -0 "$FFPID" 2>/dev/null; then
+      echo "ffmpeg exited before ${path} was ready (${in_rate} -> ${out_rate})" >&2
+      cat "$WORK/ffmpeg.log" >&2
+      exit 1
+    fi
+    sleep 0.25
+  done
+  if [[ "$ready" != 1 ]]; then
+    echo "MediaMTX path ${path} did not become ready (${in_rate} -> ${out_rate})" >&2
+    echo "---- ffmpeg ----" >&2
+    cat "$WORK/ffmpeg.log" >&2 || true
+    echo "---- mediamtx ----" >&2
+    cat "$WORK/mediamtx.log" >&2 || true
+    echo "---- path ----" >&2
+    cat "$WORK/path.json" >&2 || true
     exit 1
   fi
-  sleep 0.25
-done
+  echo "RTSP smoke test passed for ${path} (${in_rate} Hz f32le -> ${out_rate} Hz opus)"
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1])))' "$WORK/path.json"
+  kill "$FFPID" 2>/dev/null || true
+  wait "$FFPID" 2>/dev/null || true
+  FFPID=""
+  kill "$PYPID" 2>/dev/null || true
+  wait "$PYPID" 2>/dev/null || true
+  PYPID=""
+}
 
-if [[ "$ready" != 1 ]]; then
-  echo "MediaMTX path live did not become ready" >&2
-  echo "---- ffmpeg ----" >&2
-  cat "$WORK/ffmpeg.log" >&2 || true
-  echo "---- mediamtx ----" >&2
-  cat "$WORK/mediamtx.log" >&2 || true
-  echo "---- path ----" >&2
-  cat "$WORK/path.json" >&2 || true
-  exit 1
-fi
-
-echo "RTSP smoke test passed"
-python3 -c 'import json,sys; print(json.load(open(sys.argv[1])))' "$WORK/path.json"
+# Same-rate publish keeps the pcm_f32le decoder regression.
+publish 48000 48000 64k audio live
+# Device-like 48 kHz float down to the Speech preset (16 kHz, 32 kbps).
+publish 48000 16000 32k voip speech
+# 44.1 kHz is a common USB native rate and is not a legal Opus rate.
+publish 44100 16000 32k voip native
