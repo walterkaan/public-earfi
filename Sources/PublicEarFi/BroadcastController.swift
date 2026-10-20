@@ -8,6 +8,8 @@ enum BroadcastPhase: Equatable {
   case live(since: Date)
   case waitingForDevice(String)
   case problem(String)
+  /// A port is taken, or a leftover helper is still running. Not retrying.
+  case blocked(String)
 }
 
 struct BroadcastLaunch {
@@ -26,6 +28,7 @@ final class BroadcastController {
   var onListeners: ((Int) -> Void)?
   var onHealth: ((String) -> Void)?
   var onLog: ((String) -> Void)?
+  var onStray: ((StrayHelper?) -> Void)?
 
   private let queue = DispatchQueue(label: "earfi.supervisor")
   private var desired = false
@@ -48,6 +51,9 @@ final class BroadcastController {
   private var ffmpegAttemptClosed = false
   private let capture = CapturePipe()
   private var ffmpegInput: Pipe?
+  private var helperPaths: [String] = []
+  private var mediamtxLog: FileHandle?
+  private var mediamtxLogTail = ""
 
   init(logger: FileLogger) {
     self.logger = logger
@@ -57,12 +63,34 @@ final class BroadcastController {
     queue.async {
       self.pendingRestart?.cancel()
       self.launch = launch
+      self.helperPaths = [launch.helpers.mediamtx.path, launch.helpers.ffmpeg.path]
       self.desired = true
       self.stopping = false
       self.failures = 0
       self.frameDrops = 0
       self.stall.reset()
       self.launchPipeline()
+    }
+  }
+
+  /// A bundled helper still holding a port after a crash. Foreign processes
+  /// are reported only when Start is pressed.
+  func bundledConflict(settings: AppSettings, helperPaths: [String]) -> PortConflict? {
+    queue.sync {
+      self.helperPaths = helperPaths
+      guard let found = PortProbe.conflict(settings: settings, helperPaths: helperPaths),
+        found.stray != nil
+      else { return nil }
+      return found
+    }
+  }
+
+  func stopStray(_ helper: StrayHelper, done: @escaping (Bool) -> Void) {
+    queue.async {
+      let stopped = self.terminateStray(helper)
+      DispatchQueue.main.async {
+        done(stopped)
+      }
     }
   }
 
@@ -115,6 +143,7 @@ final class BroadcastController {
 
   private func launchPipeline() {
     guard desired, !stopping, let launch else { return }
+    resetMediaMTXLog()
     publish(.starting)
     guard FileManager.default.isExecutableFile(atPath: launch.helpers.mediamtx.path),
       FileManager.default.isExecutableFile(atPath: launch.helpers.ffmpeg.path)
@@ -146,11 +175,20 @@ final class BroadcastController {
       return
     }
     stopChildren()
+    if let conflict = PortProbe.conflict(settings: launch.settings, helperPaths: helperPaths) {
+      halt(conflict)
+      return
+    }
     guard startMediaMTX(configURL: configURL, launch: launch) else {
       noteFailure(component: "mediamtx", detail: "mediamtx did not start")
       return
     }
     guard waitForAPI() else {
+      drainMediaMTXLog()
+      if let conflict = bindConflict() {
+        halt(conflict)
+        return
+      }
       noteFailure(component: "mediamtx", detail: "the local API did not answer within 5 s")
       return
     }
@@ -249,11 +287,18 @@ final class BroadcastController {
     if source == "ffmpeg" {
       ffmpegLog = pipe.fileHandleForReading
     }
+    if source == "mediamtx" {
+      mediamtxLog = pipe.fileHandleForReading
+      resetMediaMTXLog()
+    }
     pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
       let data = handle.availableData
       guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
       if source == "ffmpeg" {
         self?.noteFFmpegOutput(text)
+      }
+      if source == "mediamtx" {
+        self?.rememberMediaMTX(text)
       }
       self?.queue.async {
         self?.ingest(text, source: source)
@@ -329,6 +374,11 @@ final class BroadcastController {
     let status = process.terminationStatus
     logger.log(source, "exited with status \(status)")
     if source == "mediamtx" {
+      drainMediaMTXLog()
+      if let conflict = bindConflict() {
+        halt(conflict)
+        return
+      }
       noteFailure(component: "mediamtx", detail: "mediamtx exited with status \(status)")
     } else {
       noteFailure(component: "ffmpeg", detail: "exited with status \(status)")
@@ -362,13 +412,98 @@ final class BroadcastController {
   private func becameLive() {
     stableSince = Date()
     stall.reset()
+    publishStray(nil)
     publish(.live(since: stableSince ?? Date()))
     publishHealth("\(clock(Date())) audio healthy")
     startPoller()
   }
 
+  /// Stops the restart loop and leaves the port message on screen.
+  private func halt(_ conflict: PortConflict) {
+    desired = false
+    pendingRestart?.cancel()
+    stopPoller()
+    stopChildren()
+    logger.log("mediamtx", conflict.message)
+    publish(.blocked(conflict.message))
+    publishHealth(conflict.message)
+    publishStray(conflict.stray)
+  }
+
+  private func bindConflict() -> PortConflict? {
+    let excerpt = mediamtxExcerpt()
+    guard !RestartPolicy.retries(detail: excerpt, logExcerpt: excerpt),
+      let settings = launch?.settings
+    else { return nil }
+    return PortProbe.conflict(settings: settings, helperPaths: helperPaths)
+      ?? PortConflictText.fromLog(
+        excerpt, listenerPort: settings.listenerPort, icePort: settings.icePort)
+  }
+
+  private func terminateStray(_ helper: StrayHelper) -> Bool {
+    guard helper.pid > 1 else { return false }
+    let path = ProcessPath.executablePath(pid: helper.pid)
+    guard path == helper.executablePath,
+      HelperIdentity.isBundledHelper(executablePath: path, knownHelperPaths: helperPaths)
+    else {
+      logger.log("supervisor", "refused to stop pid \(helper.pid); it is not a Public EarFi helper")
+      return false
+    }
+    kill(helper.pid, SIGTERM)
+    let grace = Date().addingTimeInterval(2)
+    while processIsAlive(helper.pid) && Date() < grace {
+      Thread.sleep(forTimeInterval: 0.05)
+    }
+    if processIsAlive(helper.pid) {
+      kill(helper.pid, SIGKILL)
+    }
+    let stopped = !processIsAlive(helper.pid)
+    if stopped {
+      logger.log("supervisor", "stopped leftover \(helper.processName) pid \(helper.pid)")
+      publishStray(nil)
+    }
+    return stopped
+  }
+
+  private func processIsAlive(_ pid: Int32) -> Bool {
+    kill(pid, 0) == 0
+  }
+
+  private func rememberMediaMTX(_ text: String) {
+    logLock.lock()
+    mediamtxLogTail += text
+    if mediamtxLogTail.count > 4_000 {
+      mediamtxLogTail.removeFirst(mediamtxLogTail.count - 4_000)
+    }
+    logLock.unlock()
+  }
+
+  private func resetMediaMTXLog() {
+    logLock.lock()
+    mediamtxLogTail = ""
+    logLock.unlock()
+  }
+
+  private func mediamtxExcerpt() -> String {
+    logLock.lock()
+    defer { logLock.unlock() }
+    return mediamtxLogTail
+  }
+
+  private func drainMediaMTXLog() {
+    guard let handle = mediamtxLog else { return }
+    let data = handle.availableData
+    guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+    rememberMediaMTX(text)
+    ingest(text, source: "mediamtx")
+  }
+
   private func noteFailure(component: String, detail: String) {
     guard desired, !stopping else { return }
+    if component == "mediamtx", let conflict = bindConflict() {
+      halt(conflict)
+      return
+    }
     if component == "ffmpeg" {
       if ffmpegAttemptClosed { return }
       ffmpegAttemptClosed = true
@@ -553,21 +688,11 @@ final class BroadcastController {
 
   private func reap(_ pid: Int32?, expected: String?) {
     guard let pid, pid > 0 else { return }
-    let path = executablePath(pid: pid)
+    let path = ProcessPath.executablePath(pid: pid)
     if let expected, let path, path != expected { return }
     if path == nil { return }
     kill(pid, SIGKILL)
     logger.log("supervisor", "cleared stale process \(pid)")
-  }
-
-  private func executablePath(pid: Int32) -> String? {
-    var buffer = [UInt8](repeating: 0, count: 4 * 1024)
-    let length = buffer.withUnsafeMutableBufferPointer { pointer -> Int32 in
-      guard let base = pointer.baseAddress else { return 0 }
-      return earfiProcPidPath(pid, base, UInt32(pointer.count))
-    }
-    guard length > 0 else { return nil }
-    return String(decoding: buffer.prefix(Int(length)), as: UTF8.self)
   }
 
   private func publish(_ phase: BroadcastPhase) {
@@ -589,6 +714,12 @@ final class BroadcastController {
     }
   }
 
+  private func publishStray(_ stray: StrayHelper?) {
+    DispatchQueue.main.async {
+      self.onStray?(stray)
+    }
+  }
+
   private func clock(_ date: Date) -> String {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -596,8 +727,3 @@ final class BroadcastController {
     return formatter.string(from: date)
   }
 }
-
-@_silgen_name("proc_pidpath")
-private func earfiProcPidPath(
-  _ pid: Int32, _ buffer: UnsafeMutablePointer<UInt8>, _ buffersize: UInt32
-) -> Int32

@@ -78,6 +78,13 @@ struct RunningTab: View {
           Circle().fill(statusColor).frame(width: 10, height: 10)
           Text(model.statusLine()).fontWeight(.semibold)
         }
+        if let stray = model.strayHelper {
+          Text(
+            "A leftover \(stray.processName) (pid \(stray.pid)) is using port \(stray.port)."
+          )
+          .font(.caption)
+          Button("Stop leftover helper") { model.stopStrayHelper() }
+        }
         HStack {
           Text("Input level").foregroundStyle(.secondary).frame(width: 90, alignment: .leading)
           LevelBar(fraction: model.levelFraction)
@@ -178,7 +185,7 @@ struct RunningTab: View {
     switch model.phase {
     case .starting:
       return "Starting…"
-    case .stopped:
+    case .stopped, .blocked:
       return "Start Broadcasting"
     default:
       return "Stop Broadcasting"
@@ -187,7 +194,7 @@ struct RunningTab: View {
 
   private var buttonColor: Color {
     switch model.phase {
-    case .stopped, .starting:
+    case .stopped, .starting, .blocked:
       return Color(red: 0.16, green: 0.55, blue: 0.28)
     default:
       return Color(red: 0.84, green: 0.25, blue: 0.18)

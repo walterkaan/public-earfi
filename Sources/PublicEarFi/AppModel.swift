@@ -27,6 +27,7 @@ final class AppModel: ObservableObject {
   @Published var loginItemMessage: String?
   @Published var qrImage: NSImage?
   @Published var selectedLicense: CreditComponent?
+  @Published var strayHelper: StrayHelper?
 
   let credits: CreditsDocument?
   private let store: SettingsStore
@@ -62,6 +63,9 @@ final class AppModel: ObservableObject {
     controller.onLog = { [weak self] line in
       Task { @MainActor in self?.appendLog(line) }
     }
+    controller.onStray = { [weak self] stray in
+      Task { @MainActor in self?.strayHelper = stray }
+    }
     meter.onLevel = { [weak self] decibels, fraction in
       Task { @MainActor in
         self?.levelDB = decibels
@@ -69,6 +73,16 @@ final class AppModel: ObservableObject {
       }
     }
     controller.reapStaleChildren()
+    if let helpers = HelperLocator.locate(),
+      let conflict = controller.bundledConflict(
+        settings: settings,
+        helperPaths: [helpers.mediamtx.path, helpers.ffmpeg.path]
+      )
+    {
+      strayHelper = conflict.stray
+      phase = .blocked(conflict.message)
+      health = conflict.message
+    }
     refreshDevices(startMeter: false)
     refreshNetwork()
     hotplug.start { [weak self] in
@@ -89,7 +103,7 @@ final class AppModel: ObservableObject {
 
   var isBroadcasting: Bool {
     switch phase {
-    case .stopped:
+    case .stopped, .blocked:
       return false
     default:
       return true
@@ -173,7 +187,7 @@ final class AppModel: ObservableObject {
       return "Starting…"
     case .waitingForDevice(let name):
       return "Problem: Audio interface unplugged, waiting for \(name)…"
-    case .problem(let reason):
+    case .problem(let reason), .blocked(let reason):
       return "Problem: \(reason)"
     case .live(let since):
       return "Live · \(elapsed(since: since)) · \(levelDB < -50 ? "quiet" : "audio healthy")"
@@ -278,6 +292,20 @@ final class AppModel: ObservableObject {
       loginItemMessage = nil
     }
     updateSleepAssertion()
+  }
+
+  func stopStrayHelper() {
+    guard let stray = strayHelper else { return }
+    controller.stopStray(stray) { stopped in
+      Task { @MainActor in
+        guard stopped else { return }
+        self.strayHelper = nil
+        if case .blocked = self.phase {
+          self.phase = .stopped
+          self.health = "Ready"
+        }
+      }
+    }
   }
 
   func copyLink() {
@@ -401,6 +429,10 @@ final class AppModel: ObservableObject {
   private func apply(phase: BroadcastPhase) {
     self.phase = phase
     if case .stopped = phase {
+      listeners = 0
+      runningSignature = nil
+    }
+    if case .blocked = phase {
       listeners = 0
       runningSignature = nil
     }

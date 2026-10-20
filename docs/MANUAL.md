@@ -206,7 +206,7 @@ Your own Wi-Fi still has to carry that 1 Mbps, plus a little overhead, shared am
 | The sound breaks up, or you hear a regular click | Leave quality on Speech. In Settings, try **TCP only**. |
 | The Mac slept | The lid was closed, or it was on battery and idle. Power is connected, the lid is open, and “Keep Mac awake while broadcasting” is on. |
 | The microphone prompt appears after an update | Expected. Allow it again. See Install and first open. |
-| You quit the app hard and it says a port is busy | Open Public EarFi again. It stops leftover helper programs it started. |
+| It says a port is already in use | Another program is using that port. The message names the program. Quit it, or in Settings change the listener port or the ICE port. Public EarFi stops and waits. It does not keep restarting. If the program is a leftover Public EarFi helper, press **Stop leftover helper**, then Start. |
 
 **Copy diagnostics** on the main window puts the version, the settings, and the recent log on the clipboard. That is the useful thing to attach to a bug report. Logs are also in `~/Library/Logs/Public EarFi/`.
 

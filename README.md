@@ -93,7 +93,7 @@ Closing the laptop lid still sleeps the Mac unless it is on power with an extern
 | Dropouts or a regular click | Leave quality on Speech. Wired Mac, and TCP only mode. The app captures the selected device and always sends 48 kHz in 20 ms frames. There is no sample-rate setting to change. |
 | Microphone prompt on every update | Expected for ad-hoc builds. See the first-open section. |
 | "Public EarFi is damaged" | Re-download. Do not run a half-copied app. |
-| The app was quit hard and the port is busy | Open it again. It stops stale mediamtx and ffmpeg processes it started. |
+| A port is already in use | The window names the port and the program (for example mediamtx). Quit that program, or change the listener or ICE port in Settings. Public EarFi does not keep restarting. A leftover copy of its own helper has a Stop leftover helper button. Opening the app still stops a helper it recorded before a crash. |
 
 Copy diagnostics puts the version, settings, and the last 200 log lines on the clipboard. Logs are also in `~/Library/Logs/Public EarFi/`.
 

@@ -411,6 +411,109 @@ final class PosterAndSupervisorTests: XCTestCase {
   }
 }
 
+final class PortConflictTests: XCTestCase {
+  func testWatchedPortsCoverListenerIceRTSPAndAPI() {
+    var settings = AppSettings.defaults
+    settings.listenerPort = 8889
+    settings.icePort = 8189
+    let ports = WatchedPorts.all(settings: settings)
+    XCTAssertEqual(ports.map(\.port), [8889, 8189, 8554, 9997])
+    XCTAssertTrue(ports[0].tcp)
+    XCTAssertFalse(ports[0].udp)
+    XCTAssertTrue(ports[0].changeable)
+    XCTAssertTrue(ports[1].tcp)
+    XCTAssertTrue(ports[1].udp)
+    XCTAssertFalse(ports[2].changeable)
+    XCTAssertTrue(ports[2].localhostOnly)
+    XCTAssertTrue(ports[3].localhostOnly)
+
+    settings.networkMode = .tcpOnly
+    let tcpOnly = WatchedPorts.all(settings: settings)
+    XCTAssertTrue(tcpOnly[1].tcp)
+    XCTAssertFalse(tcpOnly[1].udp)
+
+    settings.networkMode = .udpOnly
+    let udpOnly = WatchedPorts.all(settings: settings)
+    XCTAssertFalse(udpOnly[1].tcp)
+    XCTAssertTrue(udpOnly[1].udp)
+  }
+
+  func testPortMessageNamesTheProcessAndDoesNotRetryABindError() {
+    XCTAssertEqual(
+      PortConflictText.message(
+        port: 8889, processName: "mediamtx", pid: 4321, changeable: true, ours: false),
+      "port 8889 is in use by mediamtx (pid 4321). Quit that app, or change the port in Settings."
+    )
+    XCTAssertEqual(
+      PortConflictText.message(
+        port: 8554, processName: "mediamtx", pid: 4321, changeable: false, ours: false),
+      "port 8554 is in use by mediamtx (pid 4321). Quit that app."
+    )
+    XCTAssertEqual(
+      PortConflictText.message(
+        port: 8889, processName: "mediamtx", pid: 4321, changeable: true, ours: true),
+      "port 8889 is in use by a leftover mediamtx (pid 4321). Stop it, then press Start again."
+    )
+    XCTAssertEqual(
+      PortConflictText.message(
+        port: 8189, processName: nil, pid: nil, changeable: true, ours: false),
+      "port 8189 is in use. Quit the other app, or change the port in Settings."
+    )
+
+    let log = "ERR [WebRTC] listen tcp :8889: bind: address already in use"
+    XCTAssertTrue(BindFailure.isAddressInUse(log))
+    XCTAssertEqual(BindFailure.mentionedPort(log), 8889)
+    XCTAssertEqual(
+      BindFailure.mentionedPort("listen tcp 127.0.0.1:8554: bind: address already in use"),
+      8554
+    )
+    XCTAssertFalse(RestartPolicy.retries(detail: "mediamtx exited with status 1", logExcerpt: log))
+    XCTAssertTrue(
+      RestartPolicy.retries(
+        detail: "mediamtx exited with status 1", logExcerpt: "configuration loaded")
+    )
+    let fromLog = PortConflictText.fromLog(log, listenerPort: 8889, icePort: 8189)
+    XCTAssertEqual(fromLog.port, 8889)
+    XCTAssertNil(fromLog.stray)
+    XCTAssertTrue(fromLog.message.contains("change the port in Settings"))
+  }
+
+  func testLsofParseAndBundledHelperPaths() {
+    let text = """
+      p4321
+      cmediamtx
+      n*:8889
+      p77
+      cGoogle
+      n192.168.1.5:50000->192.168.1.9:8889
+      p88
+      cpython
+      n127.0.0.1:9997
+      """
+    let records = LsofText.records(from: text)
+    XCTAssertEqual(records.count, 3)
+    XCTAssertEqual(records[0].pid, 4321)
+    XCTAssertEqual(records[0].command, "mediamtx")
+    XCTAssertTrue(LsofText.matches(name: records[0].names[0], port: 8889))
+    XCTAssertFalse(LsofText.matches(name: records[0].names[0], port: 88890))
+    XCTAssertFalse(LsofText.matches(name: "192.168.1.5:50000->192.168.1.9:8889", port: 8889))
+    XCTAssertTrue(LsofText.matches(name: "[::1]:8189", port: 8189))
+
+    let bundled = "/Applications/Public EarFi.app/Contents/Helpers/mediamtx"
+    XCTAssertTrue(HelperIdentity.isBundledHelper(executablePath: bundled))
+    XCTAssertTrue(
+      HelperIdentity.isBundledHelper(
+        executablePath: "/tmp/elsewhere/mediamtx",
+        knownHelperPaths: ["/tmp/elsewhere/mediamtx"]
+      )
+    )
+    XCTAssertFalse(
+      HelperIdentity.isBundledHelper(executablePath: "/opt/homebrew/bin/mediamtx")
+    )
+    XCTAssertFalse(HelperIdentity.isBundledHelper(executablePath: nil))
+  }
+}
+
 final class APIAndCreditsTests: XCTestCase {
   func testPathParserCountsOnlyWebRTCReadersAndPrefersNewByteCounters() throws {
     let json = """
