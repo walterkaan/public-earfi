@@ -70,6 +70,11 @@ final class AudioCaptureTests: XCTestCase {
     XCTAssertEqual(meter.latest().fraction, 0, accuracy: 0.001)
 
     let pipe = Pipe()
+    let reading = pipe.fileHandleForReading
+    reading.readabilityHandler = { handle in
+      _ = handle.availableData
+    }
+    defer { reading.readabilityHandler = nil }
     let capture = CapturePipe()
     capture.setGainDB(6)
     let problem = capture.start(
@@ -103,6 +108,11 @@ final class AudioCaptureTests: XCTestCase {
       }
       capture.stop()
       let reopened = Pipe()
+      let rereading = reopened.fileHandleForReading
+      rereading.readabilityHandler = { handle in
+        _ = handle.availableData
+      }
+      defer { rereading.readabilityHandler = nil }
       let second = capture.start(
         deviceID: device.deviceID,
         channelMode: .mono,
@@ -166,6 +176,11 @@ final class AudioCaptureTests: XCTestCase {
     XCTAssertFalse(capture.captureIsRunning)
 
     let next = Pipe()
+    let reading = next.fileHandleForReading
+    reading.readabilityHandler = { handle in
+      _ = handle.availableData
+    }
+    defer { reading.readabilityHandler = nil }
     let opened = capture.start(
       deviceID: 42,
       channelMode: .mono,
@@ -200,6 +215,11 @@ final class AudioCaptureTests: XCTestCase {
       )
     }
     let pipe = Pipe()
+    let reading = pipe.fileHandleForReading
+    reading.readabilityHandler = { handle in
+      _ = handle.availableData
+    }
+    defer { reading.readabilityHandler = nil }
     let problem = capture.start(
       deviceID: 7,
       channelMode: .mono,

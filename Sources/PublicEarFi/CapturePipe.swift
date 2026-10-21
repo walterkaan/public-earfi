@@ -634,6 +634,12 @@ final class CapturePipe {
   }
 
   private func writerMain() {
+    // ffmpeg closes stdin when it exits. A write to that pipe must return
+    // EPIPE. The default SIGPIPE would quit the whole app.
+    var blocked = sigset_t()
+    sigemptyset(&blocked)
+    sigaddset(&blocked, SIGPIPE)
+    _ = pthread_sigmask(SIG_BLOCK, &blocked, nil)
     let scratch = UnsafeMutableRawPointer.allocate(
       byteCount: 8_192, alignment: MemoryLayout<Float>.alignment)
     defer { scratch.deallocate() }
