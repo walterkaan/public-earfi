@@ -201,6 +201,76 @@ final class AudioCaptureTests: XCTestCase {
     XCTAssertFalse(capture.captureIsRunning)
   }
 
+  /// AirPods can vanish while macOS changes profile. Stopping that proc must
+  /// return, and the next device must still deliver callbacks.
+  func testSwitchingAwayFromARemovedDeviceStillStartsTheNextOne() throws {
+    let watch = AudioFormatWatch()
+    watch.start(deviceID: AudioDeviceID(0x7FFF_0001), queue: .main) {}
+    watch.stop()
+    watch.stop()
+    HALDeviceInputSession().stop()
+
+    let ledger = SessionLedger()
+    let specs: [(AudioDeviceID, Int, Bool)] = [(81, 1, false), (82, 1, false)]
+    var index = 0
+    var made: [ScriptedInputSession] = []
+    let capture = CapturePipe {
+      let spec = specs[index]
+      index += 1
+      let session = ScriptedInputSession(
+        deviceID: spec.0,
+        channels: spec.1,
+        fails: spec.2,
+        staleDefaultChannels: 1,
+        ledger: ledger
+      )
+      made.append(session)
+      return session
+    }
+    let airpods = Pipe()
+    let airpodsReading = airpods.fileHandleForReading
+    airpodsReading.readabilityHandler = { handle in
+      _ = handle.availableData
+    }
+    defer { airpodsReading.readabilityHandler = nil }
+    XCTAssertNil(
+      capture.start(
+        deviceID: 81,
+        channelMode: .mono,
+        inputChannel: 1,
+        output: airpods.fileHandleForWriting,
+        deviceName: "AirPods"
+      )
+    )
+    try waitForStdin(capture)
+    XCTAssertEqual(made.count, 1)
+    made[0].markRemoved()
+
+    let mic = Pipe()
+    let micReading = mic.fileHandleForReading
+    micReading.readabilityHandler = { handle in
+      _ = handle.availableData
+    }
+    defer { micReading.readabilityHandler = nil }
+    XCTAssertNil(
+      capture.start(
+        deviceID: 82,
+        channelMode: .mono,
+        inputChannel: 1,
+        output: mic.fileHandleForWriting,
+        deviceName: "MacBook Microphone"
+      )
+    )
+    try waitForStdin(capture)
+    XCTAssertEqual(ledger.disposed, 1)
+    XCTAssertTrue(made[0].wasRemovedWhenStopped)
+    XCTAssertEqual(made.count, 2)
+    XCTAssertTrue(made[1].isRunning)
+    XCTAssertGreaterThan(capture.delivery().callbacks, 0)
+    capture.stop()
+    XCTAssertEqual(ledger.disposed, 2)
+  }
+
   /// The system default mic is 1 channel. The chosen device is 2. The open
   /// uses the chosen device, and the log does not say the client format was widened.
   func testTwoChannelDeviceOpensWhileTheDefaultMicIsOneChannel() throws {
@@ -395,8 +465,14 @@ final class ScriptedInputSession: DeviceInputSession {
   let ledger: SessionLedger
   private var running = false
   private var stopped = false
+  private var removed = false
+  private(set) var wasRemovedWhenStopped = false
 
   var isRunning: Bool { running }
+
+  func markRemoved() {
+    removed = true
+  }
 
   init(
     deviceID: AudioDeviceID,
@@ -454,6 +530,7 @@ final class ScriptedInputSession: DeviceInputSession {
   func stop() {
     if stopped { return }
     stopped = true
+    wasRemovedWhenStopped = removed
     running = false
     ledger.disposed += 1
   }

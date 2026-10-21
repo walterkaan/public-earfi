@@ -13,6 +13,17 @@ struct AudioInputDevice: Identifiable, Equatable {
 
 enum AudioDeviceList {
   static func inputs() -> [AudioInputDevice] {
+    hardwareDeviceIDs().compactMap(makeDevice)
+  }
+
+  /// True when this id is still in the system device list. A removed
+  /// Bluetooth device fails this, and callers must not stop an IOProc on it.
+  static func isPresent(_ deviceID: AudioDeviceID) -> Bool {
+    guard deviceID != 0, deviceID != AudioObjectID(kAudioObjectUnknown) else { return false }
+    return hardwareDeviceIDs().contains(deviceID)
+  }
+
+  private static func hardwareDeviceIDs() -> [AudioDeviceID] {
     let system = AudioObjectID(kAudioObjectSystemObject)
     var address = AudioObjectPropertyAddress(
       mSelector: kAudioHardwarePropertyDevices,
@@ -28,7 +39,7 @@ enum AudioDeviceList {
     guard AudioObjectGetPropertyData(system, &address, 0, nil, &size, &identifiers) == noErr else {
       return []
     }
-    return identifiers.compactMap(makeDevice)
+    return identifiers
   }
 
   /// False for a missing or unplugged device. Call this before opening an
@@ -163,8 +174,13 @@ final class AudioHotplug {
   )
 
   func start(_ handler: @escaping () -> Void) {
+    stop()
     let listener: AudioObjectPropertyListenerBlock = { _, _ in
-      handler()
+      // The device list is read on the main thread. Core Audio can deliver
+      // this block on another queue; the menu update must not race that.
+      DispatchQueue.main.async {
+        handler()
+      }
     }
     block = listener
     AudioObjectAddPropertyListenerBlock(

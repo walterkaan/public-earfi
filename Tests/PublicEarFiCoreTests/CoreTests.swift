@@ -162,6 +162,60 @@ final class SettingsTests: XCTestCase {
     )
   }
 
+  func testAirPodsCollapseToOneRowAndKeepTheSelection() {
+    let mic = ListedInput(
+      uid: "builtin", name: "MacBook Microphone", isBuiltIn: true, inputChannels: 1,
+      isBluetooth: false)
+    let music = ListedInput(
+      uid: "airpods-a2dp", name: "AirPods", isBuiltIn: false, inputChannels: 0, isBluetooth: true)
+    let call = ListedInput(
+      uid: "airpods-hfp", name: "AirPods", isBuiltIn: false, inputChannels: 1, isBluetooth: true)
+    let duplicate = ListedInput(
+      uid: "airpods-hfp", name: "AirPods", isBuiltIn: false, inputChannels: 1, isBluetooth: true)
+    let stable = InputDeviceList.stabilize(
+      devices: [mic, music, call, duplicate], selectedUID: "airpods-hfp", selectedName: "AirPods")
+    XCTAssertEqual(stable.devices.map(\.uid), ["builtin", "airpods-hfp"])
+    XCTAssertEqual(stable.selectedUID, "airpods-hfp")
+
+    let followed = InputDeviceList.stabilize(
+      devices: [mic, call], selectedUID: "airpods-a2dp", selectedName: "AirPods")
+    XCTAssertEqual(followed.devices.map(\.uid), ["builtin", "airpods-hfp"])
+    XCTAssertEqual(followed.selectedUID, "airpods-hfp")
+
+    let ghost = InputDeviceList.stabilize(
+      devices: [mic, music, call], selectedUID: "airpods-a2dp", selectedName: "AirPods")
+    XCTAssertEqual(ghost.devices.map(\.uid), ["builtin", "airpods-hfp"])
+    XCTAssertEqual(ghost.selectedUID, "airpods-hfp")
+
+    var hold = HeadsetSelectionHold()
+    hold.observe(call)
+    hold.observe(nil)
+    XCTAssertEqual(hold.name, "AirPods")
+    XCTAssertTrue(hold.holds("airpods-hfp"))
+    XCTAssertFalse(
+      InputDeviceList.shouldForget(
+        rememberedUID: "airpods-hfp", visibleUIDs: ["builtin"],
+        holdBluetooth: hold.holds("airpods-hfp"))
+    )
+    hold.observe(mic)
+    XCTAssertFalse(hold.holds("airpods-hfp"))
+    XCTAssertTrue(
+      InputDeviceList.shouldForget(
+        rememberedUID: "airpods-hfp", visibleUIDs: ["builtin"],
+        holdBluetooth: hold.holds("airpods-hfp")))
+    XCTAssertTrue(
+      InputDeviceList.shouldForget(
+        rememberedUID: "usb-pnp", visibleUIDs: ["builtin"], holdBluetooth: false))
+    XCTAssertFalse(
+      DeviceProcTeardown.shouldStopIOProc(isInDeviceList: false, isAlive: true))
+    XCTAssertFalse(
+      DeviceProcTeardown.shouldStopIOProc(isInDeviceList: true, isAlive: false))
+    XCTAssertTrue(
+      DeviceProcTeardown.shouldStopIOProc(isInDeviceList: true, isAlive: true))
+    XCTAssertFalse(DeviceProcTeardown.shouldRemoveListeners(isInDeviceList: false))
+    XCTAssertTrue(DeviceProcTeardown.shouldRemoveListeners(isInDeviceList: true))
+  }
+
   func testInvalidSettingsAreRepairedAndPersisted() throws {
     let suite = "public-earfi-tests-\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suite)!

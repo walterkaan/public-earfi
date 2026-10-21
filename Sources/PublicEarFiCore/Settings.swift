@@ -325,6 +325,178 @@ public enum DeviceSelection {
   }
 }
 
+/// One input row before the menu is built. Bluetooth headsets can appear
+/// twice while macOS switches between music and call mode.
+public struct ListedInput: Equatable, Identifiable, Sendable {
+  public var uid: String
+  public var name: String
+  public var isBuiltIn: Bool
+  public var inputChannels: Int
+  public var isBluetooth: Bool
+
+  public var id: String { uid }
+
+  public init(
+    uid: String, name: String, isBuiltIn: Bool, inputChannels: Int, isBluetooth: Bool
+  ) {
+    self.uid = uid
+    self.name = name
+    self.isBuiltIn = isBuiltIn
+    self.inputChannels = inputChannels
+    self.isBluetooth = isBluetooth
+  }
+}
+
+public enum InputDeviceList {
+  /// One row per UID. A second Bluetooth row with the same name is the
+  /// profile-switch ghost: the row with no channels is hidden, and if several
+  /// still have channels the selected UID stays. When that UID has gone and
+  /// one Bluetooth row still has the same name, the selection follows it.
+  public static func stabilize(
+    devices: [ListedInput], selectedUID: String?, selectedName: String?
+  ) -> (devices: [ListedInput], selectedUID: String?) {
+    let unique = uniqueUIDs(devices)
+    let visible = hideBluetoothTwins(unique, selectedUID: normalized(selectedUID))
+    let selected = normalized(selectedUID)
+    if let selected, visible.contains(where: { $0.uid == selected }) {
+      return (visible, selected)
+    }
+    let name = normalized(selectedName) ?? ""
+    if !name.isEmpty {
+      let same = visible.filter {
+        $0.isBluetooth && sameName($0.name, name) && $0.inputChannels > 0
+      }
+      if same.count == 1, let only = same.first {
+        return (visible, only.uid)
+      }
+    }
+    return (visible, selected)
+  }
+
+  /// A missing USB device is cleared. A missing Bluetooth headset is kept so
+  /// a brief profile switch does not move the menu onto the built-in mic.
+  public static func shouldForget(
+    rememberedUID: String?, visibleUIDs: [String], holdBluetooth: Bool
+  ) -> Bool {
+    guard let uid = normalized(rememberedUID) else { return false }
+    if visibleUIDs.contains(uid) { return false }
+    if holdBluetooth { return false }
+    return true
+  }
+
+  private static func uniqueUIDs(_ devices: [ListedInput]) -> [ListedInput] {
+    var order: [String] = []
+    var byUID: [String: ListedInput] = [:]
+    for device in devices {
+      guard let uid = normalized(device.uid) else { continue }
+      var copy = device
+      copy.uid = uid
+      if let existing = byUID[uid] {
+        if copy.inputChannels > existing.inputChannels {
+          byUID[uid] = copy
+        }
+        continue
+      }
+      byUID[uid] = copy
+      order.append(uid)
+    }
+    return order.compactMap { byUID[$0] }
+  }
+
+  private static func hideBluetoothTwins(_ devices: [ListedInput], selectedUID: String?)
+    -> [ListedInput]
+  {
+    var drop = Set<String>()
+    let names = Set(devices.filter(\.isBluetooth).map { normalized($0.name) ?? "" })
+    for name in names where !name.isEmpty {
+      let group = devices.filter { $0.isBluetooth && sameName($0.name, name) }
+      guard group.count > 1 else { continue }
+      let withChannels = group.filter { $0.inputChannels > 0 }
+      if withChannels.isEmpty {
+        let keep = group.first { $0.uid == selectedUID }?.uid ?? group[0].uid
+        for device in group where device.uid != keep {
+          drop.insert(device.uid)
+        }
+        continue
+      }
+      for device in group where device.inputChannels == 0 {
+        drop.insert(device.uid)
+      }
+      guard withChannels.count > 1 else { continue }
+      let keep: String
+      if let selectedUID, withChannels.contains(where: { $0.uid == selectedUID }) {
+        keep = selectedUID
+      } else {
+        keep =
+          withChannels.reduce(withChannels[0]) { best, next in
+            next.inputChannels > best.inputChannels ? next : best
+          }.uid
+      }
+      for device in withChannels where device.uid != keep {
+        drop.insert(device.uid)
+      }
+    }
+    return devices.filter { !drop.contains($0.uid) }
+  }
+
+  private static func normalized(_ value: String?) -> String? {
+    let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return trimmed.isEmpty ? nil : trimmed
+  }
+
+  private static func sameName(_ left: String, _ right: String) -> Bool {
+    let lhs = normalized(left) ?? ""
+    let rhs = normalized(right) ?? ""
+    return lhs.compare(rhs, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+  }
+}
+
+/// Remembers the Bluetooth row the menu is holding. The row is gone on the
+/// next device-list refresh, and that refresh still has to keep the selection
+/// instead of treating the headset like an unplugged USB device.
+public struct HeadsetSelectionHold: Equatable, Sendable {
+  public var uid: String?
+  public var name: String?
+
+  public init(uid: String? = nil, name: String? = nil) {
+    self.uid = uid
+    self.name = name
+  }
+
+  /// A Bluetooth row is remembered. A non-Bluetooth row clears the memory.
+  /// `nil` means the selection is not in this refresh, and the memory stays.
+  public mutating func observe(_ selected: ListedInput?) {
+    guard let selected else { return }
+    if selected.isBluetooth {
+      uid = selected.uid
+      name = selected.name
+      return
+    }
+    uid = nil
+    name = nil
+  }
+
+  public func holds(_ rememberedUID: String?) -> Bool {
+    guard let uid else { return false }
+    let trimmed = rememberedUID?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return !trimmed.isEmpty && trimmed == uid
+  }
+}
+
+/// Whether teardown may call into a device that might already be gone.
+public enum DeviceProcTeardown {
+  /// `AudioDeviceStop` and `AudioDeviceDestroyIOProcID` crash on a device
+  /// the HAL has already removed.
+  public static func shouldStopIOProc(isInDeviceList: Bool, isAlive: Bool) -> Bool {
+    isInDeviceList && isAlive
+  }
+
+  /// Remove listeners only while the object is still in the device list.
+  public static func shouldRemoveListeners(isInDeviceList: Bool) -> Bool {
+    isInDeviceList
+  }
+}
+
 public struct StoredSettingsLoad: Equatable {
   public var settings: AppSettings
   public var notice: String?

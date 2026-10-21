@@ -680,19 +680,77 @@ final class AppModel: ObservableObject {
     qrImage = QRCodeMaker.image(text: listenerURL, side: 512)
   }
 
-  /// Stores the device list and clears a remembered device or channel that
-  /// cannot be used. Does not start the broadcast.
+  /// Stores one row per device. A Bluetooth headset that appears twice during
+  /// the call-mode switch keeps a single row, and its selection stays put
+  /// when that row disappears for a moment. Does not start the broadcast.
+  private var headsetHold = HeadsetSelectionHold()
+
   private func adoptDeviceList(_ found: [AudioInputDevice]) -> [String] {
-    devices = found
+    let previous = devices.first { $0.id == settings.inputDeviceUID }
+    let listed = found.map {
+      ListedInput(
+        uid: $0.id,
+        name: $0.name,
+        isBuiltIn: $0.isBuiltIn,
+        inputChannels: $0.inputChannels,
+        isBluetooth: $0.isBluetooth
+      )
+    }
+    if settings.inputDeviceUID == nil {
+      headsetHold = HeadsetSelectionHold()
+    } else if let previous {
+      headsetHold.observe(Self.listed(previous))
+    }
+    let selectedName =
+      headsetHold.holds(settings.inputDeviceUID)
+      ? (previous?.name ?? headsetHold.name) : previous?.name
+    let stable = InputDeviceList.stabilize(
+      devices: listed,
+      selectedUID: settings.inputDeviceUID,
+      selectedName: selectedName)
+    devices = Self.pickDevices(found, visible: stable.devices)
+    if let uid = stable.selectedUID, uid != settings.inputDeviceUID,
+      devices.contains(where: { $0.id == uid })
+    {
+      settings.inputDeviceUID = uid
+      store.save(settings)
+    }
+    if let current = devices.first(where: { $0.id == settings.inputDeviceUID }) {
+      headsetHold.observe(Self.listed(current))
+    }
     guard !isBroadcasting else { return [] }
     var notices: [String] = []
-    if let missing = clearMissingDevice() {
+    let holdBluetooth = headsetHold.holds(settings.inputDeviceUID)
+    if InputDeviceList.shouldForget(
+      rememberedUID: settings.inputDeviceUID,
+      visibleUIDs: devices.map(\.id),
+      holdBluetooth: holdBluetooth
+    ), let missing = clearMissingDevice() {
       notices.append(missing)
     }
     if let channel = clampChannelToSelectedDevice() {
       notices.append(channel)
     }
     return notices
+  }
+
+  private static func listed(_ device: AudioInputDevice) -> ListedInput {
+    ListedInput(
+      uid: device.id,
+      name: device.name,
+      isBuiltIn: device.isBuiltIn,
+      inputChannels: device.inputChannels,
+      isBluetooth: device.isBluetooth
+    )
+  }
+
+  /// Keeps the row with the most input channels when one UID was listed twice.
+  private static func pickDevices(_ found: [AudioInputDevice], visible: [ListedInput])
+    -> [AudioInputDevice]
+  {
+    visible.compactMap { item in
+      found.filter { $0.id == item.uid }.max { $0.inputChannels < $1.inputChannels }
+    }
   }
 
   private func clearMissingDevice() -> String? {

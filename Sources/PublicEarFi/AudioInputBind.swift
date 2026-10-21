@@ -123,7 +123,7 @@ final class AudioFormatWatch {
 
   func start(deviceID: AudioDeviceID, queue: DispatchQueue, handler: @escaping () -> Void) {
     stop()
-    guard deviceID != 0 else { return }
+    guard deviceID != 0, AudioDeviceList.isPresent(deviceID) else { return }
     self.deviceID = deviceID
     let pairs: [(AudioObjectPropertySelector, AudioObjectPropertyScope)] = [
       (kAudioDevicePropertyStreamFormat, kAudioObjectPropertyScopeInput),
@@ -132,12 +132,14 @@ final class AudioFormatWatch {
       (kAudioDevicePropertyDeviceIsAlive, kAudioObjectPropertyScopeGlobal),
     ]
     for (selector, scope) in pairs {
+      guard AudioDeviceList.isPresent(deviceID) else { break }
       var address = AudioObjectPropertyAddress(
         mSelector: selector,
         mScope: scope,
         mElement: kAudioObjectPropertyElementMain
       )
       let block: AudioObjectPropertyListenerBlock = { _, _ in
+        guard AudioDeviceList.isPresent(deviceID) else { return }
         handler()
       }
       guard AudioObjectAddPropertyListenerBlock(deviceID, &address, queue, block) == noErr else {
@@ -149,13 +151,14 @@ final class AudioFormatWatch {
 
   func stop() {
     let deviceID = self.deviceID
-    if deviceID != 0 {
-      for index in listeners.indices {
-        AudioObjectRemovePropertyListenerBlock(
-          deviceID, &listeners[index].address, nil, listeners[index].block)
-      }
-    }
+    let pending = listeners
     listeners.removeAll()
     self.deviceID = 0
+    guard deviceID != 0,
+      DeviceProcTeardown.shouldRemoveListeners(isInDeviceList: AudioDeviceList.isPresent(deviceID))
+    else { return }
+    for listener in pending {
+      AudioObjectRemovePropertyListenerBlock(deviceID, &listener.address, nil, listener.block)
+    }
   }
 }

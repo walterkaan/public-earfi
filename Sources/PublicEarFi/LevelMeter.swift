@@ -42,7 +42,7 @@ final class LevelMeter {
 
   func start(deviceID: AudioDeviceID?) {
     stop()
-    guard let deviceID else { return }
+    guard let deviceID, AudioDeviceList.isPresent(deviceID) else { return }
     watchedDevice = deviceID
     settleAttempts = 0
     sawBluetooth = AudioDeviceList.isBluetooth(deviceID)
@@ -69,6 +69,10 @@ final class LevelMeter {
   private func open(_ deviceID: AudioDeviceID) {
     stopEngine()
     guard watchedDevice == deviceID else { return }
+    guard AudioDeviceList.isPresent(deviceID) else {
+      if sawBluetooth { scheduleSettle(deviceID) }
+      return
+    }
     if AudioDeviceList.isBluetooth(deviceID) { sawBluetooth = true }
     guard AudioDeviceList.isAlive(deviceID) else {
       if sawBluetooth { scheduleSettle(deviceID) }
@@ -102,7 +106,7 @@ final class LevelMeter {
   }
 
   private func noteDeviceChange(_ deviceID: AudioDeviceID) {
-    guard watchedDevice == deviceID else { return }
+    guard watchedDevice == deviceID, AudioDeviceList.isPresent(deviceID) else { return }
     let native = AudioInputBind.nativeDescription(deviceID: deviceID)
     let ready = AudioDeviceList.isAlive(deviceID) && native?.canOpen == true
     if ready, native?.summary == lastNativeSummary { return }

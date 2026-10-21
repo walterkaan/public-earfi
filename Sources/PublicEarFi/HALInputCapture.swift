@@ -42,7 +42,7 @@ final class HALDeviceInputSession: DeviceInputSession {
     onBuffer: @escaping (AVAudioPCMBuffer) -> Void
   ) -> DeviceInputOpen {
     stop()
-    guard AudioDeviceList.isAlive(deviceID) else {
+    guard AudioDeviceList.isPresent(deviceID), AudioDeviceList.isAlive(deviceID) else {
       return .failed("The selected audio device is not connected.")
     }
     guard let nominal = Self.inputFormat(deviceID: deviceID) else {
@@ -73,7 +73,11 @@ final class HALDeviceInputSession: DeviceInputSession {
     }
     let started = AudioDeviceStart(deviceID, created)
     if started != noErr {
-      AudioDeviceDestroyIOProcID(deviceID, created)
+      let stillPresent = AudioDeviceList.isPresent(deviceID)
+      let stillAlive = stillPresent && AudioDeviceList.isAlive(deviceID)
+      if DeviceProcTeardown.shouldStopIOProc(isInDeviceList: stillPresent, isAlive: stillAlive) {
+        AudioDeviceDestroyIOProcID(deviceID, created)
+      }
       return .failed(Self.openFailure)
     }
     lock.lock()
@@ -95,7 +99,16 @@ final class HALDeviceInputSession: DeviceInputSession {
     running = false
     lock.unlock()
     guard let proc, device != 0 else { return }
-    AudioDeviceStop(device, proc)
+    let present = AudioDeviceList.isPresent(device)
+    let alive = present && AudioDeviceList.isAlive(device)
+    guard DeviceProcTeardown.shouldStopIOProc(isInDeviceList: present, isAlive: alive) else {
+      return
+    }
+    let stopped = AudioDeviceStop(device, proc)
+    guard stopped == noErr else { return }
+    let stillThere = AudioDeviceList.isPresent(device) && AudioDeviceList.isAlive(device)
+    guard DeviceProcTeardown.shouldStopIOProc(isInDeviceList: stillThere, isAlive: stillThere)
+    else { return }
     AudioDeviceDestroyIOProcID(device, proc)
   }
 

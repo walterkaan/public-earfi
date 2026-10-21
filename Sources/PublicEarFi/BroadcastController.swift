@@ -286,12 +286,13 @@ final class BroadcastController {
       stopWithProblem("No input device is available.")
       return
     }
-    if AudioDeviceList.isBluetooth(deviceID) {
+    let present = AudioDeviceList.isPresent(deviceID)
+    if present && AudioDeviceList.isBluetooth(deviceID) {
       bluetoothDeviceID = deviceID
     } else if bluetoothDeviceID != deviceID {
       bluetoothDeviceID = 0
     }
-    guard AudioDeviceList.isAlive(deviceID) else {
+    guard present && AudioDeviceList.isAlive(deviceID) else {
       if bluetoothDeviceID == deviceID {
         retrySettlingInput(CaptureFormatPlan.notReadyMessage(deviceName: name))
       } else {
@@ -901,11 +902,13 @@ final class BroadcastController {
   /// not changed.
   private func reopenAfterFormatChange() {
     guard desired, !stopping, !isHalted(), let deviceID = launch?.deviceID else { return }
-    let transport = AudioDeviceList.transportDescription(deviceID)
-    let bluetooth = AudioDeviceList.isBluetooth(deviceID) || bluetoothDeviceID == deviceID
-    if bluetooth { bluetoothDeviceID = deviceID }
+    let present = AudioDeviceList.isPresent(deviceID)
+    let transport = present ? AudioDeviceList.transportDescription(deviceID) : "Unknown"
+    let bluetooth =
+      (present && AudioDeviceList.isBluetooth(deviceID)) || bluetoothDeviceID == deviceID
+    if present && bluetooth { bluetoothDeviceID = deviceID }
     formatBudget.limit = CaptureFormatPlan.rebuildLimit(bluetooth: bluetooth)
-    let alive = AudioDeviceList.isAlive(deviceID)
+    let alive = present && AudioDeviceList.isAlive(deviceID)
     let native = alive ? AudioInputBind.nativeDescription(deviceID: deviceID) : nil
     let ready = alive && native?.canOpen == true
     if !ready {
