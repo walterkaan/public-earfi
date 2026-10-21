@@ -71,19 +71,16 @@ public enum ListenerPage {
       <style>
       html,body{margin:0;padding:0;height:100%;font-family:Arial,sans-serif}
       #video{position:absolute;top:0;left:0;width:100%;height:100%;background:rgb(30,30,30)}
-      #message{position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;text-align:center;justify-content:center;font-size:16px;font-weight:bold;color:#fff;pointer-events:none;padding:20px;box-sizing:border-box;text-shadow:0 0 5px #000;z-index:1}
-      #playerTitle{position:absolute;z-index:2;left:8px;bottom:calc(env(safe-area-inset-bottom, 0px) + 5px);max-width:calc(100% - 124px);min-width:9em;height:32px;box-sizing:border-box;display:flex;align-items:center;padding:0 10px;color:#fff;background:rgb(30,30,30);font:600 16px/1.1 -apple-system,BlinkMacSystemFont,sans-serif;pointer-events:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+      #message{position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;text-align:center;justify-content:center;font-size:16px;font-weight:bold;color:#fff;pointer-events:none;padding:20px;box-sizing:border-box;text-shadow:0 0 5px #000}
       </style>
       <script defer src="\(readerPath)"></script>
       </head>
       <body>
       <video id="video" title="\(safeTitle)"></video>
       <div id="message"></div>
-      <div id="playerTitle">\(safeTitle)</div>
       <script>
       const video=document.getElementById("video");
       const message=document.getElementById("message");
-      const playerTitle=document.getElementById("playerTitle");
       let defaultControls=false;
       let reader=null;
       const setMessage=(str)=>{video.controls=str!==""?false:defaultControls;message.innerText=str;};
@@ -98,15 +95,9 @@ public enum ListenerPage {
       document.title=title;
       video.title=title;
       video.setAttribute("title",title);
-      if(playerTitle)playerTitle.textContent=title;
       if(navigator.mediaSession&&typeof MediaMetadata==="function"){
       navigator.mediaSession.metadata=new MediaMetadata({title:title});
       try{navigator.mediaSession.playbackState="playing";}catch(err){}
-      }
-      const root=video.shadowRoot;
-      if(root){
-      const label=root.querySelector(".status-label");
-      if(label)label.textContent=title;
       }
       };
       const earfiSpec=\(scriptTitle);
@@ -136,14 +127,14 @@ public enum ListenerPage {
       reader=new MediaMTXWebRTCReader({
       url:new URL("\(whepPath)",window.location.href).toString(),
       onError:(err)=>{setMessage(err);},
-      onTrack:(evt)=>{setMessage("");video.srcObject=evt.streams[0];applyTitle(playerTitle?playerTitle.textContent:document.title);},
+      onTrack:(evt)=>{setMessage("");video.srcObject=evt.streams[0];applyTitle(document.title);},
       onDataChannel:(evt)=>{
       evt.channel.binaryType="arraybuffer";
       evt.channel.onmessage=(evt)=>{console.log("data channel message",evt.data);};
       },
       });
       });
-      video.addEventListener("play",()=>applyTitle(playerTitle?playerTitle.textContent:document.title));
+      video.addEventListener("play",()=>applyTitle(document.title));
       window.addEventListener("beforeunload",()=>{if(reader!==null)reader.close();});
       </script>
       </body>

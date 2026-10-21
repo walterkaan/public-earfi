@@ -61,20 +61,19 @@ final class ListenerPageTests: XCTestCase {
       .notFound)
   }
 
-  func testPageShowsTheBroadcastTitleOnThePlayerAndInTheTab() {
+  func testPageShowsTheBroadcastTitleInTheTabAndMediaSession() {
     let plain = ListenerPage.html(title: "Public EarFi Broadcast")
     XCTAssertTrue(plain.contains("<title>Public EarFi Broadcast</title>"))
-    XCTAssertTrue(plain.contains("<div id=\"playerTitle\">Public EarFi Broadcast</div>"))
+    XCTAssertFalse(plain.contains("playerTitle"))
+    XCTAssertFalse(plain.contains("status-label"))
     XCTAssertTrue(plain.contains("title=\"Public EarFi Broadcast\""))
     XCTAssertTrue(plain.contains("new MediaMetadata({title:title})"))
-    XCTAssertTrue(plain.contains("playerTitle.textContent=title"))
-    XCTAssertTrue(plain.contains(".status-label"))
     XCTAssertFalse(plain.contains("get(\"title\")"))
     XCTAssertTrue(plain.contains("new URL(\"/whep\""))
 
     let awkward = ListenerPage.html(title: "A & B <live>")
     XCTAssertTrue(awkward.contains("<title>A &amp; B &lt;live&gt;</title>"))
-    XCTAssertTrue(awkward.contains("<div id=\"playerTitle\">A &amp; B &lt;live&gt;</div>"))
+    XCTAssertFalse(awkward.contains("playerTitle"))
     XCTAssertFalse(awkward.contains("<live>"))
     XCTAssertTrue(ListenerPage.jsonForScript(title: "A & B <live>").contains("\\u003c"))
     XCTAssertTrue(ListenerPage.json(title: "A & B").contains("\"title\":\"A & B\""))
@@ -106,7 +105,7 @@ final class ListenerPageTests: XCTestCase {
     let page = exchange(port: server.boundPort, request: "GET / HTTP/1.1\r\nHost: x\r\n\r\n")
     XCTAssertTrue(page.contains("200"))
     XCTAssertTrue(page.contains("<title>Hall A</title>"))
-    XCTAssertTrue(page.contains("<div id=\"playerTitle\">Hall A</div>"))
+    XCTAssertFalse(page.contains("playerTitle"))
 
     let old = exchange(
       port: server.boundPort, request: "GET /live?title=Old HTTP/1.1\r\nHost: x\r\n\r\n")

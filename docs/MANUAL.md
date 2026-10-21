@@ -121,7 +121,7 @@ That uses the least Wi-Fi. Standard and Music use more for the same number of li
 
 Standard (64 kbps) and Music (96 kbps mono, or 128 kbps stereo) use more of the Wi-Fi for the same number of listeners. Speech is the one sized for about 30 phones.
 
-**Broadcast title**, under Stream, is the name on the listener player, on the phone’s lock screen, and in the browser tab. Leave it blank for “Public EarFi Broadcast”. That blank default follows the app name, so a rename updates it. A name you type is used as it is. It does not change the listener link, and it does not restart the audio. A phone that already has the page open picks up a new name when the person comes back to that tab. Safari also writes “Live Broadcast” on a live player; the page covers that spot with this name.
+**Broadcast title**, under Stream, is the name in the browser tab and on the phone’s lock screen. Leave it blank for “Public EarFi Broadcast”. That blank default follows the app name, so a rename updates it. A name you type is used as it is. It does not change the listener link, and it does not restart the audio. A phone that already has the page open picks up a new name when the person comes back to that tab. The listener page leaves the player’s own controls clear, including the mute button.
 
 **TCP only**, under Network mode, is the setting to try if listeners hear dropouts on Wi-Fi. Auto is the normal choice.
 
