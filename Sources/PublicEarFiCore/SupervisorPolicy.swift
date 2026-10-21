@@ -1,5 +1,30 @@
 import Foundation
 
+/// `Process.terminationStatus` raises `NSInvalidArgumentException` if the
+/// task is still running or was never launched. Callers must use this
+/// instead of reading the status themselves. `startFFmpeg` hits that when
+/// the stream is not ready yet and ffmpeg is still alive.
+public enum ProcessExit {
+  public static func statusIfExited(
+    isRunning: Bool,
+    wasLaunched: Bool,
+    status: () -> Int32
+  ) -> Int32? {
+    guard wasLaunched, !isRunning else { return nil }
+    return status()
+  }
+
+  /// Detail for the Start path that waits until ffmpeg's stream is ready.
+  public static func ffmpegNotReadyDetail(isRunning: Bool, wasLaunched: Bool, status: Int32?)
+    -> String
+  {
+    if let status, wasLaunched, !isRunning {
+      return "exited with status \(status)"
+    }
+    return "the stream was not ready within 5 s"
+  }
+}
+
 public enum RestartBackoff {
   public static let steps: [TimeInterval] = [1, 2, 4, 8, 16, 30]
   public static let problemAfter = 5

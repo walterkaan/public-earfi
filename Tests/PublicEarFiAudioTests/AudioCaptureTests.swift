@@ -4,6 +4,41 @@ import XCTest
 @testable import PublicEarFi
 
 final class AudioCaptureTests: XCTestCase {
+  /// The Start failure path used to call `terminationStatus` while ffmpeg was
+  /// still running, which raises NSInvalidArgumentException. `/bin/sleep`
+  /// stands in for that still-running ffmpeg.
+  func testStartFFmpegDoesNotReadStatusWhileFFmpegIsRunning() throws {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sleep")
+    process.arguments = ["30"]
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "earfi-exit-\(UUID().uuidString)", isDirectory: true)
+    let controller = BroadcastController(logger: FileLogger(directory: directory))
+    try process.run()
+    defer {
+      if process.isRunning {
+        process.terminate()
+      }
+      process.waitUntilExit()
+      try? FileManager.default.removeItem(at: directory)
+    }
+    XCTAssertTrue(process.isRunning)
+    XCTAssertEqual(
+      controller.startFFmpegExitDetail(process: process, launched: true),
+      "the stream was not ready within 5 s"
+    )
+    XCTAssertTrue(process.isRunning)
+    process.terminate()
+    process.waitUntilExit()
+    XCTAssertFalse(process.isRunning)
+    let exited = controller.startFFmpegExitDetail(process: process, launched: true)
+    XCTAssertTrue(exited.hasPrefix("exited with status "))
+    XCTAssertEqual(
+      controller.startFFmpegExitDetail(process: process, launched: false),
+      "the stream was not ready within 5 s"
+    )
+  }
+
   func testMeterReadingIsSampledWithoutACallback() {
     let meter = LevelMeter()
     let initial = meter.latest()

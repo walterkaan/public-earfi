@@ -89,7 +89,7 @@ Closing the laptop lid still sleeps the Mac unless it is on power with an extern
 |---|---|
 | No sound on a phone | Tap play. Tap the speaker/mute icon on the player or the browser tab. Turn the phone volume up. Keep the screen on. |
 | The meter shows no signal | Confirm the desk is feeding the interface. Mono adds every input, so a one-sided stereo feed is included. While live, silence for about 5 seconds is called out on the window and does not flicker off on a single loud frame. The log records the device's own format and a peak level. |
-| Bluetooth earbuds are the mic | The app reopens the input after macOS switches them to call mode. The mic is speech quality. Their playback drops to call quality while broadcasting, so the stage may be harder to hear. Use a wired or USB microphone, or listen on separate wired headphones, if that matters. |
+| Bluetooth earbuds are the mic | The app reopens the input after macOS switches them to call mode. The mic is speech quality. Their playback drops to call quality while broadcasting, so the stage may be harder to hear. Use a wired or USB microphone, or listen on separate wired headphones, if that matters. Turn Bluetooth off on your phone, and on any other nearby device paired to the earbuds, before you go live. |
 | Listeners cannot open the link | Same network, no client isolation, firewall allows mediamtx, and the poster matches the current address. |
 | Dropouts or a regular click | Leave quality on Speech. Wired Mac, and TCP only mode. The app captures the selected device and always sends 48 kHz in 20 ms frames. There is no sample-rate setting to change. |
 | Microphone prompt on every update | Expected for ad-hoc builds. See the first-open section. |

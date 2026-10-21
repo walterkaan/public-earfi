@@ -319,19 +319,25 @@ final class BroadcastController {
       self?.scheduleFormatRebuild()
     }
     guard waitUntilReady(stream: launch.settings.streamName) else {
-      let stillRunning = process.isRunning
-      let status = process.terminationStatus
+      let detail = startFFmpegExitDetail(process: process, launched: true)
       stopCapture()
       abandon(process)
       ffmpeg = nil
-      let detail =
-        stillRunning
-        ? "the stream was not ready within 5 s"
-        : "exited with status \(status)"
       noteFailure(component: "ffmpeg", detail: detail)
       return
     }
     becameLive()
+  }
+
+  /// Exit line for `startFFmpeg` when the stream is not ready. Does not read
+  /// `terminationStatus` while ffmpeg is still running, or if it never launched.
+  func startFFmpegExitDetail(process: Process, launched: Bool) -> String {
+    let running = launched && process.isRunning
+    let status = ProcessExit.statusIfExited(isRunning: running, wasLaunched: launched) {
+      process.terminationStatus
+    }
+    return ProcessExit.ffmpegNotReadyDetail(
+      isRunning: running, wasLaunched: launched, status: status)
   }
 
   private func startMediaMTX(configURL: URL, launch: BroadcastLaunch) -> Bool {
@@ -465,17 +471,20 @@ final class BroadcastController {
       drainFFmpegLog()
     }
     guard desired, !stopping, !isHalted() else { return }
-    let status = process.terminationStatus
-    logger.log(source, "exited with status \(status)")
+    let status = ProcessExit.statusIfExited(isRunning: process.isRunning, wasLaunched: true) {
+      process.terminationStatus
+    }
+    let statusText = status.map { "\($0)" } ?? "unknown"
+    logger.log(source, "exited with status \(statusText)")
     if source == "mediamtx" {
       drainMediaMTXLog()
       if let conflict = bindConflict() {
         halt(conflict)
         return
       }
-      noteFailure(component: "mediamtx", detail: "mediamtx exited with status \(status)")
+      noteFailure(component: "mediamtx", detail: "mediamtx exited with status \(statusText)")
     } else {
-      noteFailure(component: "ffmpeg", detail: "exited with status \(status)")
+      noteFailure(component: "ffmpeg", detail: "exited with status \(statusText)")
     }
   }
 

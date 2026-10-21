@@ -262,7 +262,12 @@ final class MediaMTXConfigTests: XCTestCase {
       process.waitUntilExit()
       let output =
         String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-      XCTAssertEqual(process.terminationStatus, 0, output)
+      let status = ProcessExit.statusIfExited(
+        isRunning: process.isRunning, wasLaunched: true
+      ) {
+        process.terminationStatus
+      }
+      XCTAssertEqual(status, 0, output)
     }
   }
 
@@ -468,6 +473,44 @@ final class PosterAndSupervisorTests: XCTestCase {
       PosterBuilder.steps(
         instructions: PosterBuilder.defaultInstructions, show: false, networkName: "Hall"
       ).isEmpty
+    )
+  }
+
+  func testStartFFmpegDoesNotReadStatusWhileFFmpegIsRunning() {
+    var reads = 0
+    let running = ProcessExit.statusIfExited(isRunning: true, wasLaunched: true) {
+      reads += 1
+      return 9
+    }
+    XCTAssertNil(running)
+    XCTAssertEqual(reads, 0)
+    XCTAssertEqual(
+      ProcessExit.ffmpegNotReadyDetail(isRunning: true, wasLaunched: true, status: nil),
+      "the stream was not ready within 5 s"
+    )
+
+    var unlaunchedReads = 0
+    let unlaunched = ProcessExit.statusIfExited(isRunning: false, wasLaunched: false) {
+      unlaunchedReads += 1
+      return 0
+    }
+    XCTAssertNil(unlaunched)
+    XCTAssertEqual(unlaunchedReads, 0)
+    XCTAssertEqual(
+      ProcessExit.ffmpegNotReadyDetail(isRunning: false, wasLaunched: false, status: nil),
+      "the stream was not ready within 5 s"
+    )
+
+    var exitedReads = 0
+    let exited = ProcessExit.statusIfExited(isRunning: false, wasLaunched: true) {
+      exitedReads += 1
+      return 1
+    }
+    XCTAssertEqual(exited, 1)
+    XCTAssertEqual(exitedReads, 1)
+    XCTAssertEqual(
+      ProcessExit.ffmpegNotReadyDetail(isRunning: false, wasLaunched: true, status: 1),
+      "exited with status 1"
     )
   }
 
