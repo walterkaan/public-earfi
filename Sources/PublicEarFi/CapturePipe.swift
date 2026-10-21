@@ -153,9 +153,9 @@ final class CapturePipe {
         self?.consume(buffer)
       })
     {
-    case .success(let value):
+    case .ready(let value):
       native = value
-    case .failure(let message):
+    case .failed(let message):
       stop()
       return settlingMessage(message, deviceName: deviceName)
     }

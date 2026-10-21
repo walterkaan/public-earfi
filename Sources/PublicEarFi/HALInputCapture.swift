@@ -8,12 +8,17 @@ import PublicEarFiCore
 /// build a new session and destroy the previous one. Nothing here is an
 /// `AVAudioEngine`, so a failed open cannot leave a stale 1-channel input node
 /// for the next device.
+enum DeviceInputOpen {
+  case ready(CaptureStreamDescription)
+  case failed(String)
+}
+
 protocol DeviceInputSession: AnyObject {
   var isRunning: Bool { get }
   func start(
     deviceID: AudioDeviceID,
     onBuffer: @escaping (AVAudioPCMBuffer) -> Void
-  ) -> Result<CaptureStreamDescription, String>
+  ) -> DeviceInputOpen
   func stop()
 }
 
@@ -35,25 +40,25 @@ final class HALDeviceInputSession: DeviceInputSession {
   func start(
     deviceID: AudioDeviceID,
     onBuffer: @escaping (AVAudioPCMBuffer) -> Void
-  ) -> Result<CaptureStreamDescription, String> {
+  ) -> DeviceInputOpen {
     stop()
     guard AudioDeviceList.isAlive(deviceID) else {
-      return .failure("The selected audio device is not connected.")
+      return .failed("The selected audio device is not connected.")
     }
     guard let nominal = Self.inputFormat(deviceID: deviceID) else {
-      return .failure(CaptureFormatPlan.notReadyMessage(deviceName: ""))
+      return .failed(CaptureFormatPlan.notReadyMessage(deviceName: ""))
     }
     let configured = AudioDeviceList.inputChannelCount(deviceID)
     let channels = max(Int(nominal.mChannelsPerFrame), configured)
     let described = Self.describe(nominal, channels: channels)
     guard let bound = CaptureDeviceBinding.bound(device: described, staleChannels: 0) else {
       if AudioDeviceList.isAlive(deviceID) {
-        return .failure(CaptureFormatPlan.notReadyMessage(deviceName: ""))
+        return .failed(CaptureFormatPlan.notReadyMessage(deviceName: ""))
       }
-      return .failure(CaptureFormatPlan.impossibleMessage(deviceName: "", stream: described))
+      return .failed(CaptureFormatPlan.impossibleMessage(deviceName: "", stream: described))
     }
     guard nominal.mFormatID == 0 || nominal.mFormatID == kAudioFormatLinearPCM else {
-      return .failure(CaptureFormatPlan.impossibleMessage(deviceName: "", stream: bound))
+      return .failed(CaptureFormatPlan.impossibleMessage(deviceName: "", stream: bound))
     }
     var created: AudioDeviceIOProcID?
     let status = AudioDeviceCreateIOProcIDWithBlock(&created, deviceID, nil) {
@@ -64,19 +69,19 @@ final class HALDeviceInputSession: DeviceInputSession {
       onBuffer(buffer)
     }
     guard status == noErr, let created else {
-      return .failure(Self.openFailure)
+      return .failed(Self.openFailure)
     }
     let started = AudioDeviceStart(deviceID, created)
     if started != noErr {
       AudioDeviceDestroyIOProcID(deviceID, created)
-      return .failure(Self.openFailure)
+      return .failed(Self.openFailure)
     }
     lock.lock()
     self.deviceID = deviceID
     procID = created
     running = true
     lock.unlock()
-    return .success(bound)
+    return .ready(bound)
   }
 
   func stop() {

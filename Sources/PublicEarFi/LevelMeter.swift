@@ -85,11 +85,11 @@ final class LevelMeter {
         self?.measure(buffer)
       })
     {
-    case .failure(let message):
+    case .failed(let message):
       stopEngine()
       if CaptureFormatPlan.isInputSettling(message) { scheduleSettle(deviceID) }
       return
-    case .success(let native):
+    case .ready(let native):
       lastNativeSummary = native.summary
     }
     settleAttempts = 0

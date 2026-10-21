@@ -396,13 +396,13 @@ final class ScriptedInputSession: DeviceInputSession {
   func start(
     deviceID: AudioDeviceID,
     onBuffer: @escaping (AVAudioPCMBuffer) -> Void
-  ) -> Result<CaptureStreamDescription, String> {
+  ) -> DeviceInputOpen {
     guard deviceID == self.deviceID else {
-      return .failure("Could not open the selected audio device.")
+      return .failed("Could not open the selected audio device.")
     }
     if fails {
       running = true
-      return .failure("Could not open the selected audio device.")
+      return .failed("Could not open the selected audio device.")
     }
     let described = CaptureStreamDescription(
       sampleRate: 48_000,
@@ -415,7 +415,7 @@ final class ScriptedInputSession: DeviceInputSession {
       let bound = CaptureDeviceBinding.bound(
         device: described, staleChannels: staleDefaultChannels)
     else {
-      return .failure(CaptureFormatPlan.notReadyMessage(deviceName: ""))
+      return .failed(CaptureFormatPlan.notReadyMessage(deviceName: ""))
     }
     running = true
     ledger.openedChannels.append(bound.channelCount)
@@ -428,7 +428,7 @@ final class ScriptedInputSession: DeviceInputSession {
     ) {
       onBuffer(buffer)
     }
-    return .success(bound)
+    return .ready(bound)
   }
 
   func stop() {
