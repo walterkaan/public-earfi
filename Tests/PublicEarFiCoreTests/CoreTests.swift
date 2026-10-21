@@ -29,6 +29,8 @@ final class SettingsTests: XCTestCase {
     XCTAssertTrue(settings.posterShowInstructions)
     XCTAssertTrue(settings.posterInstructions.contains("No sound? Tap the speaker/mute icon"))
     XCTAssertEqual(settings.posterNetworkName, "")
+    XCTAssertEqual(settings.posterWiFiSecurity, .wpa)
+    XCTAssertFalse(settings.posterWiFiHidden)
     XCTAssertNil(settings.posterPaperSize)
     XCTAssertTrue(settings.posterUseFooter)
     XCTAssertEqual(AppSettings.listenerTarget, 30)
@@ -160,7 +162,7 @@ final class SettingsTests: XCTestCase {
     )
   }
 
-  func testInvalidSettingsAreRepairedAndPersisted() {
+  func testInvalidSettingsAreRepairedAndPersisted() throws {
     let suite = "public-earfi-tests-\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suite)!
     defaults.removePersistentDomain(forName: suite)
@@ -193,6 +195,25 @@ final class SettingsTests: XCTestCase {
     XCTAssertEqual(store.load().streamName, "live")
     XCTAssertFalse(SettingsRepair.channelFits(8, inputCount: 2))
     XCTAssertTrue(SettingsRepair.channelFits(2, inputCount: 2))
+
+    defaults.set(Data("{}".utf8), forKey: SettingsStore.storageKey)
+    let missingPosterFields = store.load()
+    XCTAssertEqual(missingPosterFields.posterWiFiSecurity, .wpa)
+    XCTAssertFalse(missingPosterFields.posterWiFiHidden)
+    XCTAssertEqual(missingPosterFields.posterNetworkName, "")
+
+    var poster = AppSettings.defaults
+    poster.posterNetworkName = "Hall-Guest"
+    poster.posterWiFiSecurity = .wep
+    poster.posterWiFiHidden = true
+    store.save(poster)
+    XCTAssertEqual(store.load().posterNetworkName, "Hall-Guest")
+    XCTAssertEqual(store.load().posterWiFiSecurity, .wep)
+    XCTAssertTrue(store.load().posterWiFiHidden)
+    let saved = try XCTUnwrap(JSONEncoder().encode(poster))
+    let json = String(decoding: saved, as: UTF8.self)
+    XCTAssertFalse(json.contains("password"))
+    XCTAssertFalse(json.contains("venue-password"))
 
     defaults.set(Data([0x00, 0x01, 0xFF]), forKey: SettingsStore.storageKey)
     let unreadable = store.loadResolved()
@@ -468,6 +489,96 @@ final class PosterAndSupervisorTests: XCTestCase {
         instructions: PosterBuilder.defaultInstructions, show: false, networkName: "Hall"
       ).isEmpty
     )
+  }
+
+  func testQuickPosterStepsLeaveALineWhenTheNetworkIsUnknown() {
+    XCTAssertEqual(
+      PosterBuilder.quickSteps(networkName: "Hall-Guest"),
+      [
+        "Join Wi-Fi Hall-Guest",
+        "Scan the QR code with your phone camera",
+        "Tap play; use your own earphones",
+      ]
+    )
+    let blank = PosterBuilder.quickSteps(networkName: "  ")
+    XCTAssertEqual(blank.count, 3)
+    XCTAssertTrue(blank[0].hasPrefix("Join Wi-Fi "))
+    XCTAssertTrue(blank[0].contains("____"))
+    XCTAssertFalse(blank[0].contains("Hall"))
+    XCTAssertEqual(PosterBuilder.poweredBy, "Powered by Public EarFi")
+  }
+
+  func testQuickPosterAddsAWiFiCodeWhenTheNetworkIsSet() {
+    let url = "http://192.168.1.20:8889/"
+    let blank = PosterBuilder.quickPlan(
+      networkName: "  ",
+      password: "secret",
+      security: .wpa,
+      hidden: true,
+      listenerURL: url
+    )
+    XCTAssertFalse(blank.includesWiFiCode)
+    XCTAssertEqual(blank.codes.map(\.payload), [url])
+    XCTAssertEqual(blank.closing, "")
+    XCTAssertTrue(blank.steps[0].contains("____"))
+    XCTAssertFalse(blank.steps.joined(separator: "\n").contains("secret"))
+
+    let joined = PosterBuilder.quickPlan(
+      networkName: "Hall-Guest",
+      password: "p:q;r",
+      security: .wpa,
+      hidden: false,
+      listenerURL: url
+    )
+    XCTAssertTrue(joined.includesWiFiCode)
+    XCTAssertEqual(joined.codes[0].label, "1. Join the Wi-Fi")
+    XCTAssertEqual(
+      joined.codes[0].payload,
+      "WIFI:T:WPA;S:Hall-Guest;P:p\\:q\\;r;H:false;;"
+    )
+    XCTAssertEqual(joined.codes[0].lines, ["Hall-Guest", "Password: p:q;r"])
+    XCTAssertEqual(joined.codes[1].label, "2. Open the broadcast")
+    XCTAssertEqual(joined.codes[1].payload, url)
+    XCTAssertEqual(joined.codes[1].lines, [url])
+    XCTAssertEqual(joined.closing, "3. Tap play; use your own earphones")
+    XCTAssertFalse(joined.codes[1].payload.contains("WIFI:"))
+
+    let hidden = PosterBuilder.quickPlan(
+      networkName: "a\\b;c,d:e\"f",
+      password: "secret",
+      security: .wep,
+      hidden: true,
+      listenerURL: url
+    )
+    XCTAssertEqual(
+      hidden.codes[0].payload,
+      "WIFI:T:WEP;S:a\\\\b\\;c\\,d\\:e\\\"f;P:secret;H:true;;"
+    )
+    XCTAssertEqual(
+      hidden.codes[0].lines,
+      ["a\\b;c,d:e\"f", "Password: secret", "Hidden network"]
+    )
+
+    let open = PosterBuilder.quickPlan(
+      networkName: "Hall",
+      password: "secret",
+      security: .none,
+      hidden: false,
+      listenerURL: url
+    )
+    XCTAssertEqual(open.codes[0].payload, "WIFI:T:nopass;S:Hall;P:;H:false;;")
+    XCTAssertEqual(open.codes[0].lines, ["Hall", "No password"])
+    XCTAssertFalse(open.codes[0].lines.joined(separator: "\n").contains("secret"))
+  }
+
+  func testWiFiQREscapesTheReservedCharacters() {
+    XCTAssertEqual(WiFiQRCode.escape("\\ ;,:\"end"), #"\\ \;\,\:\"end"#)
+    XCTAssertEqual(
+      WiFiQRCode.payload(ssid: "Cafe", password: "ok", security: .wpa, hidden: true),
+      "WIFI:T:WPA;S:Cafe;P:ok;H:true;;"
+    )
+    XCTAssertEqual(WiFiSecurity.wpa.menuLabel, "WPA/WPA2/WPA3")
+    XCTAssertEqual(WiFiSecurity.none.qrType, "nopass")
   }
 
   func testStartFFmpegDoesNotReadStatusWhileFFmpegIsRunning() {
@@ -779,7 +890,31 @@ final class APIAndCreditsTests: XCTestCase {
     XCTAssertFalse(report.contains("line 1\n"))
     XCTAssertTrue(report.contains("stream: live"))
     XCTAssertTrue(report.contains("broadcast title: Public EarFi Broadcast"))
+    XCTAssertTrue(report.contains("poster Wi-Fi password: not included"))
     XCTAssertTrue(report.contains("Recent log (200 lines)"))
+  }
+
+  func testDiagnosticsOmitsThePosterPassword() throws {
+    var settings = AppSettings.defaults
+    settings.posterNetworkName = "Hall-Guest"
+    settings.posterWiFiSecurity = .wpa
+    settings.posterWiFiHidden = true
+    let secret = "venue-password-9f3a"
+    let report = DiagnosticsReport.make(
+      appVersion: "1.0.0",
+      systemDescription: "macOS",
+      settings: settings,
+      listenerURL: "http://10.0.0.2:8889/",
+      helperSummary: "helpers",
+      logLines: ["started"]
+    )
+    XCTAssertFalse(report.contains(secret))
+    XCTAssertTrue(report.contains("poster Wi-Fi: Hall-Guest"))
+    XCTAssertTrue(report.contains("poster Wi-Fi security: wpa"))
+    XCTAssertTrue(report.contains("poster Wi-Fi hidden: true"))
+    XCTAssertTrue(report.contains("poster Wi-Fi password: not included"))
+    let data = try XCTUnwrap(JSONEncoder().encode(settings))
+    XCTAssertFalse(String(decoding: data, as: UTF8.self).contains(secret))
   }
 
   func testMonoDownmixGainAndSoftLimit() {
@@ -1148,6 +1283,10 @@ final class APIAndCreditsTests: XCTestCase {
     XCTAssertEqual(
       AppPaths.logDirectory(home: home).path,
       "/Users/volunteer/Library/Logs/Public EarFi"
+    )
+    XCTAssertEqual(
+      AppPaths.posterFile(home: home).path,
+      "/Users/volunteer/Library/Application Support/Public EarFi/Public EarFi poster.pdf"
     )
   }
 }

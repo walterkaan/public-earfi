@@ -57,6 +57,12 @@ struct PosterTab: View {
               Button("Use current network name") { model.useCurrentNetworkName() }
             }
           }
+          Text(
+            "Password, security, and hidden network are in Settings → Poster. The main-window poster prints a join code when this name is filled in. This window does not print the password."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
           LabeledRow(title: "Paper") {
             Picker("Paper", selection: paperBinding) {
               Text("A4").tag(PaperSize.a4)

@@ -23,6 +23,10 @@ final class AppModel: ObservableObject {
   @Published var showQR = false
   @Published var onBattery = false
   @Published var knownSSID: String?
+  /// Poster Wi-Fi password. Held in memory for the poster and the Settings
+  /// field. The Keychain is the only copy on disk. Never log this value.
+  @Published var posterPassword = ""
+  @Published var posterPasswordNotice: String?
   @Published var now = Date()
   @Published var loginItemMessage: String?
   @Published var qrImage: NSImage?
@@ -59,6 +63,11 @@ final class AppModel: ObservableObject {
     store = SettingsStore()
     let resolved = store.loadResolved()
     settings = resolved.settings
+    let passwordLoad = PosterPasswordStore.load()
+    posterPassword = passwordLoad.password
+    if passwordLoad.unreadable {
+      posterPasswordNotice = "The saved Wi-Fi password could not be read from the Keychain."
+    }
     credits = BundledResources.credits()
     controller.onPhase = { [weak self] phase in
       Task { @MainActor in self?.apply(phase: phase) }
@@ -112,7 +121,6 @@ final class AppModel: ObservableObject {
       Task { @MainActor in self?.pollMeter() }
     }
     Self.shared = self
-    knownSSID = InterfaceEnumerator.currentSSID()
   }
 
   var isBroadcasting: Bool {
@@ -273,6 +281,13 @@ final class AppModel: ObservableObject {
   }
 
   func resetDefaults() {
+    if case .failed(let status) = PosterPasswordStore.delete() {
+      posterPasswordNotice =
+        "The Wi-Fi password could not be removed from the Keychain (error \(status))."
+    } else {
+      posterPasswordNotice = nil
+    }
+    posterPassword = ""
     settings = store.reset()
     settingsRevision += 1
     loginItemMessage = nil
@@ -293,6 +308,17 @@ final class AppModel: ObservableObject {
   func useCurrentNetworkName() {
     guard let knownSSID, !knownSSID.isEmpty else { return }
     mutate { $0.posterNetworkName = knownSSID }
+  }
+
+  func setPosterPassword(_ value: String) {
+    posterPassword = value
+    switch PosterPasswordStore.save(value) {
+    case .saved, .cleared:
+      posterPasswordNotice = nil
+    case .failed(let status):
+      posterPasswordNotice =
+        "The Wi-Fi password could not be saved in the Keychain (error \(status))."
+    }
   }
 
   func setInputGain(_ db: Double) {
@@ -354,6 +380,70 @@ final class AppModel: ObservableObject {
   func copyLink() {
     guard let listenerURL else { return }
     Clipboard.copy(listenerURL)
+  }
+
+  func printQuickPoster() {
+    guard let page = quickPosterModel() else { return }
+    PosterActions.printPoster(model: page) { self.rememberPoster() }
+  }
+
+  func openQuickPosterPDF() {
+    guard let page = quickPosterModel() else { return }
+    let url = AppPaths.posterFile(home: FileManager.default.homeDirectoryForCurrentUser)
+    PosterActions.writeAndOpenPDF(model: page, url: url) { self.rememberPoster() }
+  }
+
+  private func quickPosterModel() -> PosterRenderModel? {
+    guard let listenerURL else { return nil }
+    let paper = settings.resolvedPaperSize(
+      regionCode: Locale.current.region?.identifier,
+      measurementSystemIsUS: Locale.current.measurementSystem == .us
+    )
+    let network = settings.posterNetworkName.trimmingCharacters(in: .whitespacesAndNewlines)
+    let plan = PosterBuilder.quickPlan(
+      networkName: network,
+      password: posterPassword,
+      security: settings.posterWiFiSecurity,
+      hidden: settings.posterWiFiHidden,
+      listenerURL: listenerURL
+    )
+    if plan.includesWiFiCode {
+      let codes = plan.codes.map { code in
+        PosterCodeBlock(
+          label: code.label,
+          image: QRCodeMaker.image(text: code.payload, side: 2048),
+          lines: code.lines
+        )
+      }
+      return PosterRenderModel(
+        header: broadcastTitle,
+        description: "",
+        steps: [],
+        url: listenerURL,
+        qr: nil,
+        showFooter: true,
+        paper: paper,
+        footerText: PosterBuilder.poweredBy,
+        headerPoints: 36,
+        stepPoints: 16,
+        qrFraction: 0.42,
+        codes: codes,
+        closing: plan.closing
+      )
+    }
+    return PosterRenderModel(
+      header: broadcastTitle,
+      description: "",
+      steps: plan.steps,
+      url: listenerURL,
+      qr: QRCodeMaker.image(text: plan.codes.first?.payload ?? listenerURL, side: 2048),
+      showFooter: true,
+      paper: paper,
+      footerText: PosterBuilder.poweredBy,
+      headerPoints: 44,
+      stepPoints: 17,
+      qrFraction: 0.62
+    )
   }
 
   func copyQRImage() {
@@ -578,6 +668,7 @@ final class AppModel: ObservableObject {
 
   private func refreshNetwork() {
     networks = InterfaceEnumerator.candidates()
+    knownSSID = InterfaceEnumerator.currentSSID()
     let ip = selectedIP
     if let lastAnnouncedIP, let ip, lastAnnouncedIP != ip, isBroadcasting {
       health = "Address changed to \(ip). Listeners need the new link."

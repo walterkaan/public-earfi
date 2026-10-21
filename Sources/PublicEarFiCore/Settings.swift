@@ -57,6 +57,8 @@ public struct AppSettings: Codable, Equatable {
   public var posterShowInstructions: Bool
   public var posterInstructions: String
   public var posterNetworkName: String
+  public var posterWiFiSecurity: WiFiSecurity
+  public var posterWiFiHidden: Bool
   public var posterPaperSize: PaperSize?
   public var posterUseFooter: Bool
 
@@ -84,6 +86,8 @@ public struct AppSettings: Codable, Equatable {
     posterShowInstructions: Bool = true,
     posterInstructions: String = PosterBuilder.defaultInstructions,
     posterNetworkName: String = "",
+    posterWiFiSecurity: WiFiSecurity = .wpa,
+    posterWiFiHidden: Bool = false,
     posterPaperSize: PaperSize? = nil,
     posterUseFooter: Bool = true
   ) {
@@ -110,6 +114,8 @@ public struct AppSettings: Codable, Equatable {
     self.posterShowInstructions = posterShowInstructions
     self.posterInstructions = posterInstructions
     self.posterNetworkName = posterNetworkName
+    self.posterWiFiSecurity = posterWiFiSecurity
+    self.posterWiFiHidden = posterWiFiHidden
     self.posterPaperSize = posterPaperSize
     self.posterUseFooter = posterUseFooter
   }
@@ -450,6 +456,8 @@ private struct StoredSettings: Codable {
   var posterShowInstructions: Bool?
   var posterInstructions: String?
   var posterNetworkName: String?
+  var posterWiFiSecurity: WiFiSecurity?
+  var posterWiFiHidden: Bool?
   var posterPaperSize: PaperSize?
   var posterUseFooter: Bool?
 }
@@ -526,6 +534,8 @@ public struct SettingsStore {
     if let value = stored.posterShowInstructions { settings.posterShowInstructions = value }
     if let value = stored.posterInstructions { settings.posterInstructions = value }
     if let value = stored.posterNetworkName { settings.posterNetworkName = value }
+    if let value = stored.posterWiFiSecurity { settings.posterWiFiSecurity = value }
+    if let value = stored.posterWiFiHidden { settings.posterWiFiHidden = value }
     settings.posterPaperSize = stored.posterPaperSize
     if let value = stored.posterUseFooter { settings.posterUseFooter = value }
     return settings

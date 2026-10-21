@@ -18,6 +18,11 @@ public enum AppPaths {
   public static func pidFile(home: URL) -> URL {
     supportDirectory(home: home).appendingPathComponent("supervised-pids.json")
   }
+
+  /// Replaced each time Open PDF QR Poster is used.
+  public static func posterFile(home: URL) -> URL {
+    supportDirectory(home: home).appendingPathComponent("Public EarFi poster.pdf")
+  }
 }
 
 public struct SupervisedPIDs: Codable, Equatable {
@@ -72,10 +77,14 @@ public enum DiagnosticsReport {
       """
   }
 
+  /// Poster Wi-Fi name and security only. The password is never a settings field
+  /// and must not be passed into this report.
   public static func settingsSummary(
     _ settings: AppSettings, appName: String = BroadcastTitle.fallbackAppName
   ) -> String {
-    [
+    let posterNetwork = settings.posterNetworkName.trimmingCharacters(
+      in: .whitespacesAndNewlines)
+    return [
       "device UID: \(settings.inputDeviceUID ?? "(auto)")",
       "channels: \(settings.channelMode == .mono ? "mono (all inputs summed)" : "stereo from input \(settings.inputChannel)")",
       "volume: \(InputGain.label(settings.inputGainDB))",
@@ -91,6 +100,10 @@ public enum DiagnosticsReport {
       "max listeners: \(settings.maxListeners)",
       "keep awake: \(settings.keepAwake)",
       "log level: \(settings.logLevel.rawValue)",
+      "poster Wi-Fi: \(posterNetwork.isEmpty ? "(not set)" : posterNetwork)",
+      "poster Wi-Fi security: \(settings.posterWiFiSecurity.rawValue)",
+      "poster Wi-Fi hidden: \(settings.posterWiFiHidden)",
+      "poster Wi-Fi password: not included",
       "saved in: ~/Library/Preferences/\(SettingsRepair.defaultsDomain).plist key \(SettingsStore.storageKey)",
     ].joined(separator: "\n")
   }

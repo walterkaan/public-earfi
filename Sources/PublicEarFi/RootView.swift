@@ -153,15 +153,22 @@ struct RunningTab: View {
             }
             HStack {
               Button("Copy link") { model.copyLink() }
-              if model.rankedNetworks.count > 1 {
-                Picker("Address", selection: addressBinding) {
-                  Text("Auto").tag(nil as String?)
-                  ForEach(model.rankedNetworks) { candidate in
-                    Text("\(candidate.name) \(candidate.address)").tag(Optional(candidate.address))
-                  }
+                .disabled(model.listenerURL == nil)
+              Button("Print Poster") { model.printQuickPoster() }
+                .disabled(model.listenerURL == nil)
+                .help("Open the Mac print window for a one-page QR poster")
+              Button("Open PDF QR Poster") { model.openQuickPosterPDF() }
+                .disabled(model.listenerURL == nil)
+                .help("Save a PDF of the QR poster and open it")
+            }
+            if model.rankedNetworks.count > 1 {
+              Picker("Address", selection: addressBinding) {
+                Text("Auto").tag(nil as String?)
+                ForEach(model.rankedNetworks) { candidate in
+                  Text("\(candidate.name) \(candidate.address)").tag(Optional(candidate.address))
                 }
-                .frame(maxWidth: 220)
               }
+              .frame(maxWidth: 220)
             }
             SectionLabel(text: "Listening now")
             Text("\(model.listeners)")
@@ -405,6 +412,53 @@ struct SettingsTab: View {
             .foregroundStyle(.secondary)
         }
         Card {
+          SectionLabel(text: "Poster")
+          LabeledRow(title: "Wi-Fi name") {
+            TextField("Network name", text: posterNetworkBinding)
+              .frame(maxWidth: 280)
+          }
+          if let ssid = model.knownSSID, !ssid.isEmpty,
+            ssid != model.settings.posterNetworkName.trimmingCharacters(in: .whitespacesAndNewlines)
+          {
+            Button("Use this Mac’s Wi-Fi (\(ssid))") { model.useCurrentNetworkName() }
+              .font(.caption)
+          }
+          Text(
+            "Phones join this network before the listen code works. Leave it blank to print a line you can write in. Use this Mac’s Wi-Fi only when that is the network people will join."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          LabeledRow(title: "Password") {
+            SecureField("Wi-Fi password", text: posterPasswordBinding)
+              .frame(maxWidth: 280)
+          }
+          if let notice = model.posterPasswordNotice {
+            Text(notice).font(.caption).foregroundStyle(.orange)
+          }
+          Text(
+            "Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          LabeledRow(title: "Security") {
+            Picker("Security", selection: posterSecurityBinding) {
+              ForEach(WiFiSecurity.allCases, id: \.self) { security in
+                Text(security.menuLabel).tag(security)
+              }
+            }
+            .labelsHidden()
+            .frame(width: 180)
+          }
+          if model.settings.posterWiFiSecurity == .none {
+            Text("An open network has no password. The poster will not print one.")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+          Toggle("Hidden network", isOn: posterHiddenBinding)
+        }
+        Card {
           SectionLabel(text: "This Mac")
           Toggle("Keep Mac awake while broadcasting", isOn: awakeBinding)
           Text(
@@ -479,12 +533,15 @@ struct SettingsTab: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .id(model.settingsRevision)
     .sheet(isPresented: $model.showCredits) { CreditsSheet() }
-    .alert("Reset every setting, including the poster text?", isPresented: $confirmReset) {
+    .alert(
+      "Reset every setting, including the poster text and the Wi-Fi password?",
+      isPresented: $confirmReset
+    ) {
       Button("Reset to defaults", role: .destructive) { model.resetDefaults() }
       Button("Cancel", role: .cancel) {}
     } message: {
       Text(
-        "Logs are kept. The defaults are saved immediately. If you are live, they apply on the next Start."
+        "Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start."
       )
     }
   }
@@ -583,6 +640,24 @@ struct SettingsTab: View {
     )
   }
   private var bitrateText: Binding<String> { numberText(\.customBitrateKbps) }
+  private var posterNetworkBinding: Binding<String> {
+    Binding(
+      get: { model.settings.posterNetworkName },
+      set: { value in model.mutate { $0.posterNetworkName = value } })
+  }
+  private var posterPasswordBinding: Binding<String> {
+    Binding(get: { model.posterPassword }, set: { model.setPosterPassword($0) })
+  }
+  private var posterSecurityBinding: Binding<WiFiSecurity> {
+    Binding(
+      get: { model.settings.posterWiFiSecurity },
+      set: { value in model.mutate { $0.posterWiFiSecurity = value } })
+  }
+  private var posterHiddenBinding: Binding<Bool> {
+    Binding(
+      get: { model.settings.posterWiFiHidden },
+      set: { value in model.mutate { $0.posterWiFiHidden = value } })
+  }
 }
 
 struct LabeledRow<Content: View>: View {
