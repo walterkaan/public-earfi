@@ -46,9 +46,13 @@ public enum MediaMTXConfigWriter {
     if options.includeMoqKey {
       lines.append("moq: no")
     }
+    let webrtcHTTP = webrtcHTTPPort(
+      listenerPort: settings.listenerPort, icePort: settings.icePort)
     lines += [
       "webrtc: yes",
-      "webrtcAddress: :\(settings.listenerPort)",
+      // Phones open the app's page on the listener port. MediaMTX answers
+      // WHEP on loopback, and the app forwards it.
+      "webrtcAddress: 127.0.0.1:\(webrtcHTTP)",
       "webrtcLocalUDPAddress: \(yamlScalar(udp))",
       "webrtcLocalTCPAddress: \(yamlScalar(tcp))",
       "webrtcIPsFromInterfaces: yes",
@@ -67,6 +71,24 @@ public enum MediaMTXConfigWriter {
       "    maxReaders: \(settings.maxListeners)",
     ]
     return lines.joined(separator: "\n") + "\n"
+  }
+
+  /// Loopback port for MediaMTX's WebRTC HTTP server. The public listener
+  /// port belongs to the app, which serves `/` and forwards WHEP here.
+  public static func webrtcHTTPPort(listenerPort: Int, icePort: Int) -> Int {
+    let blocked: Set<Int> = [listenerPort, icePort, WatchedPorts.rtsp, WatchedPorts.api]
+    var candidate = listenerPort + 10_000
+    if !(1...65_535).contains(candidate) {
+      candidate = 18_889
+    }
+    var steps = 0
+    while blocked.contains(candidate) {
+      candidate += 1
+      if candidate > 65_535 { candidate = 1 }
+      steps += 1
+      if steps > 8 { return 18_889 }
+    }
+    return candidate
   }
 
   public static func topLevelKeys(in yaml: String) -> Set<String> {

@@ -22,6 +22,7 @@ struct BroadcastLaunch {
   var helpers: HelperLocations
   var home: URL
   var prepareAudio: () -> String?
+  var pageTitle: String
 }
 
 final class BroadcastController {
@@ -73,6 +74,8 @@ final class BroadcastController {
   private var ffmpegInput: Pipe?
   private var helperPaths: [String] = []
   private var mediamtxLog: FileHandle?
+  private var listenerServer: ListenerHTTPServer?
+  private var pageTitle = "Public EarFi Broadcast"
 
   init(logger: FileLogger) {
     self.logger = logger
@@ -80,6 +83,15 @@ final class BroadcastController {
 
   func setInputGain(_ db: Double) {
     capture.setGainDB(db)
+  }
+
+  /// The name on the listener page. It does not restart the stream.
+  func setPageTitle(_ title: String) {
+    queue.async {
+      self.pageTitle = title
+      self.listenerServer?.update(
+        title: title, streamName: self.launch?.settings.streamName ?? "live")
+    }
   }
 
   func recentCaptureDecibels() -> Double {
@@ -91,6 +103,7 @@ final class BroadcastController {
       self.clearHalt()
       self.pendingRestart?.cancel()
       self.launch = launch
+      self.pageTitle = launch.pageTitle
       self.helperPaths = [launch.helpers.mediamtx.path, launch.helpers.ffmpeg.path]
       self.desired = true
       self.stopping = false
@@ -229,6 +242,23 @@ final class BroadcastController {
       noteFailure(component: "mediamtx", detail: "the local API did not answer within 5 s")
       return
     }
+    switch startListenerPage(settings: launch.settings) {
+    case .ready:
+      break
+    case .addressInUse:
+      let conflict = PortConflict(
+        port: launch.settings.listenerPort,
+        message: PortConflictText.message(
+          port: launch.settings.listenerPort, processName: nil, pid: nil, changeable: true,
+          ours: false),
+        stray: nil
+      )
+      halt(conflict)
+      return
+    case .failed(let detail):
+      noteFailure(component: "listener", detail: detail)
+      return
+    }
     startFFmpeg()
   }
 
@@ -344,6 +374,37 @@ final class BroadcastController {
     }
     return ProcessExit.ffmpegNotReadyDetail(
       isRunning: running, wasLaunched: launched, status: status)
+  }
+
+  private enum ListenerStart {
+    case ready
+    case addressInUse
+    case failed(String)
+  }
+
+  /// The public port serves `/`. MediaMTX WebRTC HTTP stays on loopback.
+  private func startListenerPage(settings: AppSettings) -> ListenerStart {
+    let upstream = MediaMTXConfigWriter.webrtcHTTPPort(
+      listenerPort: settings.listenerPort, icePort: settings.icePort)
+    let server = ListenerHTTPServer(
+      port: settings.listenerPort,
+      upstreamPort: upstream,
+      title: pageTitle,
+      streamName: settings.streamName
+    )
+    do {
+      try server.start()
+    } catch ListenerServerError.addressInUse {
+      return .addressInUse
+    } catch {
+      return .failed("the listener page did not start (\(error))")
+    }
+    listenerServer = server
+    logger.log(
+      "listener",
+      "page on port \(server.boundPort), WebRTC HTTP on 127.0.0.1:\(upstream)"
+    )
+    return .ready
   }
 
   private func startMediaMTX(configURL: URL, launch: BroadcastLaunch) -> Bool {
@@ -863,6 +924,8 @@ final class BroadcastController {
   }
 
   private func stopChildren() {
+    listenerServer?.stop()
+    listenerServer = nil
     stopCapture()
     ffmpegLog?.readabilityHandler = nil
     mediamtxLog?.readabilityHandler = nil

@@ -66,13 +66,13 @@ public enum BroadcastTitle {
 }
 
 public enum ListenerLink {
+  /// `http://<host>:<port>/`. The broadcast title and the stream name are not
+  /// part of the link. The page at `/` reads the title from the app.
   public static func make(
     style: URLStyle,
     ipAddress: String?,
     localHostname: String,
-    port: Int,
-    streamName: String,
-    broadcastTitle: String = ""
+    port: Int
   ) -> String? {
     let host: String
     switch style {
@@ -82,20 +82,17 @@ public enum ListenerLink {
     case .localHostname:
       host = normalizeLocalHostname(localHostname)
     }
-    let base = "http://\(host):\(port)/\(streamName)"
-    return appendingTitle(base, title: broadcastTitle)
+    return "http://\(host):\(port)/"
   }
 
-  /// The listener page reads `title`. MediaMTX has no page-title setting, so
-  /// the name travels on the link. Phones that open the link show it as the
-  /// page title and on the player.
-  public static func appendingTitle(_ base: String, title: String) -> String {
-    let trimmed = BroadcastTitle.sanitize(title)
-    guard !trimmed.isEmpty else { return base }
-    var parts = URLComponents()
-    parts.queryItems = [URLQueryItem(name: "title", value: trimmed)]
-    guard let query = parts.percentEncodedQuery, !query.isEmpty else { return base }
-    return base + "?" + query
+  /// Host and port, ignoring path and `?title=`. An old poster that still
+  /// says `/live` is the same listener as `/`.
+  public static func endpoint(_ urlString: String) -> String? {
+    guard let components = URLComponents(string: urlString),
+      let host = components.host?.lowercased(), !host.isEmpty,
+      let port = components.port
+    else { return nil }
+    return "\(host):\(port)"
   }
 
   /// Address checks ignore the page title, so renaming the broadcast does
@@ -131,7 +128,11 @@ public enum ListenerLink {
     guard let previousURL, !previousURL.isEmpty, let currentURL, !currentURL.isEmpty else {
       return nil
     }
-    if withoutTitleQuery(previousURL) == withoutTitleQuery(currentURL) { return nil }
+    if let previous = endpoint(previousURL), let current = endpoint(currentURL) {
+      if previous == current { return nil }
+    } else if withoutTitleQuery(previousURL) == withoutTitleQuery(currentURL) {
+      return nil
+    }
     let previous = displayAddress(previousURL)
     let current = displayAddress(currentURL)
     let message =

@@ -17,7 +17,7 @@ enum PosterDocument {
         networkName: model.settings.posterNetworkName
       ),
       url: model.listenerURL
-        ?? "http://<this-mac>:\(model.settings.listenerPort)/\(model.settings.streamName)",
+        ?? "http://<this-mac>:\(model.settings.listenerPort)/",
       qr: model.qrImage,
       showFooter: model.settings.posterUseFooter,
       paper: model.settings.posterPaperSize ?? paper

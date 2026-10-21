@@ -159,9 +159,7 @@ final class AppModel: ObservableObject {
       style: settings.urlStyle,
       ipAddress: selectedIP,
       localHostname: hostname,
-      port: settings.listenerPort,
-      streamName: settings.streamName,
-      broadcastTitle: broadcastTitle
+      port: settings.listenerPort
     )
   }
 
@@ -171,9 +169,7 @@ final class AppModel: ObservableObject {
       style: .localHostname,
       ipAddress: nil,
       localHostname: hostname,
-      port: settings.listenerPort,
-      streamName: settings.streamName,
-      broadcastTitle: broadcastTitle
+      port: settings.listenerPort
     )
   }
 
@@ -325,6 +321,7 @@ final class AppModel: ObservableObject {
     settings = copy
     store.save(settings)
     refreshQR()
+    controller.setPageTitle(broadcastTitle)
     if settings.launchAtLogin {
       do {
         try LoginItemController.apply(true)
@@ -482,6 +479,7 @@ final class AppModel: ObservableObject {
         advertisedHost: host,
         helpers: helpers,
         home: FileManager.default.homeDirectoryForCurrentUser,
+        pageTitle: broadcastTitle,
         prepareAudio: {
           // The app opens this device with Core Audio and writes 48 kHz
           // PCM to ffmpeg. Do not change the interface clock, and do not

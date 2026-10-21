@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Give the bundled MediaMTX listener page a title.
 
+Phones no longer open this page. The app serves http://<ip>:<port>/ itself
+and fills in the broadcast title there. This patch remains so the embedded
+MediaMTX page, if something still requests it on the loopback WebRTC port,
+does not fall back to "Live Broadcast".
+
 MediaMTX v1.21.2 serves an embedded page (internal/servers/webrtc/read_index.html)
-with no <title> and no Media Session name. Phones then show "Live Broadcast".
-The file is stored uncompressed in the binary. This replaces that exact byte
-string with a same-length page that reads ?title=, sets document.title and
-navigator.mediaSession.metadata, and removes title before the WHEP request.
+with no <title> and no Media Session name. The file is stored uncompressed
+in the binary. This replaces that exact byte string with a same-length page
+that reads ?title=, sets document.title and navigator.mediaSession.metadata,
+and removes title before the WHEP request.
 
 scripts/mediamtx-read-index.html is the unmodified v1.21.2 page (MIT).
 The ffmpeg build is not involved. Run --self-test without a binary.

@@ -52,6 +52,10 @@ public enum WatchedPorts {
         port: settings.icePort, changeable: true, tcp: iceTCP, udp: iceUDP, localhostOnly: false),
       WatchedPort(port: rtsp, changeable: false, tcp: true, udp: false, localhostOnly: true),
       WatchedPort(port: api, changeable: false, tcp: true, udp: false, localhostOnly: true),
+      WatchedPort(
+        port: MediaMTXConfigWriter.webrtcHTTPPort(
+          listenerPort: settings.listenerPort, icePort: settings.icePort),
+        changeable: false, tcp: true, udp: false, localhostOnly: true),
     ]
   }
 }

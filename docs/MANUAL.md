@@ -36,7 +36,7 @@ What to look for when you buy or borrow one:
 
 A phone’s personal hotspot usually stops at about 5 to 10 devices. That is fine for a rehearsal or a handful of listeners. It is too small for about 30 people.
 
-The useful part is doing this at home, before the event. Set up the router and the Mac, listen on your own phone, and confirm it works. Give the Mac a fixed address on that router so the listener link stays the same next time you power everything on. The QR code contains that address, for example `http://192.168.1.20:8889/live`. When the address stays put, you can print the poster or email the PDF days ahead, including a “join this Wi-Fi” step.
+The useful part is doing this at home, before the event. Set up the router and the Mac, listen on your own phone, and confirm it works. Give the Mac a fixed address on that router so the listener link stays the same next time you power everything on. The QR code contains that address, for example `http://192.168.1.20:8889/`. When the address stays put, you can print the poster or email the PDF days ahead, including a “join this Wi-Fi” step.
 
 The app warns you if the Mac’s address has changed since the poster was made. If you have to use the venue’s network instead, ask them for a fixed address for the Mac.
 
@@ -67,7 +67,7 @@ Do this once, on the Wi-Fi you will take to the venue.
 3. Install Public EarFi and open it (the next section). Allow the microphone. If the firewall asks, allow incoming connections for mediamtx. That program is what the phones connect to.
 4. Plug in the audio interface, or use the built-in microphone for this test. In Settings, choose the input. Leave quality on **Speech 32k**.
 5. Watch the level meter on the main window. Talk, or play the desk. The meter moves before you go live. If it stays empty, the Mac is listening to the wrong input.
-6. Press **Start Broadcasting**. The window should say Live and show a link like `http://192.168.1.20:8889/live`.
+6. Press **Start Broadcasting**. The window should say Live and show a link like `http://192.168.1.20:8889/`. An older poster or QR code that still ends in `/live` opens the same page.
 7. On your phone, join that same Wi-Fi. A phone still on the house network will not open the link.
 8. Scan the QR code, or type the link. Tap play. If you hear nothing, unmute using the listener steps below.
 9. Fill in the poster, including the Wi-Fi name, and export the PDF. Email it to yourself and open it on the phone. The QR code in that PDF should still open the stream.
@@ -122,7 +122,7 @@ That uses the least Wi-Fi. Standard and Music use more for the same number of li
 
 Standard (64 kbps) and Music (96 kbps mono, or 128 kbps stereo) use more of the Wi-Fi for the same number of listeners. Speech is the one sized for about 30 phones.
 
-**Broadcast title**, under Stream, is the name phones show on the listener page and on the player. Leave it blank for “Public EarFi Broadcast”. That blank default follows the app name, so a rename updates it. A name you type is used as it is. It changes the listener link immediately and does not restart the audio.
+**Broadcast title**, under Stream, is the name on the listener player, on the phone’s lock screen, and in the browser tab. Leave it blank for “Public EarFi Broadcast”. That blank default follows the app name, so a rename updates it. A name you type is used as it is. It does not change the listener link, and it does not restart the audio. A phone that already has the page open picks up a new name when the person comes back to that tab. Safari also writes “Live Broadcast” on a live player; the page covers that spot with this name.
 
 **TCP only**, under Network mode, is the setting to try if listeners hear dropouts on Wi-Fi. Auto is the normal choice.
 

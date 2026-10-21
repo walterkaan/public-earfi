@@ -387,7 +387,7 @@ struct SettingsTab: View {
               .frame(maxWidth: 280)
           }
           Text(
-            "Shown on the listener page, including the player. Leave this blank for \(model.defaultBroadcastTitle). A blank title follows the app name."
+            "Shown on the player, the lock screen, and the browser tab. Leave this blank for \(model.defaultBroadcastTitle). A blank title follows the app name. Changing it does not change the link."
           )
           .font(.caption)
           .foregroundStyle(.secondary)

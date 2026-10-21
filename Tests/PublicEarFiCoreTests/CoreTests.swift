@@ -216,6 +216,12 @@ final class MediaMTXConfigTests: XCTestCase {
     XCTAssertTrue(yaml.contains("rtspAddress: 127.0.0.1:8554"))
     XCTAssertTrue(yaml.contains("rtspTransports: [tcp]"))
     XCTAssertTrue(yaml.contains("moq: no"))
+    XCTAssertTrue(yaml.contains("webrtcAddress: 127.0.0.1:18889"))
+    XCTAssertFalse(yaml.contains("webrtcAddress: :8889"))
+    XCTAssertEqual(
+      MediaMTXConfigWriter.webrtcHTTPPort(listenerPort: 8889, icePort: 8189), 18889)
+    XCTAssertEqual(
+      MediaMTXConfigWriter.webrtcHTTPPort(listenerPort: 8889, icePort: 18889), 18890)
     XCTAssertTrue(yaml.contains("webrtcLocalUDPAddress: :8189"))
     XCTAssertTrue(yaml.contains("webrtcLocalTCPAddress: :8189"))
     XCTAssertTrue(yaml.contains("webrtcAdditionalHosts: ['192.168.1.42']"))
@@ -349,46 +355,22 @@ final class NetworkAndURLTests: XCTestCase {
       style: .ip,
       ipAddress: "192.168.1.42",
       localHostname: "Hall-Mac.local",
-      port: 8889,
-      streamName: "live"
+      port: 8889
     )
-    XCTAssertEqual(ip, "http://192.168.1.42:8889/live")
-    let titled = ListenerLink.make(
-      style: .ip,
-      ipAddress: "192.168.1.42",
-      localHostname: "Hall-Mac.local",
-      port: 8889,
-      streamName: "live",
-      broadcastTitle: "Public EarFi Broadcast"
-    )
-    let titledParts = URLComponents(string: titled ?? "")
-    XCTAssertEqual(titledParts?.queryItems?.count, 1)
-    XCTAssertEqual(titledParts?.queryItems?.first?.name, "title")
-    XCTAssertEqual(titledParts?.queryItems?.first?.value, "Public EarFi Broadcast")
-    let awkward = ListenerLink.make(
-      style: .ip,
-      ipAddress: "192.168.1.42",
-      localHostname: "Hall-Mac.local",
-      port: 8889,
-      streamName: "live",
-      broadcastTitle: "A & B"
-    )
-    let awkwardParts = URLComponents(string: awkward ?? "")
-    XCTAssertEqual(awkwardParts?.queryItems?.count, 1)
-    XCTAssertEqual(awkwardParts?.queryItems?.first?.value, "A & B")
+    XCTAssertEqual(ip, "http://192.168.1.42:8889/")
+    XCTAssertNil(URLComponents(string: ip ?? "")?.queryItems)
     XCTAssertNil(
       ListenerLink.make(
-        style: .ip, ipAddress: nil, localHostname: "Hall-Mac", port: 8889, streamName: "live")
+        style: .ip, ipAddress: nil, localHostname: "Hall-Mac", port: 8889)
     )
     XCTAssertEqual(
       ListenerLink.make(
         style: .localHostname,
         ipAddress: nil,
         localHostname: "Hall-Mac.local",
-        port: 8889,
-        streamName: "live"
+        port: 8889
       ),
-      "http://Hall-Mac.local:8889/live"
+      "http://Hall-Mac.local:8889/"
     )
     XCTAssertEqual(ListenerLink.normalizeLocalHostname("Hall-Mac.localdomain."), "Hall-Mac.local")
     XCTAssertEqual(ListenerLink.normalizeLocalHostname(""), "mac.local")
@@ -409,9 +391,21 @@ final class NetworkAndURLTests: XCTestCase {
     XCTAssertNil(
       ListenerLink.staleWarning(
         previousURL: "http://192.168.1.40:8889/live?title=Old",
+        currentURL: "http://192.168.1.40:8889/"
+      )
+    )
+    XCTAssertNil(
+      ListenerLink.staleWarning(
+        previousURL: "http://192.168.1.40:8889/live?title=Old",
         currentURL: "http://192.168.1.40:8889/live?title=New"
       )
     )
+    let portChange = ListenerLink.staleWarning(
+      previousURL: "http://192.168.1.40:8889/",
+      currentURL: "http://192.168.1.40:8890/"
+    )
+    XCTAssertEqual(portChange?.previous, "192.168.1.40")
+    XCTAssertEqual(portChange?.current, "192.168.1.40")
   }
 
   func testBroadcastTitleFollowsTheAppName() {
@@ -572,7 +566,11 @@ final class PortConflictTests: XCTestCase {
     settings.listenerPort = 8889
     settings.icePort = 8189
     let ports = WatchedPorts.all(settings: settings)
-    XCTAssertEqual(ports.map(\.port), [8889, 8189, 8554, 9997])
+    XCTAssertEqual(ports.map(\.port), [8889, 8189, 8554, 9997, 18889])
+    XCTAssertTrue(ports[4].localhostOnly)
+    XCTAssertFalse(ports[4].changeable)
+    XCTAssertTrue(ports[4].tcp)
+    XCTAssertFalse(ports[4].udp)
     XCTAssertTrue(ports[0].tcp)
     XCTAssertFalse(ports[0].udp)
     XCTAssertTrue(ports[0].changeable)
