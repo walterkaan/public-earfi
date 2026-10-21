@@ -158,7 +158,8 @@ final class AudioFormatWatch {
       DeviceProcTeardown.shouldRemoveListeners(isInDeviceList: AudioDeviceList.isPresent(deviceID))
     else { return }
     for listener in pending {
-      AudioObjectRemovePropertyListenerBlock(deviceID, &listener.address, nil, listener.block)
+      var address = listener.address
+      AudioObjectRemovePropertyListenerBlock(deviceID, &address, nil, listener.block)
     }
   }
 }
