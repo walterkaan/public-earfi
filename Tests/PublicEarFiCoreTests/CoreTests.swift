@@ -491,6 +491,28 @@ final class PosterAndSupervisorTests: XCTestCase {
     )
   }
 
+  func testSameRateStereoKeepsTheEngineFormat() {
+    XCTAssertEqual(
+      CaptureFormatPlan.clientFormatChoice(engineChannels: 2, deviceChannels: 2), .keep)
+    XCTAssertEqual(
+      CaptureFormatPlan.clientFormatChoice(engineChannels: 1, deviceChannels: 1), .keep)
+    XCTAssertEqual(
+      CaptureFormatPlan.clientFormatChoice(engineChannels: 2, deviceChannels: 1), .keep)
+    XCTAssertEqual(
+      CaptureFormatPlan.clientFormatChoice(engineChannels: 0, deviceChannels: 2), .keep)
+    XCTAssertEqual(
+      CaptureFormatPlan.clientFormatChoice(engineChannels: 1, deviceChannels: 2), .widen)
+    let delivery = CaptureDelivery(
+      callbacks: 4, framesIn: 3840, framesOut: 1920, dropped: 1, bytesWritten: 7680,
+      rateNote: "rate conversion skipped at 48000 Hz"
+    )
+    XCTAssertTrue(delivery.line.contains("callbacks 4"))
+    XCTAssertTrue(delivery.line.contains("frames in 3840"))
+    XCTAssertTrue(delivery.line.contains("frames out 1920"))
+    XCTAssertTrue(delivery.line.contains("stdin bytes 7680"))
+    XCTAssertTrue(delivery.line.contains("rate conversion skipped at 48000 Hz"))
+  }
+
   func testQuickPosterStepsLeaveALineWhenTheNetworkIsUnknown() {
     XCTAssertEqual(
       PosterBuilder.quickSteps(networkName: "Hall-Guest"),

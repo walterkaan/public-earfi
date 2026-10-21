@@ -56,10 +56,36 @@ final class CapturePipe {
   private let level = OSAllocatedUnfairLock(
     initialState: CaptureLevel(decibels: -120, at: .distantPast))
   private let bytesOut = OSAllocatedUnfairLock(initialState: 0)
+  private let deliveryLock = NSLock()
+  private var callbackCount = 0
+  private var framesIn = 0
+  private var framesOut = 0
+  private var droppedCallbacks = 0
+  private var rateNote = "rate conversion not used yet"
+  private var openedNative = CaptureStreamDescription(
+    sampleRate: 0, channelCount: 0, bitsPerChannel: 0, isFloat: false, isInterleaved: true)
 
   func bytesWritten() -> Int {
     bytesOut.withLock { $0 }
   }
+
+  func delivery() -> CaptureDelivery {
+    deliveryLock.lock()
+    let snapshot = CaptureDelivery(
+      callbacks: callbackCount,
+      framesIn: framesIn,
+      framesOut: framesOut,
+      dropped: droppedCallbacks,
+      bytesWritten: bytesWritten(),
+      rateNote: rateNote
+    )
+    deliveryLock.unlock()
+    return snapshot
+  }
+
+  var engineIsRunning: Bool { engine.isRunning }
+
+  var openedNativeDescription: CaptureStreamDescription { openedNative }
 
   func recentDecibels(now: Date = Date()) -> Double {
     level.withLock { state in
@@ -104,8 +130,21 @@ final class CapturePipe {
     self.channelMode = channelMode
     self.inputChannel = inputChannel
     nativeSummary = prepared.native.summary
+    openedNative = prepared.native
     openedDeviceName = deviceName
+    let mono = channelMode == .mono
+    let plannedChannels = max(1, Int(prepared.format.channelCount))
+    let pipeChannels = CaptureFormatPlan.rateChannels(
+      inputChannels: plannedChannels, mono: mono)
+    guard pipeChannels > 0 else {
+      stop()
+      return CaptureFormatPlan.impossibleMessage(deviceName: deviceName, stream: prepared.native)
+    }
+    // Accept tap buffers before the engine starts. A 48 kHz device can
+    // deliver its first callbacks inside start(), and those used to be dropped.
+    armWriter(output: output, pipeChannels: pipeChannels)
     let delivering: AVAudioFormat
+    let clientAction: String
     switch AudioInputBind.startEngine(
       engine: engine,
       prepared: prepared,
@@ -115,8 +154,9 @@ final class CapturePipe {
         self?.consume(buffer)
       }
     ) {
-    case .ready(let format):
+    case .ready(let format, let action):
       delivering = format
+      clientAction = action
     case .failed(let message):
       stop()
       return settlingMessage(message, deviceName: deviceName)
@@ -126,22 +166,13 @@ final class CapturePipe {
     let inputCount = max(1, Int(delivering.channelCount))
     openedInputChannels = inputCount
     openedDeviceChannels = max(prepared.deviceChannels, inputCount)
-    let mono = channelMode == .mono
-    let pipeChannels = CaptureFormatPlan.rateChannels(inputChannels: inputCount, mono: mono)
-    guard pipeChannels > 0 else {
-      stop()
-      if AudioDeviceList.isAlive(deviceID) {
-        return CaptureFormatPlan.notReadyMessage(deviceName: deviceName)
-      }
-      return CaptureFormatPlan.impossibleMessage(deviceName: deviceName, stream: prepared.native)
-    }
     let mix =
       mono
       ? "mono sums \(inputCount) of \(openedDeviceChannels) channels"
       : "stereo"
     formatSummary =
-      AudioInputBind.summary(native: prepared.native, engine: prepared.engine) + "; \(mix)"
-    armWriter(output: output, pipeChannels: pipeChannels)
+      AudioInputBind.summary(native: prepared.native, engine: prepared.engine)
+      + "; \(mix); \(clientAction)"
     return nil
   }
 
@@ -175,6 +206,13 @@ final class CapturePipe {
       _ = fcntl(descriptor, F_SETFL, flags | O_NONBLOCK)
     }
     bytesOut.withLock { $0 = 0 }
+    deliveryLock.lock()
+    callbackCount = 0
+    framesIn = 0
+    framesOut = 0
+    droppedCallbacks = 0
+    rateNote = "rate conversion not used yet"
+    deliveryLock.unlock()
     condition.lock()
     frameBytes = max(MemoryLayout<Float>.size, pipeChannels * MemoryLayout<Float>.size)
     readPos = 0
@@ -251,9 +289,18 @@ final class CapturePipe {
   }
 
   private func consume(_ buffer: AVAudioPCMBuffer) {
-    guard beginCallback() else { return }
+    recordArrival(frames: Int(buffer.frameLength))
+    guard beginCallback() else {
+      recordDrop()
+      return
+    }
     defer { endCallback() }
-    guard let samples = renderWhileAccepted(buffer) else { return }
+    guard let samples = renderWhileAccepted(buffer) else {
+      recordDrop()
+      return
+    }
+    let outChannels = channelMode == .mono ? 1 : 2
+    recordOutput(frames: samples.count / max(1, outChannels))
     emit(samples)
   }
 
@@ -295,8 +342,10 @@ final class CapturePipe {
   /// Integer device audio becomes float at the same rate and the same
   /// channel count. The map is every channel, in order.
   private func floatSamples(from buffer: AVAudioPCMBuffer) -> [Float]? {
-    if buffer.format.commonFormat == .pcmFormatFloat32 {
-      return CapturePCM.interleavedFloats(from: buffer)
+    if buffer.format.commonFormat == .pcmFormatFloat32,
+      let direct = CapturePCM.interleavedFloats(from: buffer)
+    {
+      return direct
     }
     let channels = Int(buffer.format.channelCount)
     let sampleRate = buffer.format.sampleRate
@@ -333,6 +382,7 @@ final class CapturePipe {
   private func resample(_ samples: [Float], channels: Int, sampleRate: Double) -> [Float]? {
     guard channels > 0, sampleRate > 0, !samples.isEmpty else { return nil }
     if abs(sampleRate - CaptureFormatPlan.encodeRate) < 1 {
+      noteRate("rate conversion skipped at \(Int(sampleRate.rounded())) Hz")
       return samples
     }
     if rateConverter == nil || rateChannelCount != channels || abs(rateInputRate - sampleRate) > 1 {
@@ -360,7 +410,35 @@ final class CapturePipe {
       return nil
     }
     guard convert(rateConverter, input: input, output: output) else { return nil }
+    noteRate(
+      "rate conversion \(Int(sampleRate.rounded())) Hz to \(Int(CaptureFormatPlan.encodeRate)) Hz"
+    )
     return CapturePCM.interleavedFloats(from: output)
+  }
+
+  private func recordArrival(frames: Int) {
+    deliveryLock.lock()
+    callbackCount += 1
+    framesIn += frames
+    deliveryLock.unlock()
+  }
+
+  private func recordDrop() {
+    deliveryLock.lock()
+    droppedCallbacks += 1
+    deliveryLock.unlock()
+  }
+
+  private func recordOutput(frames: Int) {
+    deliveryLock.lock()
+    framesOut += frames
+    deliveryLock.unlock()
+  }
+
+  private func noteRate(_ note: String) {
+    deliveryLock.lock()
+    rateNote = note
+    deliveryLock.unlock()
   }
 
   private func convert(

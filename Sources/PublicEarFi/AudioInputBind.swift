@@ -18,7 +18,7 @@ enum AudioInputBind {
   }
 
   enum StartOutcome {
-    case ready(AVAudioFormat)
+    case ready(format: AVAudioFormat, clientAction: String)
     case failed(String)
   }
 
@@ -38,12 +38,8 @@ enum AudioInputBind {
     let nativeStreamDescription = nativeStream(deviceID: deviceID)
     let wanted = deviceChannelCount(
       deviceID: deviceID, audioUnit: audioUnit, native: nativeStreamDescription)
-    let rate = clientSampleRate(
-      audioUnit: audioUnit, native: nativeStreamDescription, input: input)
-    if wanted > 0, rate > 0 {
-      _ = applyClientFormat(
-        audioUnit: audioUnit, deviceID: deviceID, sampleRate: rate, channels: wanted)
-    }
+    // Leave a format the engine already opened alone. Forcing float 48 kHz
+    // stereo here uninitialized the unit and the tap then never ran.
     let format = input.outputFormat(forBus: 0)
     guard currentDevice(audioUnit) == deviceID else {
       return .failed("The selected audio device did not open. Pick it again in Settings.")
@@ -68,9 +64,9 @@ enum AudioInputBind {
   }
 
   /// Installs a tap on the input and starts the engine. The client format is
-  /// widened to every HAL input channel before the tap, and checked again
-  /// after start. A format that is still short is tapped as it is: the mix
-  /// then sums the channels that actually arrived.
+  /// left as the engine opened it when that already has every device channel.
+  /// It is widened only when the engine is hiding channels. After start, a
+  /// tap whose format no longer matches the node is installed again.
   static func startEngine(
     engine: AVAudioEngine,
     prepared: Prepared,
@@ -97,21 +93,47 @@ enum AudioInputBind {
       return .failed(problem)
     }
     let live = input.outputFormat(forBus: 0)
-    let narrowed =
-      Int(live.channelCount) < prepared.deviceChannels
-      || Int(live.channelCount) != Int(initial.channelCount)
-    if !narrowed {
+    if !sameTapFormat(live, initial) {
+      input.removeTap(onBus: 0)
+      engine.stop()
+      let settled = tapFormat(input, preferredChannels: prepared.deviceChannels)
+      guard settled.sampleRate > 0, settled.channelCount > 0 else {
+        return .failed(CaptureFormatPlan.notReadyMessage(deviceName: ""))
+      }
+      input.installTap(onBus: 0, bufferSize: bufferSize, format: settled) { buffer, _ in
+        onBuffer(buffer)
+      }
+      do {
+        try engine.start()
+      } catch {
+        input.removeTap(onBus: 0)
+        if engine.isRunning { engine.stop() }
+        return .failed(startFailure(error))
+      }
+      if let problem = confirm(prepared, deviceID: deviceID) {
+        input.removeTap(onBus: 0)
+        engine.stop()
+        return .failed(problem)
+      }
+    }
+    let delivering = input.outputFormat(forBus: 0)
+    let engineChannels = Int(
+      delivering.channelCount > 0 ? delivering.channelCount : initial.channelCount)
+    let choice = CaptureFormatPlan.clientFormatChoice(
+      engineChannels: engineChannels, deviceChannels: prepared.deviceChannels)
+    if choice == .keep {
       if !engine.isRunning {
         do { try engine.start() } catch {
           input.removeTap(onBus: 0)
           return .failed(startFailure(error))
         }
       }
-      return .ready(live.channelCount > 0 ? live : initial)
+      let format = delivering.channelCount > 0 ? delivering : initial
+      return .ready(format: format, clientAction: "client format kept")
     }
     input.removeTap(onBus: 0)
     engine.stop()
-    let rate = live.sampleRate > 0 ? live.sampleRate : prepared.format.sampleRate
+    let rate = delivering.sampleRate > 0 ? delivering.sampleRate : prepared.format.sampleRate
     _ = applyClientFormat(
       audioUnit: prepared.audioUnit,
       deviceID: deviceID,
@@ -147,8 +169,15 @@ enum AudioInputBind {
         return .failed(startFailure(error))
       }
     }
-    let delivering = input.outputFormat(forBus: 0)
-    return .ready(delivering.channelCount > 0 ? delivering : widened)
+    let widenedLive = input.outputFormat(forBus: 0)
+    let format = widenedLive.channelCount > 0 ? widenedLive : widened
+    return .ready(
+      format: format, clientAction: "client format widened to \(prepared.deviceChannels)")
+  }
+
+  private static func sameTapFormat(_ left: AVAudioFormat, _ right: AVAudioFormat) -> Bool {
+    abs(left.sampleRate - right.sampleRate) < 1 && left.channelCount == right.channelCount
+      && left.isInterleaved == right.isInterleaved && left.commonFormat == right.commonFormat
   }
 
   /// Called after `engine.start()`. A start can initialize the unit again and
@@ -343,6 +372,41 @@ enum AudioInputBind {
     nativeStream(deviceID: deviceID)
   }
 
+  /// One line per input stream, so a multi-stream USB device can be compared
+  /// with the single 48 kHz stream BlackHole exposes.
+  static func inputStreamLines(deviceID: AudioDeviceID) -> [String] {
+    var address = AudioObjectPropertyAddress(
+      mSelector: kAudioDevicePropertyStreams,
+      mScope: kAudioObjectPropertyScopeInput,
+      mElement: kAudioObjectPropertyElementMain
+    )
+    var size: UInt32 = 0
+    guard AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size) == noErr, size > 0
+    else { return [] }
+    let count = Int(size) / MemoryLayout<AudioObjectID>.size
+    guard count > 0 else { return [] }
+    var identifiers = [AudioObjectID](repeating: 0, count: count)
+    guard AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &identifiers) == noErr
+    else { return [] }
+    return identifiers.enumerated().map { index, streamID in
+      let summary = streamDescription(streamID)?.summary ?? "unread"
+      return "stream \(index): \(summary)"
+    }
+  }
+
+  private static func streamDescription(_ streamID: AudioObjectID) -> CaptureStreamDescription? {
+    var address = AudioObjectPropertyAddress(
+      mSelector: kAudioStreamPropertyVirtualFormat,
+      mScope: kAudioObjectPropertyScopeGlobal,
+      mElement: kAudioObjectPropertyElementMain
+    )
+    var description = AudioStreamBasicDescription()
+    var size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+    guard AudioObjectGetPropertyData(streamID, &address, 0, nil, &size, &description) == noErr
+    else { return nil }
+    return describeBasic(description)
+  }
+
   private static func nativeStream(deviceID: AudioDeviceID) -> CaptureStreamDescription? {
     var address = AudioObjectPropertyAddress(
       mSelector: kAudioDevicePropertyStreamFormat,
@@ -355,6 +419,12 @@ enum AudioInputBind {
     else {
       return nil
     }
+    return describeBasic(description)
+  }
+
+  private static func describeBasic(_ description: AudioStreamBasicDescription)
+    -> CaptureStreamDescription
+  {
     let flags = description.mFormatFlags
     return CaptureStreamDescription(
       sampleRate: description.mSampleRate,

@@ -81,8 +81,28 @@ final class AudioCaptureTests: XCTestCase {
       capture.stop()
       throw XCTSkip("Capture did not start (\(problem)).")
     }
-    Thread.sleep(forTimeInterval: 0.2)
+    let deadline = Date().addingTimeInterval(2)
+    while Date() < deadline && capture.bytesWritten() == 0 && capture.delivery().callbacks == 0 {
+      Thread.sleep(forTimeInterval: 0.05)
+    }
+    let delivery = capture.delivery()
+    let summary = capture.openedFormatSummary
     capture.setGainDB(-3)
+    if delivery.callbacks > 0 {
+      XCTAssertGreaterThan(
+        delivery.bytesWritten, 0,
+        "tap callbacks wrote no stdin bytes for \(device.name): \(summary); \(delivery.line)"
+      )
+      XCTAssertGreaterThan(delivery.framesOut, 0)
+    } else if ProcessInfo.processInfo.environment["CI"] == "true" {
+      capture.stop()
+      throw XCTSkip(
+        "Opened \(device.name) (\(summary)) on the real device path, but it delivered no callbacks in 2 s."
+      )
+    } else {
+      XCTFail("No tap callbacks in 2 s for \(device.name). \(summary); \(delivery.line)")
+    }
+    XCTAssertFalse(summary.isEmpty)
     capture.stop()
     capture.stop()
   }

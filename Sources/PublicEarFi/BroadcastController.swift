@@ -63,6 +63,8 @@ final class BroadcastController {
   private let formatWatch = AudioFormatWatch()
   private var pendingFormat: DispatchWorkItem?
   private var lastFormatSummary = ""
+  private var lastNative: CaptureStreamDescription?
+  private var loggedBenignFormatWatch = false
   private var formatBudget = FormatRebuildBudget(limit: CaptureFormatPlan.formatRebuildLimit)
   private var inputSettleAttempts = 0
   private var deviceWentQuiet = false
@@ -332,14 +334,18 @@ final class BroadcastController {
     writePIDs()
     inputSettleAttempts = 0
     lastFormatSummary = capture.openedNativeSummary
+    lastNative = capture.openedNativeDescription
+    loggedBenignFormatWatch = false
     nextLevelLog = Date().addingTimeInterval(4)
     let transport = AudioDeviceList.transportDescription(deviceID)
     if AudioDeviceList.isBluetooth(deviceID) {
       bluetoothDeviceID = deviceID
     }
+    let streams = AudioInputBind.inputStreamLines(deviceID: deviceID)
+    let streamNote = streams.isEmpty ? "streams: unread" : streams.joined(separator: "; ")
     logger.log(
       "audio",
-      "opened \(name): transport \(transport); \(capture.openedFormatSummary); sending 48 kHz \(capture.openedMixNote) float"
+      "opened \(name): transport \(transport); \(capture.openedFormatSummary); \(streamNote); engine \(capture.engineIsRunning ? "running" : "stopped"); sending 48 kHz \(capture.openedMixNote) float"
     )
     logger.log(
       "ffmpeg",
@@ -348,14 +354,21 @@ final class BroadcastController {
     formatWatch.start(deviceID: deviceID, queue: queue) { [weak self] in
       self?.scheduleFormatRebuild()
     }
+    let generation = process.processIdentifier
+    queue.asyncAfter(deadline: .now() + 2) { [weak self] in
+      guard let self, self.ffmpeg?.processIdentifier == generation, self.ffmpeg?.isRunning == true
+      else { return }
+      self.logger.log("audio", "capture \(self.capture.delivery().line)")
+    }
     guard waitUntilReady(stream: launch.settings.streamName) else {
       let detail = startFFmpegExitDetail(process: process, launched: true)
       let wrote = capture.bytesWritten()
+      let delivery = capture.delivery().line
       stopCapture()
       abandon(process)
       ffmpeg = nil
       if wrote == 0 {
-        logger.log("audio", "\(detail); no samples were written for \(name)")
+        logger.log("audio", "\(detail); no samples were written for \(name); \(delivery)")
         stopWithProblem(CaptureFormatPlan.noAudioMessage(deviceName: name))
         return
       }
@@ -908,6 +921,22 @@ final class BroadcastController {
     }
     let summary = native?.summary ?? ""
     if summary == lastFormatSummary && !deviceWentQuiet { return }
+    if !bluetooth, !deviceWentQuiet, let native, let previous = lastNative,
+      native.channelCount > 0, previous.channelCount > 0,
+      native.channelCount == previous.channelCount,
+      abs(native.sampleRate - previous.sampleRate) < 1
+    {
+      lastFormatSummary = summary
+      lastNative = native
+      if !loggedBenignFormatWatch {
+        loggedBenignFormatWatch = true
+        logger.log(
+          "audio",
+          "format watch noted \(summary); left the capture running (\(capture.delivery().line))"
+        )
+      }
+      return
+    }
     deviceWentQuiet = false
     guard formatBudget.allow(at: Date()) else {
       stopWithProblem(

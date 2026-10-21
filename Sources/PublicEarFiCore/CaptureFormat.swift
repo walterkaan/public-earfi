@@ -41,6 +41,42 @@ public struct CaptureStreamDescription: Equatable, Sendable {
   }
 }
 
+public enum ClientFormatChoice: Equatable {
+  case keep
+  case widen
+}
+
+/// Counters from the tap through stdin, so a silent 48 kHz device can be
+/// told apart from a tap that never ran.
+public struct CaptureDelivery: Equatable {
+  public var callbacks: Int
+  public var framesIn: Int
+  public var framesOut: Int
+  public var dropped: Int
+  public var bytesWritten: Int
+  public var rateNote: String
+
+  public init(
+    callbacks: Int = 0,
+    framesIn: Int = 0,
+    framesOut: Int = 0,
+    dropped: Int = 0,
+    bytesWritten: Int = 0,
+    rateNote: String = "rate conversion not used yet"
+  ) {
+    self.callbacks = callbacks
+    self.framesIn = framesIn
+    self.framesOut = framesOut
+    self.dropped = dropped
+    self.bytesWritten = bytesWritten
+    self.rateNote = rateNote
+  }
+
+  public var line: String {
+    "callbacks \(callbacks), frames in \(framesIn), frames out \(framesOut), dropped \(dropped), stdin bytes \(bytesWritten), \(rateNote)"
+  }
+}
+
 /// How a device format becomes 48 kHz float for ffmpeg.
 /// An interleaved float layout is only requested for one or two channels.
 /// Wider devices use non-interleaved float, because the interleaved
@@ -66,6 +102,19 @@ public enum CaptureFormatPlan {
 
   public static func rebuildLimit(bluetooth: Bool) -> Int {
     bluetooth ? bluetoothFormatRebuildLimit : formatRebuildLimit
+  }
+
+  /// A device that already exposes every input channel keeps the engine's
+  /// own format. Rewriting that format stops the IOProc on 48 kHz stereo
+  /// devices (BlackHole, USB PnP) that need no conversion. Widen only when
+  /// the engine is hiding channels the device actually has.
+  public static func clientFormatChoice(engineChannels: Int, deviceChannels: Int)
+    -> ClientFormatChoice
+  {
+    if deviceChannels > engineChannels, engineChannels > 0, deviceChannels > 0 {
+      return .widen
+    }
+    return .keep
   }
 
   /// Channels the 48 kHz converter is allowed to see, after our mix.

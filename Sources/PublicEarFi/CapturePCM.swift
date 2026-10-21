@@ -12,10 +12,19 @@ enum CapturePCM {
     let frameCount = Int(buffer.frameLength)
     let channelCount = Int(format.channelCount)
     guard frameCount > 0, channelCount > 0 else { return nil }
-    if format.isInterleaved || buffer.floatChannelData == nil {
-      return interleaved(buffer, frameCount: frameCount, channelCount: channelCount)
+    // A 2-channel tap can report interleaved while the samples live only in
+    // floatChannelData, with an empty AudioBufferList. Reading the list
+    // first then drops every callback, so stdin stays empty. Try both.
+    if format.isInterleaved {
+      if let packed = interleaved(buffer, frameCount: frameCount, channelCount: channelCount) {
+        return packed
+      }
+      return channelPointers(buffer, frameCount: frameCount, channelCount: channelCount)
     }
-    return planar(buffer, frameCount: frameCount, channelCount: channelCount)
+    if let planar = channelPointers(buffer, frameCount: frameCount, channelCount: channelCount) {
+      return planar
+    }
+    return interleaved(buffer, frameCount: frameCount, channelCount: channelCount)
   }
 
   private static func interleaved(
@@ -33,20 +42,31 @@ enum CapturePCM {
     return Array(UnsafeBufferPointer(start: pointer, count: count))
   }
 
-  private static func planar(
+  /// `floatChannelData` indexes frames directly. `stride` is not a frame
+  /// count: on an interleaved stereo buffer it is often 2, and treating it
+  /// as the length keeps only two frames.
+  private static func channelPointers(
     _ buffer: AVAudioPCMBuffer, frameCount: Int, channelCount: Int
   ) -> [Float]? {
     guard let channels = buffer.floatChannelData else { return nil }
-    let frames = PCMCopy.planarFrameCount(frameLength: frameCount, stride: Int(buffer.stride))
-    guard frames > 0 else { return nil }
-    let available = Int(buffer.audioBufferList.pointee.mNumberBuffers)
-    let usableChannels = min(channelCount, max(0, available))
-    guard usableChannels > 0 else { return nil }
-    var planar = [[Float]]()
-    planar.reserveCapacity(usableChannels)
-    for channel in 0..<usableChannels {
-      planar.append(Array(UnsafeBufferPointer(start: channels[channel], count: frames)))
+    guard frameCount > 0, channelCount > 0 else { return nil }
+    if buffer.format.isInterleaved {
+      let source = channels[0]
+      var output = [Float]()
+      output.reserveCapacity(frameCount * channelCount)
+      for frame in 0..<frameCount {
+        let base = frame * channelCount
+        for channel in 0..<channelCount {
+          output.append(source[base + channel])
+        }
+      }
+      return output
     }
-    return PCMCopy.interleave(channels: planar, frameCount: frames)
+    var planar = [[Float]]()
+    planar.reserveCapacity(channelCount)
+    for channel in 0..<channelCount {
+      planar.append(Array(UnsafeBufferPointer(start: channels[channel], count: frameCount)))
+    }
+    return PCMCopy.interleave(channels: planar, frameCount: frameCount)
   }
 }
