@@ -569,14 +569,14 @@ final class AppModel: ObservableObject {
         advertisedHost: host,
         helpers: helpers,
         home: FileManager.default.homeDirectoryForCurrentUser,
-        pageTitle: broadcastTitle,
         prepareAudio: {
           // The app opens this device with Core Audio and writes 48 kHz
           // PCM to ffmpeg. Do not change the interface clock, and do not
           // capture with ffmpeg's avfoundation device.
           guard device != nil else { return "No input device is available." }
           return nil
-        }
+        },
+        pageTitle: broadcastTitle
       )
     )
   }
