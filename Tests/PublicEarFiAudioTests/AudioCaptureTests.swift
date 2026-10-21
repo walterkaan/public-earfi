@@ -324,7 +324,7 @@ final class AudioCaptureTests: XCTestCase {
     XCTAssertGreaterThan(capture.bytesWritten(), 0)
   }
 
-  private static func floatBuffer(
+  fileprivate static func floatBuffer(
     sampleRate: Double,
     channels: Int,
     frames: AVAudioFrameCount,
