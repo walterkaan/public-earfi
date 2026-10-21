@@ -320,9 +320,15 @@ final class BroadcastController {
     }
     guard waitUntilReady(stream: launch.settings.streamName) else {
       let detail = startFFmpegExitDetail(process: process, launched: true)
+      let wrote = capture.bytesWritten()
       stopCapture()
       abandon(process)
       ffmpeg = nil
+      if wrote == 0 {
+        logger.log("audio", "\(detail); no samples were written for \(name)")
+        stopWithProblem(CaptureFormatPlan.noAudioMessage(deviceName: name))
+        return
+      }
       noteFailure(component: "ffmpeg", detail: detail)
       return
     }
@@ -465,6 +471,7 @@ final class BroadcastController {
     if process.processIdentifier == mediamtx?.processIdentifier {
       mediamtx = nil
     }
+    let wrote = capture.bytesWritten()
     if process.processIdentifier == ffmpeg?.processIdentifier {
       ffmpeg = nil
       stopCapture()
@@ -483,6 +490,9 @@ final class BroadcastController {
         return
       }
       noteFailure(component: "mediamtx", detail: "mediamtx exited with status \(statusText)")
+    } else if wrote == 0 {
+      let name = launch?.deviceName ?? ""
+      stopWithProblem(CaptureFormatPlan.noAudioMessage(deviceName: name))
     } else {
       noteFailure(component: "ffmpeg", detail: "exited with status \(statusText)")
     }

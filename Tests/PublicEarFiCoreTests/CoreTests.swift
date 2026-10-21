@@ -1050,6 +1050,14 @@ final class APIAndCreditsTests: XCTestCase {
     XCTAssertFalse(settling.lowercased().contains("no input"))
     XCTAssertFalse(settling.lowercased().contains("not connected"))
     XCTAssertFalse(settling.lowercased().contains("could not open"))
+    XCTAssertEqual(
+      CaptureFormatPlan.noAudioMessage(deviceName: "BlackHole 2ch"),
+      "No audio from BlackHole 2ch."
+    )
+    XCTAssertFalse(
+      CaptureFormatPlan.noAudioMessage(deviceName: "USB PnP Audio Device").contains(
+        "still switching")
+    )
     let gaveUp = CaptureFormatPlan.inputGaveUpMessage(deviceName: "Headset")
     XCTAssertFalse(CaptureFormatPlan.isInputSettling(gaveUp))
     XCTAssertEqual(CaptureFormatPlan.rebuildLimit(bluetooth: false), 3)

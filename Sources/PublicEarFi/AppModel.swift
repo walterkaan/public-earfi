@@ -44,6 +44,10 @@ final class AppModel: ObservableObject {
   private var lastAnnouncedIP: String?
   private var lastDeviceName = "audio interface"
   private var feedingDeviceName = ""
+  /// True from the moment Start is requested until the broadcast stops.
+  /// The preview meter must not open the device during this time: a second
+  /// engine rebinding it leaves the 48 kHz capture tap with nothing to write.
+  private var captureOwnsInput = false
   private var silenceWatch = SilenceWatch()
   private var timer: Timer?
   private var meterTimer: Timer?
@@ -466,7 +470,8 @@ final class AppModel: ObservableObject {
     let snapshot = settings
     let host = snapshot.advertisedAddress
     runningSignature = BroadcastSignature(snapshot)
-    restartMeter()
+    captureOwnsInput = true
+    meter.stop()
     controller.setInputGain(snapshot.inputGainDB)
     controller.start(
       BroadcastLaunch(
@@ -490,13 +495,15 @@ final class AppModel: ObservableObject {
 
   private func apply(phase: BroadcastPhase) {
     self.phase = phase
-    if case .stopped = phase {
+    switch phase {
+    case .stopped, .blocked:
       listeners = 0
       runningSignature = nil
-    }
-    if case .blocked = phase {
-      listeners = 0
-      runningSignature = nil
+      captureOwnsInput = false
+      restartMeter()
+    case .starting, .live, .waitingForDevice, .problem:
+      captureOwnsInput = true
+      meter.stop()
     }
     updateSleepAssertion()
   }
@@ -518,6 +525,12 @@ final class AppModel: ObservableObject {
   }
 
   private func pollMeter() {
+    if captureOwnsInput {
+      let decibels = controller.recentCaptureDecibels()
+      levelDB = decibels
+      levelFraction = min(1, max(0, (decibels + 60) / 60))
+      return
+    }
     let reading = meter.latest()
     levelDB = reading.decibels
     levelFraction = reading.fraction
@@ -637,6 +650,10 @@ final class AppModel: ObservableObject {
   }
 
   private func restartMeter() {
+    guard !captureOwnsInput else {
+      meter.stop()
+      return
+    }
     meter.setGainDB(settings.inputGainDB)
     meter.start(deviceID: selectedDevice?.deviceID)
   }

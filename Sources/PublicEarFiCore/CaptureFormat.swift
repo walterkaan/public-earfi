@@ -139,6 +139,13 @@ public enum CaptureFormatPlan {
     message.lowercased().contains("still switching its input")
   }
 
+  /// Shown once when capture opened but ffmpeg received no samples.
+  /// Start must not keep restarting on this.
+  public static func noAudioMessage(deviceName: String) -> String {
+    let name = deviceName.isEmpty ? "the selected input" : deviceName
+    return "No audio from \(name)."
+  }
+
   public static func inputGaveUpMessage(deviceName: String) -> String {
     let name = deviceName.isEmpty ? "The selected audio device" : deviceName
     return

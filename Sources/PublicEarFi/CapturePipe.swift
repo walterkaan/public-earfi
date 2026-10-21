@@ -55,6 +55,11 @@ final class CapturePipe {
   private var consecutiveConversionFailures = 0
   private let level = OSAllocatedUnfairLock(
     initialState: CaptureLevel(decibels: -120, at: .distantPast))
+  private let bytesOut = OSAllocatedUnfairLock(initialState: 0)
+
+  func bytesWritten() -> Int {
+    bytesOut.withLock { $0 }
+  }
 
   func recentDecibels(now: Date = Date()) -> Double {
     level.withLock { state in
@@ -136,11 +141,40 @@ final class CapturePipe {
       : "stereo"
     formatSummary =
       AudioInputBind.summary(native: prepared.native, engine: prepared.engine) + "; \(mix)"
+    armWriter(output: output, pipeChannels: pipeChannels)
+    return nil
+  }
+
+  /// Opens the same writer `start` uses, without a Core Audio device.
+  /// Tests push buffers through mix, resample, and the stdin pipe.
+  func startPipe(
+    output: FileHandle,
+    channelMode: ChannelMode,
+    inputChannel: Int,
+    deliveringChannels: Int
+  ) {
+    stop()
+    self.channelMode = channelMode
+    self.inputChannel = inputChannel
+    openedInputChannels = max(1, deliveringChannels)
+    openedDeviceChannels = openedInputChannels
+    let pipeChannels = CaptureFormatPlan.rateChannels(
+      inputChannels: openedInputChannels, mono: channelMode == .mono)
+    guard pipeChannels > 0 else { return }
+    armWriter(output: output, pipeChannels: pipeChannels)
+  }
+
+  func push(_ buffer: AVAudioPCMBuffer) {
+    consume(buffer)
+  }
+
+  private func armWriter(output: FileHandle, pipeChannels: Int) {
     let descriptor = output.fileDescriptor
     let flags = fcntl(descriptor, F_GETFL)
     if flags >= 0 {
       _ = fcntl(descriptor, F_SETFL, flags | O_NONBLOCK)
     }
+    bytesOut.withLock { $0 = 0 }
     condition.lock()
     frameBytes = max(MemoryLayout<Float>.size, pipeChannels * MemoryLayout<Float>.size)
     readPos = 0
@@ -162,7 +196,6 @@ final class CapturePipe {
     callbackLock.lock()
     accepting = true
     callbackLock.unlock()
-    return nil
   }
 
   var openedFormatSummary: String { formatSummary }
@@ -562,6 +595,7 @@ final class CapturePipe {
       let result = Darwin.write(descriptor, raw.advanced(by: written), count - written)
       if result > 0 {
         written += result
+        bytesOut.withLock { $0 += result }
         continue
       }
       if result < 0 && (errno == EINTR || errno == EAGAIN) { continue }

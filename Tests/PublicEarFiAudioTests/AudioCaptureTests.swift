@@ -85,4 +85,102 @@ final class AudioCaptureTests: XCTestCase {
     capture.stop()
     capture.stop()
   }
+
+  /// 48 kHz stereo is the BlackHole / USB path (no rate converter). 24 kHz
+  /// mono is the Bluetooth hands-free path. Both have to put bytes on the
+  /// pipe ffmpeg reads as stdin.
+  func testStereo48kAndMono24kReachFFmpegStdin() throws {
+    try assertPipeReceives(
+      sampleRate: 48_000, channels: 2, frames: 960, interleaved: true, pushes: 2)
+    try assertPipeReceives(
+      sampleRate: 48_000, channels: 2, frames: 960, interleaved: false, pushes: 2)
+    try assertPipeReceives(
+      sampleRate: 24_000, channels: 1, frames: 480, interleaved: true, pushes: 8)
+  }
+
+  private func assertPipeReceives(
+    sampleRate: Double,
+    channels: Int,
+    frames: AVAudioFrameCount,
+    interleaved: Bool,
+    pushes: Int
+  ) throws {
+    let pipe = Pipe()
+    let capture = CapturePipe()
+    let reading = pipe.fileHandleForReading
+    let received = NSLock()
+    var data = Data()
+    let arrived = DispatchSemaphore(value: 0)
+    reading.readabilityHandler = { handle in
+      let chunk = handle.availableData
+      if chunk.isEmpty {
+        handle.readabilityHandler = nil
+        return
+      }
+      received.lock()
+      data.append(chunk)
+      received.unlock()
+      arrived.signal()
+    }
+    capture.startPipe(
+      output: pipe.fileHandleForWriting,
+      channelMode: .mono,
+      inputChannel: 1,
+      deliveringChannels: channels
+    )
+    defer { capture.stop() }
+    for index in 0..<pushes {
+      let buffer = try XCTUnwrap(
+        Self.floatBuffer(
+          sampleRate: sampleRate,
+          channels: channels,
+          frames: frames,
+          interleaved: interleaved,
+          amplitude: 0.25 + Float(index) * 0.01
+        )
+      )
+      capture.push(buffer)
+    }
+    let wait = arrived.wait(timeout: .now() + 2)
+    received.lock()
+    let bytes = data.count
+    received.unlock()
+    XCTAssertEqual(wait, .success, "no stdin bytes at \(sampleRate) Hz, \(channels) ch")
+    XCTAssertGreaterThan(bytes, 0)
+    XCTAssertGreaterThan(capture.bytesWritten(), 0)
+  }
+
+  private static func floatBuffer(
+    sampleRate: Double,
+    channels: Int,
+    frames: AVAudioFrameCount,
+    interleaved: Bool,
+    amplitude: Float
+  ) -> AVAudioPCMBuffer? {
+    guard
+      let format = AVAudioFormat(
+        commonFormat: .pcmFormatFloat32,
+        sampleRate: sampleRate,
+        channels: AVAudioChannelCount(channels),
+        interleaved: interleaved
+      ),
+      let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)
+    else { return nil }
+    buffer.frameLength = frames
+    if interleaved || buffer.floatChannelData == nil {
+      guard let raw = buffer.audioBufferList.pointee.mBuffers.mData else { return nil }
+      let samples = raw.bindMemory(to: Float.self, capacity: Int(frames) * channels)
+      for index in 0..<(Int(frames) * channels) {
+        samples[index] = amplitude
+      }
+      return buffer
+    }
+    guard let channelsData = buffer.floatChannelData else { return nil }
+    for channel in 0..<channels {
+      for frame in 0..<Int(frames) {
+        channelsData[channel][frame] = amplitude
+      }
+    }
+    return buffer
+  }
 }
