@@ -327,6 +327,14 @@ struct SettingsTab: View {
             }
             .labelsHidden()
           }
+          if model.selectedDevice?.isBluetooth == true {
+            Text(
+              "Bluetooth earbuds switch to call mode while they are the microphone. The mic stays speech quality. Their own playback drops to call quality, so the stage may be harder to hear. A wired or USB microphone, or separate wired headphones, avoids that."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+          }
           LabeledRow(title: "Channels") {
             Picker("Mode", selection: modeBinding) {
               Text("Mono").tag(ChannelMode.mono)

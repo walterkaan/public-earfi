@@ -51,6 +51,9 @@ enum AudioInputBind {
     let engineDescription = describe(format)
     let native = nativeStreamDescription ?? engineDescription
     guard format.sampleRate > 0, format.channelCount > 0 else {
+      if AudioDeviceList.isAlive(deviceID) {
+        return .failed(CaptureFormatPlan.notReadyMessage(deviceName: ""))
+      }
       return .failed(CaptureFormatPlan.impossibleMessage(deviceName: "", stream: native))
     }
     return .ready(
@@ -117,6 +120,9 @@ enum AudioInputBind {
     )
     let widened = tapFormat(input, preferredChannels: prepared.deviceChannels)
     guard widened.sampleRate > 0, widened.channelCount > 0 else {
+      if AudioDeviceList.isAlive(deviceID) {
+        return .failed(CaptureFormatPlan.notReadyMessage(deviceName: ""))
+      }
       return .failed(
         CaptureFormatPlan.impossibleMessage(deviceName: "", stream: prepared.native))
     }
@@ -372,8 +378,8 @@ enum AudioInputBind {
   }
 }
 
-/// Hears sample-rate and channel-layout changes on the open input and asks
-/// capture to rebuild. The device clock is only observed, never changed.
+/// Hears sample-rate, channel-layout, and alive changes on the open input
+/// and asks capture to rebuild. The device clock is only observed, never changed.
 final class AudioFormatWatch {
   private struct Listener {
     var address: AudioObjectPropertyAddress
@@ -391,6 +397,7 @@ final class AudioFormatWatch {
       (kAudioDevicePropertyStreamFormat, kAudioObjectPropertyScopeInput),
       (kAudioDevicePropertyNominalSampleRate, kAudioObjectPropertyScopeGlobal),
       (kAudioDevicePropertyStreamConfiguration, kAudioObjectPropertyScopeInput),
+      (kAudioDevicePropertyDeviceIsAlive, kAudioObjectPropertyScopeGlobal),
     ]
     for (selector, scope) in pairs {
       var address = AudioObjectPropertyAddress(

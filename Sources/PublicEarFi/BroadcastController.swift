@@ -62,7 +62,13 @@ final class BroadcastController {
   private let formatWatch = AudioFormatWatch()
   private var pendingFormat: DispatchWorkItem?
   private var lastFormatSummary = ""
-  private var formatRebuilds: [Date] = []
+  private var formatBudget = FormatRebuildBudget(limit: CaptureFormatPlan.formatRebuildLimit)
+  private var inputSettleAttempts = 0
+  private var deviceWentQuiet = false
+  /// Device id last seen on Bluetooth. Kept so a brief dropout, when the
+  /// transport can no longer be read, is still retried. A different device
+  /// clears it.
+  private var bluetoothDeviceID: AudioDeviceID = 0
   private var nextLevelLog = Date.distantPast
   private var ffmpegInput: Pipe?
   private var helperPaths: [String] = []
@@ -91,6 +97,13 @@ final class BroadcastController {
       self.failures = 0
       self.frameDrops = 0
       self.stall.reset()
+      self.pendingFormat?.cancel()
+      self.pendingFormat = nil
+      self.formatBudget = FormatRebuildBudget(limit: CaptureFormatPlan.formatRebuildLimit)
+      self.inputSettleAttempts = 0
+      self.deviceWentQuiet = false
+      self.bluetoothDeviceID = 0
+      self.lastFormatSummary = ""
       self.launchPipeline()
     }
   }
@@ -241,8 +254,17 @@ final class BroadcastController {
       stopWithProblem("No input device is available.")
       return
     }
+    if AudioDeviceList.isBluetooth(deviceID) {
+      bluetoothDeviceID = deviceID
+    } else if bluetoothDeviceID != deviceID {
+      bluetoothDeviceID = 0
+    }
     guard AudioDeviceList.isAlive(deviceID) else {
-      stopWithProblem("The selected audio device is not connected.")
+      if bluetoothDeviceID == deviceID {
+        retrySettlingInput(CaptureFormatPlan.notReadyMessage(deviceName: name))
+      } else {
+        stopWithProblem("The selected audio device is not connected.")
+      }
       return
     }
     let pipe = Pipe()
@@ -267,7 +289,9 @@ final class BroadcastController {
     ) {
       stopCapture()
       abandon(process)
-      if CaptureFormatPlan.shouldRetry(message: problem) {
+      if CaptureFormatPlan.isInputSettling(problem) {
+        retrySettlingInput(problem)
+      } else if CaptureFormatPlan.shouldRetry(message: problem) {
         noteFailure(component: "audio", detail: problem)
       } else {
         stopWithProblem(problem)
@@ -276,11 +300,16 @@ final class BroadcastController {
     }
     ffmpeg = process
     writePIDs()
+    inputSettleAttempts = 0
     lastFormatSummary = capture.openedNativeSummary
     nextLevelLog = Date().addingTimeInterval(4)
+    let transport = AudioDeviceList.transportDescription(deviceID)
+    if AudioDeviceList.isBluetooth(deviceID) {
+      bluetoothDeviceID = deviceID
+    }
     logger.log(
       "audio",
-      "opened \(name): \(capture.openedFormatSummary); sending 48 kHz \(capture.openedMixNote) float"
+      "opened \(name): transport \(transport); \(capture.openedFormatSummary); sending 48 kHz \(capture.openedMixNote) float"
     )
     logger.log(
       "ffmpeg",
@@ -736,33 +765,82 @@ final class BroadcastController {
     ffmpegInput = nil
   }
 
+  /// A few tries while a headset finishes switching to call mode, then a
+  /// plain error. This does not use the general restart loop.
+  private func retrySettlingInput(_ problem: String) {
+    guard desired, !stopping, !isHalted() else { return }
+    inputSettleAttempts += 1
+    let transport = launch?.deviceID.map { AudioDeviceList.transportDescription($0) } ?? "Unknown"
+    logger.log("audio", "\(problem) Transport \(transport).")
+    if inputSettleAttempts >= CaptureFormatPlan.inputSettleRetries {
+      stopWithProblem(CaptureFormatPlan.inputGaveUpMessage(deviceName: launch?.deviceName ?? ""))
+      return
+    }
+    publish(.problem(problem))
+    publishHealth(problem)
+    pendingFormat?.cancel()
+    let work = DispatchWorkItem { [weak self] in
+      guard let self, self.desired, !self.stopping, !self.isHalted() else { return }
+      if self.mediamtx?.isRunning == true {
+        self.startFFmpeg()
+      } else {
+        self.launchPipeline()
+      }
+    }
+    pendingFormat = work
+    queue.asyncAfter(deadline: .now() + CaptureFormatPlan.formatSettleSeconds, execute: work)
+  }
+
   private func scheduleFormatRebuild() {
     guard desired, !stopping, !isHalted() else { return }
     pendingFormat?.cancel()
     let work = DispatchWorkItem { [weak self] in
-      guard let self, self.desired, !self.stopping, !self.isHalted(),
-        let deviceID = self.launch?.deviceID,
-        let native = AudioInputBind.nativeDescription(deviceID: deviceID)
-      else { return }
-      let summary = native.summary
-      guard summary != self.lastFormatSummary else { return }
-      let now = Date()
-      self.formatRebuilds.removeAll { now.timeIntervalSince($0) > 30 }
-      if self.formatRebuilds.count >= 3 {
-        self.stopWithProblem(
-          "The audio device keeps changing format. Public EarFi left its sample rate unchanged. Pick the device again, or set its format in Audio MIDI Setup."
-        )
-        return
-      }
-      self.formatRebuilds.append(now)
-      self.logger.log(
-        "audio",
-        "input format changed from \(self.lastFormatSummary) to \(summary). Reopening."
-      )
-      self.startFFmpeg()
+      self?.reopenAfterFormatChange()
     }
     pendingFormat = work
-    queue.asyncAfter(deadline: .now() + 0.5, execute: work)
+    queue.asyncAfter(deadline: .now() + CaptureFormatPlan.formatSettleSeconds, execute: work)
+  }
+
+  /// Reopens after the device's own format, channel layout, or alive state
+  /// changes. A moment with no channels is not final. The hardware rate is
+  /// not changed.
+  private func reopenAfterFormatChange() {
+    guard desired, !stopping, !isHalted(), let deviceID = launch?.deviceID else { return }
+    let transport = AudioDeviceList.transportDescription(deviceID)
+    let bluetooth = AudioDeviceList.isBluetooth(deviceID) || bluetoothDeviceID == deviceID
+    if bluetooth { bluetoothDeviceID = deviceID }
+    formatBudget.limit = CaptureFormatPlan.rebuildLimit(bluetooth: bluetooth)
+    let alive = AudioDeviceList.isAlive(deviceID)
+    let native = alive ? AudioInputBind.nativeDescription(deviceID: deviceID) : nil
+    let ready = alive && native?.canOpen == true
+    if !ready {
+      deviceWentQuiet = true
+      guard formatBudget.allow(at: Date()) else {
+        stopWithProblem(CaptureFormatPlan.inputGaveUpMessage(deviceName: launch?.deviceName ?? ""))
+        return
+      }
+      logger.log(
+        "audio",
+        "input not ready yet; transport \(transport). Waiting for the device to settle."
+      )
+      scheduleFormatRebuild()
+      return
+    }
+    let summary = native?.summary ?? ""
+    if summary == lastFormatSummary && !deviceWentQuiet { return }
+    deviceWentQuiet = false
+    guard formatBudget.allow(at: Date()) else {
+      stopWithProblem(
+        "The audio device keeps changing format. Public EarFi left its sample rate unchanged. Pick the device again, or set its format in Audio MIDI Setup."
+      )
+      return
+    }
+    let previous = lastFormatSummary.isEmpty ? "unread" : lastFormatSummary
+    logger.log(
+      "audio",
+      "input format changed from \(previous) to \(summary); transport \(transport). Reopening."
+    )
+    startFFmpeg()
   }
 
   private func stopChildren() {

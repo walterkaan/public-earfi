@@ -94,7 +94,7 @@ final class CapturePipe {
     case .ready(let value):
       prepared = value
     case .failed(let message):
-      return message
+      return settlingMessage(message, deviceName: deviceName)
     }
     self.channelMode = channelMode
     self.inputChannel = inputChannel
@@ -114,7 +114,7 @@ final class CapturePipe {
       delivering = format
     case .failed(let message):
       stop()
-      return message
+      return settlingMessage(message, deviceName: deviceName)
     }
     tapInstalled = true
     running = true
@@ -125,6 +125,9 @@ final class CapturePipe {
     let pipeChannels = CaptureFormatPlan.rateChannels(inputChannels: inputCount, mono: mono)
     guard pipeChannels > 0 else {
       stop()
+      if AudioDeviceList.isAlive(deviceID) {
+        return CaptureFormatPlan.notReadyMessage(deviceName: deviceName)
+      }
       return CaptureFormatPlan.impossibleMessage(deviceName: deviceName, stream: prepared.native)
     }
     let mix =
@@ -292,6 +295,8 @@ final class CapturePipe {
     return CapturePCM.interleavedFloats(from: output)
   }
 
+  /// Any device rate, including 16 kHz and 24 kHz mono from a hands-free
+  /// Bluetooth profile, is converted to 48 kHz. The hardware clock is not changed.
   private func resample(_ samples: [Float], channels: Int, sampleRate: Double) -> [Float]? {
     guard channels > 0, sampleRate > 0, !samples.isEmpty else { return nil }
     if abs(sampleRate - CaptureFormatPlan.encodeRate) < 1 {
@@ -362,6 +367,11 @@ final class CapturePipe {
       destination.copyMemory(from: base, byteCount: byteCount)
     }
     return buffer
+  }
+
+  private func settlingMessage(_ message: String, deviceName: String) -> String {
+    guard CaptureFormatPlan.isInputSettling(message) else { return message }
+    return CaptureFormatPlan.notReadyMessage(deviceName: deviceName)
   }
 
   private func noteConversionFailure() {

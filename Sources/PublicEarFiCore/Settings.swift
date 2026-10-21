@@ -309,11 +309,13 @@ public enum DeviceSelection {
   }
 
   /// True when Settings still names a device that is not in the current list.
+  /// Zero channels still counts as present. A Bluetooth headset reports that
+  /// for a moment while macOS switches it to call mode.
   public static func isMissing(rememberedUID: String?, devices: [DeviceCandidate]) -> Bool {
     guard let rememberedUID else { return false }
     let uid = rememberedUID.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !uid.isEmpty else { return false }
-    return !devices.contains { $0.uid == uid && $0.inputChannels > 0 }
+    return !devices.contains { $0.uid == uid }
   }
 }
 

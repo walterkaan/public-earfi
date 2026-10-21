@@ -1,11 +1,13 @@
 import CoreAudio
 import Foundation
+import PublicEarFiCore
 
 struct AudioInputDevice: Identifiable, Equatable {
   var id: String
   var name: String
   var inputChannels: Int
   var isBuiltIn: Bool
+  var isBluetooth: Bool
   var deviceID: AudioDeviceID
 }
 
@@ -66,16 +68,32 @@ enum AudioDeviceList {
     return AudioObjectSetPropertyData(deviceID, &address, 0, nil, size, &requested) == noErr
   }
 
+  static func transportDescription(_ deviceID: AudioDeviceID) -> String {
+    AudioTransportLabel.describe(transport(deviceID))
+  }
+
+  static func isBluetooth(_ deviceID: AudioDeviceID) -> Bool {
+    let raw = transport(deviceID)
+    return raw == kAudioDeviceTransportTypeBluetooth || AudioTransportLabel.isBluetooth(raw)
+  }
+
   private static func makeDevice(_ deviceID: AudioDeviceID) -> AudioInputDevice? {
     let channels = inputChannelCount(deviceID)
-    guard channels > 0 else { return nil }
+    let rawTransport = transport(deviceID)
+    let bluetooth =
+      rawTransport == kAudioDeviceTransportTypeBluetooth
+      || AudioTransportLabel.isBluetooth(rawTransport)
+    // Output-only devices stay hidden. A Bluetooth headset can report no
+    // inputs for a moment while macOS switches it to call mode.
+    guard channels > 0 || (bluetooth && isAlive(deviceID)) else { return nil }
     let uid = copyString(deviceID, kAudioDevicePropertyDeviceUID) ?? "device-\(deviceID)"
     let name = copyString(deviceID, kAudioObjectPropertyName) ?? uid
     return AudioInputDevice(
       id: uid,
       name: name,
       inputChannels: channels,
-      isBuiltIn: transport(deviceID) == kAudioDeviceTransportTypeBuiltIn,
+      isBuiltIn: rawTransport == kAudioDeviceTransportTypeBuiltIn,
+      isBluetooth: bluetooth,
       deviceID: deviceID
     )
   }

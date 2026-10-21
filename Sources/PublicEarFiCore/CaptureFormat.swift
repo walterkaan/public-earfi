@@ -54,6 +54,19 @@ public enum CaptureFormatPlan {
   public static let silenceClearDB = -40.0
   public static let silenceWarningSeconds: TimeInterval = 5
   public static let silenceClearSeconds: TimeInterval = 2
+  /// Wait after a format or alive notification so a Bluetooth headset can
+  /// finish switching to the hands-free profile before capture reopens.
+  public static let formatSettleSeconds: TimeInterval = 1
+  public static let formatRebuildWindow: TimeInterval = 30
+  public static let formatRebuildLimit = 3
+  /// A call-mode switch can notify several times. Allow more than the
+  /// wired-device limit so that burst does not stop the broadcast.
+  public static let bluetoothFormatRebuildLimit = 6
+  public static let inputSettleRetries = 6
+
+  public static func rebuildLimit(bluetooth: Bool) -> Int {
+    bluetooth ? bluetoothFormatRebuildLimit : formatRebuildLimit
+  }
 
   /// Channels the 48 kHz converter is allowed to see, after our mix.
   /// Mono is already one channel. Stereo is the chosen pair.
@@ -83,6 +96,8 @@ public enum CaptureFormatPlan {
 
   /// Opening the device is a configuration failure. Retrying it leaves
   /// "Retrying" on screen for a format the app cannot use.
+  /// A headset that is still switching to call mode is the exception:
+  /// `notReadyMessage` stays retryable for a few attempts.
   public static func shouldRetry(message: String) -> Bool {
     let folded = message.lowercased()
     let permanent = [
@@ -111,6 +126,23 @@ public enum CaptureFormatPlan {
     }
     return
       "\(name) is sending \(stream.summary). Public EarFi cannot convert that to 48 kHz. Pick another device, or choose a different format in Audio MIDI Setup. The app does not change the device's sample rate."
+  }
+
+  /// Zero channels, or an unreadable format, while the device is still
+  /// connected. Wording avoids the permanent phrases in `shouldRetry`.
+  public static func notReadyMessage(deviceName: String) -> String {
+    let name = deviceName.isEmpty ? "The selected audio device" : deviceName
+    return "\(name) is still switching its input. Public EarFi will try again shortly."
+  }
+
+  public static func isInputSettling(_ message: String) -> Bool {
+    message.lowercased().contains("still switching its input")
+  }
+
+  public static func inputGaveUpMessage(deviceName: String) -> String {
+    let name = deviceName.isEmpty ? "The selected audio device" : deviceName
+    return
+      "\(name) did not present an input Public EarFi could use. Pick it again in Settings, or choose another microphone. The app does not change the device's sample rate."
   }
 
   public static func conversionStoppedMessage(deviceName: String, summary: String) -> String {
@@ -161,5 +193,87 @@ public struct SilenceWatch: Equatable {
       showing = false
       self.heardSince = nil
     }
+  }
+}
+
+/// Core Audio transport four-character codes. Names stay generic.
+/// `blea` is Bluetooth LE; the symbol is not required, so older SDKs still compile.
+public enum AudioTransportLabel {
+  public static let bluetooth = fourCC("blue")
+  public static let bluetoothLE = fourCC("blea")
+  public static let builtIn = fourCC("bltn")
+  public static let usb = fourCC("usb ")
+  public static let aggregate = fourCC("grup")
+  public static let autoAggregate = fourCC("fgrp")
+  public static let virtual = fourCC("virt")
+
+  public static func fourCC(_ text: String) -> UInt32 {
+    var value: UInt32 = 0
+    let bytes = Array(text.utf8.prefix(4))
+    for byte in bytes {
+      value = (value << 8) | UInt32(byte)
+    }
+    if bytes.count < 4 {
+      value <<= UInt32((4 - bytes.count) * 8)
+    }
+    return value
+  }
+
+  public static func isBluetooth(_ raw: UInt32) -> Bool {
+    raw == bluetooth || raw == bluetoothLE
+  }
+
+  public static func describe(_ raw: UInt32) -> String {
+    let name: String
+    if isBluetooth(raw) {
+      name = "Bluetooth"
+    } else if raw == builtIn {
+      name = "Built-in"
+    } else if raw == usb {
+      name = "USB"
+    } else if raw == aggregate || raw == autoAggregate {
+      name = "Aggregate"
+    } else if raw == virtual {
+      name = "Virtual"
+    } else {
+      name = "Unknown"
+    }
+    let code = fourChar(raw).trimmingCharacters(in: .whitespaces)
+    let visible = code.isEmpty ? String(format: "0x%08X", raw) : code
+    return "\(name) (\(visible))"
+  }
+
+  private static func fourChar(_ raw: UInt32) -> String {
+    let bytes = [
+      UInt8((raw >> 24) & 0xFF),
+      UInt8((raw >> 16) & 0xFF),
+      UInt8((raw >> 8) & 0xFF),
+      UInt8(raw & 0xFF),
+    ]
+    guard bytes.allSatisfy({ $0 >= 32 && $0 < 127 }) else {
+      return String(format: "0x%08X", raw)
+    }
+    return String(bytes: bytes, encoding: .utf8) ?? String(format: "0x%08X", raw)
+  }
+}
+
+/// How many capture reopens a format-change burst may cause.
+public struct FormatRebuildBudget: Equatable {
+  public private(set) var marks: [Date]
+  public var limit: Int
+  public var window: TimeInterval
+
+  public init(limit: Int, window: TimeInterval = CaptureFormatPlan.formatRebuildWindow) {
+    self.marks = []
+    self.limit = limit
+    self.window = window
+  }
+
+  /// True when another reopen is allowed. A full window does not record a mark.
+  public mutating func allow(at now: Date) -> Bool {
+    marks.removeAll { now.timeIntervalSince($0) > window }
+    guard marks.count < limit else { return false }
+    marks.append(now)
+    return true
   }
 }

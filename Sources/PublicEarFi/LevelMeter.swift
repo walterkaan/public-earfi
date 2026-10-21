@@ -24,6 +24,12 @@ final class LevelMeter {
   private var inFlight = 0
   private var running = false
   private var tapInstalled = false
+  private var watchedDevice: AudioDeviceID = 0
+  private var settleAttempts = 0
+  private var sawBluetooth = false
+  private var lastNativeSummary = ""
+  private var pendingOpen: DispatchWorkItem?
+  private let formatWatch = AudioFormatWatch()
 
   func setGainDB(_ db: Double) {
     gainLock.lock()
@@ -37,12 +43,44 @@ final class LevelMeter {
 
   func start(deviceID: AudioDeviceID?) {
     stop()
-    guard let deviceID, AudioDeviceList.isAlive(deviceID) else { return }
+    guard let deviceID else { return }
+    watchedDevice = deviceID
+    settleAttempts = 0
+    sawBluetooth = AudioDeviceList.isBluetooth(deviceID)
+    open(deviceID)
+  }
+
+  func stop() {
+    pendingOpen?.cancel()
+    pendingOpen = nil
+    watchedDevice = 0
+    settleAttempts = 0
+    sawBluetooth = false
+    lastNativeSummary = ""
+    formatWatch.stop()
+    stopEngine()
+    reading.withLock { state in
+      state.decibels = -120
+      state.fraction = 0
+    }
+  }
+
+  /// Opens the meter. A Bluetooth headset can report no channels until macOS
+  /// finishes switching it to call mode, so that failure is tried again.
+  private func open(_ deviceID: AudioDeviceID) {
+    stopEngine()
+    guard watchedDevice == deviceID else { return }
+    if AudioDeviceList.isBluetooth(deviceID) { sawBluetooth = true }
+    guard AudioDeviceList.isAlive(deviceID) else {
+      if sawBluetooth { scheduleSettle(deviceID) }
+      return
+    }
     let prepared: AudioInputBind.Prepared
     switch AudioInputBind.prepare(engine: engine, deviceID: deviceID) {
     case .ready(let value):
       prepared = value
-    case .failed:
+    case .failed(let message):
+      if CaptureFormatPlan.isInputSettling(message) { scheduleSettle(deviceID) }
       return
     }
     switch AudioInputBind.startEngine(
@@ -54,20 +92,48 @@ final class LevelMeter {
         self?.measure(buffer)
       }
     ) {
-    case .failed:
-      stop()
+    case .failed(let message):
+      stopEngine()
+      if CaptureFormatPlan.isInputSettling(message) { scheduleSettle(deviceID) }
       return
     case .ready:
       break
     }
+    lastNativeSummary = prepared.native.summary
+    settleAttempts = 0
     callbackLock.lock()
     accepting = true
     running = true
     tapInstalled = true
     callbackLock.unlock()
+    formatWatch.start(deviceID: deviceID, queue: .main) { [weak self] in
+      self?.noteDeviceChange(deviceID)
+    }
   }
 
-  func stop() {
+  private func noteDeviceChange(_ deviceID: AudioDeviceID) {
+    guard watchedDevice == deviceID else { return }
+    let native = AudioInputBind.nativeDescription(deviceID: deviceID)
+    let ready = AudioDeviceList.isAlive(deviceID) && native?.canOpen == true
+    if ready, native?.summary == lastNativeSummary { return }
+    scheduleSettle(deviceID)
+  }
+
+  private func scheduleSettle(_ deviceID: AudioDeviceID) {
+    guard watchedDevice == deviceID else { return }
+    pendingOpen?.cancel()
+    let work = DispatchWorkItem { [weak self] in
+      guard let self, self.watchedDevice == deviceID else { return }
+      self.settleAttempts += 1
+      guard self.settleAttempts <= CaptureFormatPlan.inputSettleRetries else { return }
+      self.open(deviceID)
+    }
+    pendingOpen = work
+    DispatchQueue.main.asyncAfter(
+      deadline: .now() + CaptureFormatPlan.formatSettleSeconds, execute: work)
+  }
+
+  private func stopEngine() {
     callbackLock.lock()
     accepting = false
     let hadTap = tapInstalled
@@ -81,10 +147,6 @@ final class LevelMeter {
     }
     if wasRunning {
       engine.stop()
-    }
-    reading.withLock { state in
-      state.decibels = -120
-      state.fraction = 0
     }
   }
 

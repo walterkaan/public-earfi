@@ -608,7 +608,7 @@ final class AppModel: ObservableObject {
   }
 
   private func clampChannelToSelectedDevice() -> String? {
-    guard let device = selectedDevice else { return nil }
+    guard let device = selectedDevice, device.inputChannels > 0 else { return nil }
     guard !SettingsRepair.channelFits(settings.inputChannel, inputCount: device.inputChannels)
     else {
       return nil

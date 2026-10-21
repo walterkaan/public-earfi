@@ -150,6 +150,14 @@ final class SettingsTests: XCTestCase {
     XCTAssertFalse(DeviceSelection.isMissing(rememberedUID: "builtin", devices: [builtIn]))
     XCTAssertFalse(DeviceSelection.isMissing(rememberedUID: nil, devices: [builtIn]))
     XCTAssertFalse(DeviceSelection.isMissing(rememberedUID: "  ", devices: [builtIn]))
+    let switching = DeviceCandidate(
+      uid: "headset", name: "Headset", isBuiltIn: false, inputChannels: 0)
+    XCTAssertFalse(
+      DeviceSelection.isMissing(rememberedUID: "headset", devices: [builtIn, switching]))
+    XCTAssertEqual(
+      DeviceSelection.preferred(devices: [builtIn, switching], rememberedUID: nil)?.uid,
+      "builtin"
+    )
   }
 
   func testInvalidSettingsAreRepairedAndPersisted() {
@@ -980,6 +988,56 @@ final class APIAndCreditsTests: XCTestCase {
         message: CaptureFormatPlan.conversionStoppedMessage(
           deviceName: "USB Audio", summary: desk.summary)
       ))
+    for rate in [16_000.0, 24_000.0] {
+      let handsFree = CaptureStreamDescription(
+        sampleRate: rate,
+        channelCount: 1,
+        bitsPerChannel: 16,
+        isFloat: false,
+        isInterleaved: true
+      )
+      XCTAssertTrue(handsFree.canOpen)
+      XCTAssertEqual(CaptureFormatPlan.rateChannels(inputChannels: 1, mono: true), 1)
+      XCTAssertTrue(handsFree.summary.hasPrefix("\(Int(rate)) Hz"))
+      XCTAssertTrue(handsFree.summary.contains("1 channel"))
+    }
+    let settling = CaptureFormatPlan.notReadyMessage(deviceName: "Headset")
+    XCTAssertTrue(CaptureFormatPlan.isInputSettling(settling))
+    XCTAssertTrue(CaptureFormatPlan.shouldRetry(message: settling))
+    XCTAssertFalse(settling.lowercased().contains("no input"))
+    XCTAssertFalse(settling.lowercased().contains("not connected"))
+    XCTAssertFalse(settling.lowercased().contains("could not open"))
+    let gaveUp = CaptureFormatPlan.inputGaveUpMessage(deviceName: "Headset")
+    XCTAssertFalse(CaptureFormatPlan.isInputSettling(gaveUp))
+    XCTAssertEqual(CaptureFormatPlan.rebuildLimit(bluetooth: false), 3)
+    XCTAssertEqual(CaptureFormatPlan.rebuildLimit(bluetooth: true), 6)
+    XCTAssertGreaterThanOrEqual(CaptureFormatPlan.formatSettleSeconds, 0.75)
+    XCTAssertLessThanOrEqual(CaptureFormatPlan.formatSettleSeconds, 1.5)
+    XCTAssertEqual(AudioTransportLabel.bluetooth, 0x626C_7565)
+    XCTAssertEqual(AudioTransportLabel.bluetoothLE, 0x626C_6561)
+    XCTAssertTrue(AudioTransportLabel.isBluetooth(AudioTransportLabel.bluetooth))
+    XCTAssertTrue(AudioTransportLabel.isBluetooth(AudioTransportLabel.bluetoothLE))
+    XCTAssertFalse(AudioTransportLabel.isBluetooth(AudioTransportLabel.usb))
+    XCTAssertFalse(AudioTransportLabel.isBluetooth(AudioTransportLabel.builtIn))
+    XCTAssertEqual(AudioTransportLabel.describe(AudioTransportLabel.bluetooth), "Bluetooth (blue)")
+    XCTAssertEqual(
+      AudioTransportLabel.describe(AudioTransportLabel.bluetoothLE), "Bluetooth (blea)")
+    XCTAssertEqual(AudioTransportLabel.describe(AudioTransportLabel.builtIn), "Built-in (bltn)")
+    XCTAssertEqual(AudioTransportLabel.describe(AudioTransportLabel.usb), "USB (usb)")
+    XCTAssertEqual(AudioTransportLabel.describe(0), "Unknown (0x00000000)")
+    var headsetBudget = FormatRebuildBudget(
+      limit: CaptureFormatPlan.rebuildLimit(bluetooth: true))
+    let budgetStart = Date(timeIntervalSince1970: 1_800_000_000)
+    for _ in 0..<6 {
+      XCTAssertTrue(headsetBudget.allow(at: budgetStart))
+    }
+    XCTAssertFalse(headsetBudget.allow(at: budgetStart.addingTimeInterval(10)))
+    XCTAssertTrue(headsetBudget.allow(at: budgetStart.addingTimeInterval(31)))
+    var wiredBudget = FormatRebuildBudget(limit: CaptureFormatPlan.rebuildLimit(bluetooth: false))
+    XCTAssertTrue(wiredBudget.allow(at: budgetStart))
+    XCTAssertTrue(wiredBudget.allow(at: budgetStart))
+    XCTAssertTrue(wiredBudget.allow(at: budgetStart))
+    XCTAssertFalse(wiredBudget.allow(at: budgetStart))
   }
 
   func testSilenceWarningWaitsAndDoesNotFlicker() {
