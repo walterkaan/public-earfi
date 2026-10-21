@@ -14,7 +14,7 @@ final class LevelMeter {
     var fraction: Double
   }
 
-  private let engine = AVAudioEngine()
+  private var session: DeviceInputSession?
   private let reading = OSAllocatedUnfairLock(
     initialState: Reading(decibels: -120, fraction: 0))
   private let callbackLock = NSLock()
@@ -23,7 +23,6 @@ final class LevelMeter {
   private var accepting = false
   private var inFlight = 0
   private var running = false
-  private var tapInstalled = false
   private var watchedDevice: AudioDeviceID = 0
   private var settleAttempts = 0
   private var sawBluetooth = false
@@ -75,36 +74,27 @@ final class LevelMeter {
       if sawBluetooth { scheduleSettle(deviceID) }
       return
     }
-    let prepared: AudioInputBind.Prepared
-    switch AudioInputBind.prepare(engine: engine, deviceID: deviceID) {
-    case .ready(let value):
-      prepared = value
-    case .failed(let message):
-      if CaptureFormatPlan.isInputSettling(message) { scheduleSettle(deviceID) }
-      return
-    }
-    switch AudioInputBind.startEngine(
-      engine: engine,
-      prepared: prepared,
+    let session = HALDeviceInputSession()
+    self.session = session
+    callbackLock.lock()
+    accepting = true
+    callbackLock.unlock()
+    switch session.start(
       deviceID: deviceID,
-      bufferSize: 1_024,
       onBuffer: { [weak self] buffer in
         self?.measure(buffer)
-      }
-    ) {
-    case .failed(let message):
+      })
+    {
+    case .failure(let message):
       stopEngine()
       if CaptureFormatPlan.isInputSettling(message) { scheduleSettle(deviceID) }
       return
-    case .ready:
-      break
+    case .success(let native):
+      lastNativeSummary = native.summary
     }
-    lastNativeSummary = prepared.native.summary
     settleAttempts = 0
     callbackLock.lock()
-    accepting = true
     running = true
-    tapInstalled = true
     callbackLock.unlock()
     formatWatch.start(deviceID: deviceID, queue: .main) { [weak self] in
       self?.noteDeviceChange(deviceID)
@@ -136,18 +126,11 @@ final class LevelMeter {
   private func stopEngine() {
     callbackLock.lock()
     accepting = false
-    let hadTap = tapInstalled
-    let wasRunning = running
-    tapInstalled = false
     running = false
     callbackLock.unlock()
     waitUntilIdle()
-    if hadTap {
-      engine.inputNode.removeTap(onBus: 0)
-    }
-    if wasRunning {
-      engine.stop()
-    }
+    session?.stop()
+    session = nil
   }
 
   private func measure(_ buffer: AVAudioPCMBuffer) {

@@ -31,8 +31,8 @@ enum AudioDeviceList {
     return identifiers.compactMap(makeDevice)
   }
 
-  /// False for a missing or unplugged device. Call this before touching
-  /// AVAudioEngine, which can abort if the device id is stale.
+  /// False for a missing or unplugged device. Call this before opening an
+  /// IOProc, which can fail if the device id is stale.
   static func isAlive(_ deviceID: AudioDeviceID) -> Bool {
     guard deviceID != 0, deviceID != AudioObjectID(kAudioObjectUnknown) else { return false }
     var address = AudioObjectPropertyAddress(

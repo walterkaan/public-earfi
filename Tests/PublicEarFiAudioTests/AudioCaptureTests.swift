@@ -1,4 +1,5 @@
 import AVFoundation
+import AudioToolbox
 import PublicEarFiCore
 import XCTest
 
@@ -94,6 +95,28 @@ final class AudioCaptureTests: XCTestCase {
         "tap callbacks wrote no stdin bytes for \(device.name): \(summary); \(delivery.line)"
       )
       XCTAssertGreaterThan(delivery.framesOut, 0)
+      XCTAssertTrue(summary.contains("native capture"), summary)
+      XCTAssertFalse(summary.contains("widen"), summary)
+      if device.inputChannels >= 2 {
+        XCTAssertGreaterThanOrEqual(capture.openedNativeDescription.channelCount, 2, summary)
+        XCTAssertFalse(summary.contains("1 channel"), summary)
+      }
+      capture.stop()
+      let reopened = Pipe()
+      let second = capture.start(
+        deviceID: device.deviceID,
+        channelMode: .mono,
+        inputChannel: 1,
+        output: reopened.fileHandleForWriting,
+        deviceName: device.name
+      )
+      XCTAssertNil(second, second ?? "")
+      let again = Date().addingTimeInterval(2)
+      while Date() < again && capture.delivery().callbacks == 0 {
+        Thread.sleep(forTimeInterval: 0.05)
+      }
+      XCTAssertGreaterThan(capture.delivery().callbacks, 0, capture.openedFormatSummary)
+      XCTAssertGreaterThan(capture.bytesWritten(), 0)
     } else if ProcessInfo.processInfo.environment["CI"] == "true" {
       capture.stop()
       throw XCTSkip(
@@ -107,6 +130,127 @@ final class AudioCaptureTests: XCTestCase {
     capture.stop()
   }
 
+  /// A failed open used to leave the shared engine running, so the next device
+  /// also produced no callbacks. A is torn down. B then gets callbacks.
+  func testFailedStartIsTornDownBeforeTheNextDevice() throws {
+    let ledger = SessionLedger()
+    let specs: [(AudioDeviceID, Int, Bool)] = [(41, 2, true), (42, 1, false)]
+    var index = 0
+    var made: [ScriptedInputSession] = []
+    let capture = CapturePipe {
+      let spec = specs[index]
+      index += 1
+      let session = ScriptedInputSession(
+        deviceID: spec.0,
+        channels: spec.1,
+        fails: spec.2,
+        staleDefaultChannels: 1,
+        ledger: ledger
+      )
+      made.append(session)
+      return session
+    }
+    let blocked = Pipe()
+    let problem = capture.start(
+      deviceID: 41,
+      channelMode: .mono,
+      inputChannel: 1,
+      output: blocked.fileHandleForWriting,
+      deviceName: "BlackHole 2ch"
+    )
+    XCTAssertNotNil(problem)
+    XCTAssertEqual(made.count, 1)
+    XCTAssertFalse(made[0].isRunning)
+    XCTAssertEqual(ledger.disposed, 1)
+    XCTAssertEqual(capture.delivery().callbacks, 0)
+    XCTAssertFalse(capture.captureIsRunning)
+
+    let next = Pipe()
+    let opened = capture.start(
+      deviceID: 42,
+      channelMode: .mono,
+      inputChannel: 1,
+      output: next.fileHandleForWriting,
+      deviceName: "MacBook Microphone"
+    )
+    XCTAssertNil(opened)
+    try waitForStdin(capture)
+    XCTAssertEqual(made.count, 2)
+    XCTAssertTrue(made[1].isRunning)
+    XCTAssertEqual(ledger.created, 2)
+    XCTAssertEqual(ledger.disposed, 1)
+    XCTAssertEqual(ledger.openedChannels, [1])
+    capture.stop()
+    XCTAssertEqual(ledger.disposed, 2)
+    XCTAssertFalse(made[1].isRunning)
+    XCTAssertFalse(capture.captureIsRunning)
+  }
+
+  /// The system default mic is 1 channel. The chosen device is 2. The open
+  /// uses the chosen device, and the log does not say the client format was widened.
+  func testTwoChannelDeviceOpensWhileTheDefaultMicIsOneChannel() throws {
+    let ledger = SessionLedger()
+    let capture = CapturePipe {
+      ScriptedInputSession(
+        deviceID: 7,
+        channels: 2,
+        fails: false,
+        staleDefaultChannels: 1,
+        ledger: ledger
+      )
+    }
+    let pipe = Pipe()
+    let problem = capture.start(
+      deviceID: 7,
+      channelMode: .mono,
+      inputChannel: 1,
+      output: pipe.fileHandleForWriting,
+      deviceName: "USB PnP Audio Device"
+    )
+    XCTAssertNil(problem)
+    try waitForStdin(capture)
+    XCTAssertEqual(ledger.openedChannels, [2])
+    let summary = capture.openedFormatSummary
+    XCTAssertTrue(summary.contains("native capture, 2 channels"), summary)
+    XCTAssertTrue(summary.contains("2 channels, interleaved"), summary)
+    XCTAssertFalse(summary.contains("widen"), summary)
+    XCTAssertFalse(summary.contains("1 channel"), summary)
+    capture.stop()
+    XCTAssertEqual(ledger.disposed, 1)
+  }
+
+  func testInterleavedStereoBufferStaysTwoChannels() {
+    let frames = 16
+    let channels = 2
+    var samples = [Float](repeating: 0.5, count: frames * channels)
+    samples.withUnsafeMutableBufferPointer { pointer in
+      let audio = AudioBuffer(
+        mNumberChannels: UInt32(channels),
+        mDataByteSize: UInt32(frames * channels * MemoryLayout<Float>.size),
+        mData: UnsafeMutableRawPointer(pointer.baseAddress)
+      )
+      var list = AudioBufferList(mNumberBuffers: 1, mBuffers: audio)
+      let nominal = AudioStreamBasicDescription(
+        mSampleRate: 48_000,
+        mFormatID: kAudioFormatLinearPCM,
+        mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,
+        mBytesPerPacket: 8,
+        mFramesPerPacket: 1,
+        mBytesPerFrame: 8,
+        mChannelsPerFrame: 2,
+        mBitsPerChannel: 32,
+        mReserved: 0
+      )
+      let pcm = withUnsafePointer(to: &list) {
+        DeviceBufferAdapter.pcmBuffer(list: $0, nominal: nominal)
+      }
+      XCTAssertEqual(pcm?.format.channelCount, 2)
+      XCTAssertEqual(Int(pcm?.frameLength ?? 0), frames)
+      let floats = pcm.flatMap { CapturePCM.interleavedFloats(from: $0) }
+      XCTAssertEqual(floats?.count, frames * channels)
+    }
+  }
+
   /// 48 kHz stereo is the BlackHole / USB path (no rate converter). 24 kHz
   /// mono is the Bluetooth hands-free path. Both have to put bytes on the
   /// pipe ffmpeg reads as stdin.
@@ -117,6 +261,15 @@ final class AudioCaptureTests: XCTestCase {
       sampleRate: 48_000, channels: 2, frames: 960, interleaved: false, pushes: 2)
     try assertPipeReceives(
       sampleRate: 24_000, channels: 1, frames: 480, interleaved: true, pushes: 8)
+  }
+
+  private func waitForStdin(_ capture: CapturePipe) throws {
+    let deadline = Date().addingTimeInterval(1)
+    while Date() < deadline && capture.bytesWritten() == 0 {
+      Thread.sleep(forTimeInterval: 0.01)
+    }
+    XCTAssertGreaterThan(capture.delivery().callbacks, 0, capture.delivery().line)
+    XCTAssertGreaterThan(capture.bytesWritten(), 0, capture.delivery().line)
   }
 
   private func assertPipeReceives(
@@ -203,5 +356,85 @@ final class AudioCaptureTests: XCTestCase {
       }
     }
     return buffer
+  }
+}
+
+final class SessionLedger {
+  var created = 0
+  var disposed = 0
+  var openedChannels: [Int] = []
+}
+
+/// A stand-in for one HAL open. `staleDefaultChannels` is the system default
+/// mic. The session reports `channels` from the chosen device instead.
+final class ScriptedInputSession: DeviceInputSession {
+  let deviceID: AudioDeviceID
+  let channels: Int
+  let fails: Bool
+  let staleDefaultChannels: Int
+  let ledger: SessionLedger
+  private var running = false
+  private var stopped = false
+
+  var isRunning: Bool { running }
+
+  init(
+    deviceID: AudioDeviceID,
+    channels: Int,
+    fails: Bool,
+    staleDefaultChannels: Int,
+    ledger: SessionLedger
+  ) {
+    self.deviceID = deviceID
+    self.channels = channels
+    self.fails = fails
+    self.staleDefaultChannels = staleDefaultChannels
+    self.ledger = ledger
+    ledger.created += 1
+  }
+
+  func start(
+    deviceID: AudioDeviceID,
+    onBuffer: @escaping (AVAudioPCMBuffer) -> Void
+  ) -> Result<CaptureStreamDescription, String> {
+    guard deviceID == self.deviceID else {
+      return .failure("Could not open the selected audio device.")
+    }
+    if fails {
+      running = true
+      return .failure("Could not open the selected audio device.")
+    }
+    let described = CaptureStreamDescription(
+      sampleRate: 48_000,
+      channelCount: channels,
+      bitsPerChannel: 32,
+      isFloat: true,
+      isInterleaved: true
+    )
+    guard
+      let bound = CaptureDeviceBinding.bound(
+        device: described, staleChannels: staleDefaultChannels)
+    else {
+      return .failure(CaptureFormatPlan.notReadyMessage(deviceName: ""))
+    }
+    running = true
+    ledger.openedChannels.append(bound.channelCount)
+    if let buffer = AudioCaptureTests.floatBuffer(
+      sampleRate: 48_000,
+      channels: bound.channelCount,
+      frames: 960,
+      interleaved: true,
+      amplitude: 0.2
+    ) {
+      onBuffer(buffer)
+    }
+    return .success(bound)
+  }
+
+  func stop() {
+    if stopped { return }
+    stopped = true
+    running = false
+    ledger.disposed += 1
   }
 }

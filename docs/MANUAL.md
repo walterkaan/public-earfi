@@ -36,7 +36,7 @@ What to look for when you buy or borrow one:
 
 A phone’s personal hotspot usually stops at about 5 to 10 devices. That is fine for a rehearsal or a handful of listeners. It is too small for about 30 people.
 
-The useful part is doing this at home, before the event. Set up the router and the Mac, listen on your own phone, and confirm it works. Give the Mac a fixed address on that router so the listener link stays the same next time you power everything on. The QR code contains that address, for example `http://192.168.1.20:8889/`. When the address stays put, print the poster before the event. On the main window, **Print Poster** opens the Mac print window, and **Open PDF QR Poster** saves a PDF and opens it. Either one uses that stable link, so you can print or email it days ahead. Once the travel-router address is stable, fill in the Wi-Fi name under **Settings → Poster** and print. People can join the network from the poster before they scan the listen code.
+The useful part is doing this at home, before the event. Set up the router and the Mac, listen on your own phone, and confirm it works. Give the Mac a fixed address on that router so the listener link stays the same next time you power everything on. The QR code contains that address, for example `http://192.168.1.20:8889/`. When the address stays put, make the poster before the event. On the main window, **Open PDF QR Poster** saves a PDF and opens it. Print that PDF yourself. It uses that stable link, so you can print or email it days ahead. Once the travel-router address is stable, fill in the Wi-Fi name under **Settings → Poster**, open the PDF, and print it. People can join the network from the poster before they scan the listen code.
 
 The app warns you if the Mac’s address has changed since the poster was made. If you have to use the venue’s network instead, ask them for a fixed address for the Mac.
 
@@ -53,7 +53,7 @@ If the Wi-Fi name is filled in, the main-window poster has two codes, in order. 
 
 If the Wi-Fi name is empty, the poster stays one code: the listen link, and a blank line where you can write the network name by hand.
 
-The poster window (File → Print Poster…) still changes the wording of a custom page. It uses the same Wi-Fi name in its instructions, and it does not print the password. The join code is the main-window poster.
+The poster window (File → Poster…) still changes the wording of a custom page. It uses the same Wi-Fi name in its instructions, and its PDF does not include the password. The join code is the main-window poster.
 
 Anyone who can read the printed sheet can read the Wi-Fi password. Print it for the room, and do not leave copies where you do not want that password seen.
 
@@ -69,7 +69,7 @@ Do this once, on the Wi-Fi you will take to the venue.
 6. Press **Start Broadcasting**. The window should say Live and show a link like `http://192.168.1.20:8889/`. An older poster or QR code that still ends in `/live` opens the same page.
 7. On your phone, join that same Wi-Fi. A phone still on the house network will not open the link.
 8. Scan the QR code, or type the link. Tap play. If you hear nothing, unmute using the listener steps below.
-9. In **Settings → Poster**, type the Wi-Fi name, the password, and the security type. Then, on the main window, press **Print Poster** or **Open PDF QR Poster**. The PDF opens so you can check it. The first code should join the Wi-Fi, and the second should open the stream. Email the PDF to yourself and try both codes on the phone. Print copies once this link is the one you will keep. If you change the router address, the Wi-Fi name, or the password, print again.
+9. In **Settings → Poster**, type the Wi-Fi name, the password, and the security type. Then, on the main window, press **Open PDF QR Poster**. The PDF opens so you can check it. Print that PDF from Preview, or any PDF app. The first code should join the Wi-Fi, and the second should open the stream. Email the PDF to yourself and try both codes on the phone. Print copies once this link is the one you will keep. If you change the router address, the Wi-Fi name, or the password, open the PDF and print again.
 10. Stop the broadcast. Power the router off and on, start the Mac again, and confirm the listener link is unchanged.
 
 Take the same router, the same Mac, and that PDF to the event.
@@ -129,20 +129,20 @@ Standard (64 kbps) and Music (96 kbps mono, or 128 kbps stereo) use more of the 
 
 ## The poster and the QR code
 
-Next to **Copy link** on the main window, **Print Poster** opens the Mac print window for a one-page poster, and **Open PDF QR Poster** saves a PDF and opens it. That PDF is replaced each time, in the Public EarFi folder inside Application Support. The poster is A4, or Letter in the US and Canada. The title is the broadcast title. A small line at the bottom says Powered by Public EarFi.
+Next to **Copy link** on the main window, **Open PDF QR Poster** saves a PDF and opens it. Print that PDF yourself. The app does not send the poster to a printer, because a printed page from the app left the QR blank. That PDF is replaced each time, in the Public EarFi folder inside Application Support. The poster is A4, or Letter in the US and Canada. The title is the broadcast title. A small line at the bottom says Powered by Public EarFi.
 
 When **Settings → Poster** has a Wi-Fi name, the page has two codes. The first is labelled **1. Join the Wi-Fi**. A phone camera can join from it. The network name and password are printed under that code. The second is labelled **2. Open the broadcast**. It is the same link as the QR code in the window, and that link is printed under it. The last line is **3. Tap play; use your own earphones**. Scan them in that order.
 
 When the Wi-Fi name is empty, there is one code, the listen link, and the first step is a blank line to write the network in. Print once the travel-router address is stable, before people arrive. Print again if that address, the Wi-Fi name, or the password changes.
 
-**File → Print Poster…** (Command-P) opens the poster window if you want to change the wording. **File → Export Poster PDF…** (Command-Shift-E) saves that custom poster without opening the window. The poster window also has Export PDF, Print, and Copy QR image. The Edit menu can copy the listener link and the QR image.
+**File → Poster…** (Command-P) opens the poster window if you want to change the wording. **File → Export Poster PDF…** (Command-Shift-E) saves that custom poster without opening the window. The poster window has Export PDF and Copy QR image. Print the PDF from Preview. The Edit menu can copy the listener link and the QR image.
 
 On the poster you can set:
 
 - A header. The default is “Listen live on your phone”.
 - A short description, such as the talk title.
 - Instructions. The defaults tell people to join the Wi-Fi, scan the code, tap play, keep the screen on, and unmute.
-- The Wi-Fi network name, which fills in `{network}` in the first instruction. The password and the join code are not on this page. Set those under Settings → Poster, then use Print Poster on the main window.
+- The Wi-Fi network name, which fills in `{network}` in the first instruction. The password and the join code are not on this page. Set those under Settings → Poster, then use Open PDF QR Poster on the main window and print that PDF.
 - Paper size. Letter in the US and Canada, A4 elsewhere, unless you pick one.
 - Address style. **IP** is the one to use. The `.local` name survives an address change on iPhone, iPad, and Mac, and fails on many Android phones, so leave the poster on IP when the address is reserved.
 

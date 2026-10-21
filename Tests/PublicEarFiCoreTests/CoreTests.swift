@@ -491,17 +491,23 @@ final class PosterAndSupervisorTests: XCTestCase {
     )
   }
 
-  func testSameRateStereoKeepsTheEngineFormat() {
-    XCTAssertEqual(
-      CaptureFormatPlan.clientFormatChoice(engineChannels: 2, deviceChannels: 2), .keep)
-    XCTAssertEqual(
-      CaptureFormatPlan.clientFormatChoice(engineChannels: 1, deviceChannels: 1), .keep)
-    XCTAssertEqual(
-      CaptureFormatPlan.clientFormatChoice(engineChannels: 2, deviceChannels: 1), .keep)
-    XCTAssertEqual(
-      CaptureFormatPlan.clientFormatChoice(engineChannels: 0, deviceChannels: 2), .keep)
-    XCTAssertEqual(
-      CaptureFormatPlan.clientFormatChoice(engineChannels: 1, deviceChannels: 2), .widen)
+  func testTwoChannelDeviceIgnoresAStaleOneChannelDefault() {
+    let stereo = CaptureStreamDescription(
+      sampleRate: 48_000, channelCount: 2, bitsPerChannel: 32, isFloat: true, isInterleaved: true)
+    let bound = CaptureDeviceBinding.bound(device: stereo, staleChannels: 1)
+    XCTAssertEqual(bound, stereo)
+    XCTAssertEqual(bound?.channelCount, 2)
+    let note = CaptureDeviceBinding.captureNote(channels: bound?.channelCount ?? 0)
+    XCTAssertEqual(note, "native capture, 2 channels")
+    XCTAssertFalse(note.contains("widen"))
+    XCTAssertNil(
+      CaptureDeviceBinding.bound(
+        device: CaptureStreamDescription(
+          sampleRate: 48_000, channelCount: 0, bitsPerChannel: 32, isFloat: true,
+          isInterleaved: true),
+        staleChannels: 1
+      )
+    )
     let delivery = CaptureDelivery(
       callbacks: 4, framesIn: 3840, framesOut: 1920, dropped: 1, bytesWritten: 7680,
       rateNote: "rate conversion skipped at 48000 Hz"

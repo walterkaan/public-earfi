@@ -345,7 +345,7 @@ final class BroadcastController {
     let streamNote = streams.isEmpty ? "streams: unread" : streams.joined(separator: "; ")
     logger.log(
       "audio",
-      "opened \(name): transport \(transport); \(capture.openedFormatSummary); \(streamNote); engine \(capture.engineIsRunning ? "running" : "stopped"); sending 48 kHz \(capture.openedMixNote) float"
+      "opened \(name): transport \(transport); \(capture.openedFormatSummary); \(streamNote); capture \(capture.captureIsRunning ? "running" : "stopped"); sending 48 kHz \(capture.openedMixNote) float"
     )
     logger.log(
       "ffmpeg",
@@ -850,6 +850,8 @@ final class BroadcastController {
     }
   }
 
+  /// Stops the IOProc and drops it. The next Start builds a new one, including
+  /// after "No audio from", so a failed device cannot stick to the next mic.
   private func stopCapture() {
     pendingFormat?.cancel()
     pendingFormat = nil

@@ -154,12 +154,9 @@ struct RunningTab: View {
             HStack {
               Button("Copy link") { model.copyLink() }
                 .disabled(model.listenerURL == nil)
-              Button("Print Poster") { model.printQuickPoster() }
-                .disabled(model.listenerURL == nil)
-                .help("Open the Mac print window for a one-page QR poster")
               Button("Open PDF QR Poster") { model.openQuickPosterPDF() }
                 .disabled(model.listenerURL == nil)
-                .help("Save a PDF of the QR poster and open it")
+                .help("Save a PDF of the QR poster and open it. Print that PDF yourself.")
             }
             if model.rankedNetworks.count > 1 {
               Picker("Address", selection: addressBinding) {

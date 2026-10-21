@@ -11,13 +11,19 @@ import os
 /// UID), not an entry in ffmpeg's avfoundation list. Mono sums every input
 /// channel in this process before the 48 kHz converter.
 ///
+/// Each Start builds a new IOProc on that device and the previous one is
+/// destroyed, including after "No audio from". The format is the device's
+/// own input. A reused engine used to keep the default microphone's one
+/// channel, and widening that format stopped the callback.
+///
 /// AVFoundation capture inside ffmpeg stamps audio with the host clock in
 /// uneven bursts. WebRTC then inserts or drops a frame on a regular period,
 /// which is the click, even when the same device is clean in other apps.
 /// ffmpeg's f32le demuxer timestamps from the sample count, so this pipe
 /// stays on a continuous 20 ms grid.
 final class CapturePipe {
-  private let engine = AVAudioEngine()
+  private let makeSession: () -> DeviceInputSession
+  private var session: DeviceInputSession?
   private let condition = NSCondition()
   private var formatConverter: AVAudioConverter?
   private var formatTarget: AVAudioFormat?
@@ -47,7 +53,6 @@ final class CapturePipe {
   private let callbackLock = NSLock()
   private var accepting = false
   private var inFlight = 0
-  private var tapInstalled = false
   private var formatSummary = "input format unknown"
   private var nativeSummary = ""
   private var openedDeviceName = ""
@@ -83,7 +88,11 @@ final class CapturePipe {
     return snapshot
   }
 
-  var engineIsRunning: Bool { engine.isRunning }
+  var captureIsRunning: Bool { session?.isRunning == true && running }
+
+  init(makeSession: @escaping () -> DeviceInputSession = { HALDeviceInputSession() }) {
+    self.makeSession = makeSession
+  }
 
   var openedNativeDescription: CaptureStreamDescription { openedNative }
 
@@ -109,6 +118,8 @@ final class CapturePipe {
   }
 
   /// Starts capture. Returns an error string the UI can show.
+  /// Builds a new device session. A failed open destroys that session before
+  /// returning, so the next Start is not left with the previous device.
   func start(
     deviceID: AudioDeviceID,
     channelMode: ChannelMode,
@@ -117,62 +128,53 @@ final class CapturePipe {
     deviceName: String = ""
   ) -> String? {
     stop()
-    guard AudioDeviceList.isAlive(deviceID) else {
-      return "The selected audio device is not connected."
-    }
-    let prepared: AudioInputBind.Prepared
-    switch AudioInputBind.prepare(engine: engine, deviceID: deviceID) {
-    case .ready(let value):
-      prepared = value
-    case .failed(let message):
-      return settlingMessage(message, deviceName: deviceName)
-    }
+    let session = makeSession()
+    self.session = session
     self.channelMode = channelMode
     self.inputChannel = inputChannel
-    nativeSummary = prepared.native.summary
-    openedNative = prepared.native
     openedDeviceName = deviceName
     let mono = channelMode == .mono
-    let plannedChannels = max(1, Int(prepared.format.channelCount))
-    let pipeChannels = CaptureFormatPlan.rateChannels(
-      inputChannels: plannedChannels, mono: mono)
+    let pipeChannels = CaptureFormatPlan.pipeChannels(mono: mono)
     guard pipeChannels > 0 else {
       stop()
-      return CaptureFormatPlan.impossibleMessage(deviceName: deviceName, stream: prepared.native)
+      return CaptureFormatPlan.impossibleMessage(
+        deviceName: deviceName,
+        stream: CaptureStreamDescription(
+          sampleRate: 0, channelCount: 0, bitsPerChannel: 0, isFloat: false, isInterleaved: true)
+      )
     }
-    // Accept tap buffers before the engine starts. A 48 kHz device can
-    // deliver its first callbacks inside start(), and those used to be dropped.
+    // Accept buffers before the device starts. The first callbacks can arrive
+    // inside start(), and those used to be dropped.
     armWriter(output: output, pipeChannels: pipeChannels)
-    let delivering: AVAudioFormat
-    let clientAction: String
-    switch AudioInputBind.startEngine(
-      engine: engine,
-      prepared: prepared,
+    let native: CaptureStreamDescription
+    switch session.start(
       deviceID: deviceID,
-      bufferSize: 960,
       onBuffer: { [weak self] buffer in
         self?.consume(buffer)
-      }
-    ) {
-    case .ready(let format, let action):
-      delivering = format
-      clientAction = action
-    case .failed(let message):
+      })
+    {
+    case .success(let value):
+      native = value
+    case .failure(let message):
       stop()
       return settlingMessage(message, deviceName: deviceName)
     }
-    tapInstalled = true
+    guard native.canOpen else {
+      stop()
+      return CaptureFormatPlan.impossibleMessage(deviceName: deviceName, stream: native)
+    }
+    nativeSummary = native.summary
+    openedNative = native
     running = true
-    let inputCount = max(1, Int(delivering.channelCount))
+    let inputCount = max(1, native.channelCount)
     openedInputChannels = inputCount
-    openedDeviceChannels = max(prepared.deviceChannels, inputCount)
+    openedDeviceChannels = inputCount
     let mix =
       mono
       ? "mono sums \(inputCount) of \(openedDeviceChannels) channels"
       : "stereo"
-    formatSummary =
-      AudioInputBind.summary(native: prepared.native, engine: prepared.engine)
-      + "; \(mix); \(clientAction)"
+    let note = CaptureDeviceBinding.captureNote(channels: inputCount)
+    formatSummary = AudioInputBind.summary(native: native, capture: native) + "; \(mix); \(note)"
     return nil
   }
 
@@ -249,23 +251,16 @@ final class CapturePipe {
   func stop() {
     callbackLock.lock()
     accepting = false
-    let hadTap = tapInstalled
-    let wasRunning = running
-    tapInstalled = false
     running = false
     callbackLock.unlock()
     waitUntilIdle()
+    session?.stop()
+    session = nil
     stopWriter = true
     outputFD = -1
     condition.lock()
     condition.broadcast()
     condition.unlock()
-    if hadTap {
-      engine.inputNode.removeTap(onBus: 0)
-    }
-    if wasRunning {
-      engine.stop()
-    }
     if writerRunning {
       _ = writerDone?.wait(timeout: .now() + 2)
       writerRunning = false

@@ -58,7 +58,7 @@ struct PosterTab: View {
             }
           }
           Text(
-            "Password, security, and hidden network are in Settings → Poster. The main-window poster prints a join code when this name is filled in. This window does not print the password."
+            "Password, security, and hidden network are in Settings → Poster. The main-window PDF has a join code when this name is filled in. This window's PDF does not include the password."
           )
           .font(.caption)
           .foregroundStyle(.secondary)
@@ -92,7 +92,6 @@ struct PosterTab: View {
           }
           HStack {
             Button("Export PDF…") { export() }
-            Button("Print…") { printPoster() }
             Button("Copy QR image") { model.copyQRImage() }
           }
         }
@@ -103,7 +102,7 @@ struct PosterTab: View {
           .frame(maxWidth: .infinity, maxHeight: .infinity)
           .background(Color(nsColor: .controlBackgroundColor))
           .clipShape(RoundedRectangle(cornerRadius: 8))
-        Text("Preview/PDF/Print Poster")
+        Text("Preview and PDF")
           .font(.caption)
           .foregroundStyle(.secondary)
       }
@@ -138,10 +137,6 @@ struct PosterTab: View {
 
   private func export() {
     PosterActions.exportPDF(model: printModel) { model.rememberPoster() }
-  }
-
-  private func printPoster() {
-    PosterActions.printPoster(model: printModel) { model.rememberPoster() }
   }
 
   private var printModel: PosterRenderModel {

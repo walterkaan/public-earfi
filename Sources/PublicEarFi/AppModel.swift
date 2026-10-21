@@ -382,11 +382,6 @@ final class AppModel: ObservableObject {
     Clipboard.copy(listenerURL)
   }
 
-  func printQuickPoster() {
-    guard let page = quickPosterModel() else { return }
-    PosterActions.printPoster(model: page) { self.rememberPoster() }
-  }
-
   func openQuickPosterPDF() {
     guard let page = quickPosterModel() else { return }
     let url = AppPaths.posterFile(home: FileManager.default.homeDirectoryForCurrentUser)

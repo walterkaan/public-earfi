@@ -52,7 +52,7 @@ struct AppMenus: Commands {
     // Settings is the scene below the app name (Cmd-,). It is not in File.
     CommandGroup(replacing: .newItem) {}
     CommandGroup(replacing: .printItem) {
-      Button("Print Poster…") {
+      Button("Poster…") {
         openWindow(id: "poster")
       }
       .keyboardShortcut("p", modifiers: [.command])

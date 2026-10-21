@@ -41,9 +41,24 @@ public struct CaptureStreamDescription: Equatable, Sendable {
   }
 }
 
-public enum ClientFormatChoice: Equatable {
-  case keep
-  case widen
+/// How the selected device is opened. The channel count is that device's own
+/// input, read after the device is chosen. A previous engine, or the system
+/// default microphone, is `staleChannels` and is not applied. Capture does
+/// not widen a client format.
+public enum CaptureDeviceBinding {
+  public static func bound(
+    device: CaptureStreamDescription, staleChannels: Int
+  ) -> CaptureStreamDescription? {
+    guard device.canOpen else { return nil }
+    _ = staleChannels
+    return device
+  }
+
+  public static func captureNote(channels: Int) -> String {
+    let count = max(0, channels)
+    let noun = count == 1 ? "channel" : "channels"
+    return "native capture, \(count) \(noun)"
+  }
 }
 
 /// Counters from the tap through stdin, so a silent 48 kHz device can be
@@ -102,19 +117,6 @@ public enum CaptureFormatPlan {
 
   public static func rebuildLimit(bluetooth: Bool) -> Int {
     bluetooth ? bluetoothFormatRebuildLimit : formatRebuildLimit
-  }
-
-  /// A device that already exposes every input channel keeps the engine's
-  /// own format. Rewriting that format stops the IOProc on 48 kHz stereo
-  /// devices (BlackHole, USB PnP) that need no conversion. Widen only when
-  /// the engine is hiding channels the device actually has.
-  public static func clientFormatChoice(engineChannels: Int, deviceChannels: Int)
-    -> ClientFormatChoice
-  {
-    if deviceChannels > engineChannels, engineChannels > 0, deviceChannels > 0 {
-      return .widen
-    }
-    return .keep
   }
 
   /// Channels the 48 kHz converter is allowed to see, after our mix.

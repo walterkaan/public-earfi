@@ -199,32 +199,6 @@ enum PosterActions {
   }
 
   @MainActor
-  static func printPoster(model: PosterRenderModel, remember: () -> Void) {
-    let page = PosterPage(model: model)
-    let view = NSHostingView(rootView: page)
-    let size = NSSize(width: model.paper.widthPoints, height: model.paper.heightPoints)
-    view.frame = NSRect(origin: .zero, size: size)
-    let info = NSPrintInfo.shared.copy() as! NSPrintInfo
-    info.paperSize = size
-    info.orientation = .portrait
-    let margin = 15.0 * 72.0 / 25.4
-    info.topMargin = margin
-    info.bottomMargin = margin
-    info.leftMargin = margin
-    info.rightMargin = margin
-    info.horizontalPagination = .fit
-    info.verticalPagination = .fit
-    info.isHorizontallyCentered = true
-    info.isVerticallyCentered = true
-    let operation = NSPrintOperation(view: view, printInfo: info)
-    operation.showsPrintPanel = true
-    operation.showsProgressPanel = true
-    if operation.run() {
-      remember()
-    }
-  }
-
-  @MainActor
   static func pdfData(page: PosterPage, paper: PaperSize) -> Data? {
     let renderer = ImageRenderer(content: page)
     let data = NSMutableData()
