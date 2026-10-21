@@ -70,11 +70,11 @@ final class AudioCaptureTests: XCTestCase {
     XCTAssertEqual(meter.latest().fraction, 0, accuracy: 0.001)
 
     let pipe = Pipe()
-    let reading = pipe.fileHandleForReading
-    reading.readabilityHandler = { handle in
+    let drain = pipe.fileHandleForReading
+    drain.readabilityHandler = { handle in
       _ = handle.availableData
     }
-    defer { reading.readabilityHandler = nil }
+    defer { drain.readabilityHandler = nil }
     let capture = CapturePipe()
     capture.setGainDB(6)
     let problem = capture.start(
