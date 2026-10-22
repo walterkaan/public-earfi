@@ -90,6 +90,9 @@ struct AppMenus: Commands {
       Button("Broadcast music from an app") {
         model.openMusicFAQ()
       }
+      Button("RoomCast FAQ") {
+        model.openFAQ()
+      }
     }
   }
 }

@@ -531,6 +531,13 @@ final class AppModel: ObservableObject {
     }
   }
 
+  /// The public FAQ, in the default browser.
+  func openFAQ() {
+    if let url = URL(string: "https://roomcast.channel/faq.html") {
+      NSWorkspace.shared.open(url)
+    }
+  }
+
   func openNotices() {
     if let url = URL(
       string: "https://github.com/walterkaan/public-earfi/blob/main/THIRD_PARTY_NOTICES.md")

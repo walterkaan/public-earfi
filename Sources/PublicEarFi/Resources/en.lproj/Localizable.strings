@@ -42,6 +42,7 @@
 "Expanded" = "Expanded";
 "Export PDF…" = "Export PDF…";
 "Export Poster PDF…" = "Export Poster PDF…";
+"FAQ" = "FAQ";
 "Getting Started" = "Getting Started";
 "Getting started" = "Getting started";
 "Guest Wi-Fi with client isolation, and separate VLANs, also block listeners." = "Guest Wi-Fi with client isolation, and separate VLANs, also block listeners.";
@@ -83,6 +84,7 @@
 "Reset to defaults…" = "Reset to defaults…";
 "Restore default instructions" = "Restore default instructions";
 "RoomCast 1.0 Beta Release" = "RoomCast 1.0 Beta Release";
+"RoomCast FAQ" = "RoomCast FAQ";
 "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, WiFi needs No Internet." = "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, WiFi needs No Internet.";
 "RoomCast" = "RoomCast";
 "Save a PDF of the QR poster and open it. Print that PDF yourself." = "Save a PDF of the QR poster and open it. Print that PDF yourself.";

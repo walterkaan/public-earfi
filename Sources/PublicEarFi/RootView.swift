@@ -368,9 +368,10 @@ struct RunningTab: View {
         }
       }
       Spacer(minLength: 8)
-      HStack {
+      HStack(spacing: 10) {
         Spacer()
         GreenPushButton("Getting Started") { model.reopenGettingStarted() }
+        GreenPushButton("FAQ") { model.openFAQ() }
         Spacer()
       }
     }

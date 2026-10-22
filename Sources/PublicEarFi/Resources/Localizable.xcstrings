@@ -1397,6 +1397,28 @@
           }
         }
       }
+    },
+    "FAQ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FAQ"
+          }
+        }
+      }
+    },
+    "RoomCast FAQ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RoomCast FAQ"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
