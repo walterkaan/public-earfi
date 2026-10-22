@@ -927,7 +927,7 @@ struct EscapeCloser: NSViewRepresentable {
   }
 }
 
-private final class EscapeMonitorView: NSView {
+final class EscapeMonitorView: NSView {
   var onEscape: (() -> Void)?
   private var monitor: Any?
   private let mainTitle = "RoomCast 1.0 Beta Release"
