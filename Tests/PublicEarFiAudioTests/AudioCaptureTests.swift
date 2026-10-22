@@ -496,6 +496,7 @@ final class AudioCaptureTests: XCTestCase {
 
   /// Reduce Transparency makes the cards opaque. The hero still has to show in
   /// the gap between them, not only as a flat window colour.
+  @MainActor
   func testHeroBackdropShowsInTheGapsAroundOpaqueCards() throws {
     let renderer = ImageRenderer(content: HeroGapFixture())
     renderer.scale = 1
