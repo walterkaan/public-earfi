@@ -598,10 +598,7 @@ struct SettingsTab: View {
           }
           .labelsHidden()
         }
-        Button("Broadcast music from an app") { model.openMusicFAQ() }
-          .buttonStyle(.link)
-          .font(.caption)
-          .tint(AppChrome.heading)
+        GreenPushButton("Broadcast music from an app") { model.openMusicFAQ() }
         if model.selectedDevice?.isBluetooth == true {
           Text(
             "Bluetooth earbuds switch to call mode while they are the microphone. The mic stays speech quality. Their own playback drops to call quality, so the stage may be harder to hear. A wired or USB microphone, or separate wired headphones, avoids that. Turn Bluetooth off on your phone, and on any other nearby device paired to the earbuds, before you go live, so the phone does not take them back and cut the stream."
