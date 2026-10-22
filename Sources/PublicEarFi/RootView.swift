@@ -235,7 +235,12 @@ struct RunningTab: View {
           model.applyNow()
         }
       }
-      Spacer(minLength: 0)
+      Spacer(minLength: 8)
+      HStack {
+        Spacer()
+        GreenPushButton("Getting Started") { model.reopenGettingStarted() }
+        Spacer()
+      }
     }
   }
 

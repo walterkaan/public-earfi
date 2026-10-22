@@ -1101,17 +1101,6 @@
         }
       }
     },
-    "RoomCast sends sound from your Mac to people's phones over your Wi-Fi. That sound gets to the Mac from your Mac’s microphone (or a headset or earbuds), or from a mixing desk for bigger events. Listeners simply scan a provided QR code and listen with earphones on their phone. No sign-in, no cloud involvement. Just you and the listeners.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "RoomCast sends sound from your Mac to people's phones over your Wi-Fi. That sound gets to the Mac from your Mac’s microphone (or a headset or earbuds), or from a mixing desk for bigger events. Listeners simply scan a provided QR code and listen with earphones on their phone. No sign-in, no cloud involvement. Just you and the listeners."
-          }
-        }
-      }
-    },
     "Getting started": {
       "extractionState": "manual",
       "localizations": {
@@ -1119,61 +1108,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Getting started"
-          }
-        }
-      }
-    },
-    "1. When you close this window, settings will open. Choose your sound source in Settings, such as a USB audio interface or a microphone, then close the settings window.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1. When you close this window, settings will open. Choose your sound source in Settings, such as a USB audio interface or a microphone, then close the settings window."
-          }
-        }
-      }
-    },
-    "2. Press Start Broadcasting.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "2. Press Start Broadcasting."
-          }
-        }
-      }
-    },
-    "3. Print the QR poster, or show it on a screen, so people can scan it and listen. The QR code is always also shown on the main window.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "3. Print the QR poster, or show it on a screen, so people can scan it and listen. The QR code is always also shown on the main window."
-          }
-        }
-      }
-    },
-    "Two macOS prompts to expect. macOS will ask to let RoomCast use the microphone, so it can hear your sound source. If your firewall is on, it may also ask to allow incoming connections, which is how phones reach this Mac. Choose Allow for both and you’re set to go!": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Two macOS prompts to expect. macOS will ask to let RoomCast use the microphone, so it can hear your sound source. If your firewall is on, it may also ask to allow incoming connections, which is how phones reach this Mac. Choose Allow for both and you’re set to go!"
-          }
-        }
-      }
-    },
-    "Get started": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Get started"
           }
         }
       }
@@ -1218,6 +1152,138 @@
           "stringUnit": {
             "state": "translated",
             "value": "No device"
+          }
+        }
+      }
+    },
+    "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, and the Wi-Fi doesn't even need to be on the internet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, and the Wi-Fi doesn't even need to be on the internet."
+          }
+        }
+      }
+    },
+    "The sound can come from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The sound can come from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events."
+          }
+        }
+      }
+    },
+    "1. Choose your sound source in Settings, which opens when you click the button below.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. Choose your sound source in Settings, which opens when you click the button below."
+          }
+        }
+      }
+    },
+    "2. Optionally, add your Wi-Fi details so listeners get an easy join code.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. Optionally, add your Wi-Fi details so listeners get an easy join code."
+          }
+        }
+      }
+    },
+    "3. Click Start Broadcasting.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3. Click Start Broadcasting."
+          }
+        }
+      }
+    },
+    "4. Print the QR poster or show it on a screen. Listeners scan to join the Wi-Fi, scan again to listen, and use earphones. The audio QR code is always on the main window.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "4. Print the QR poster or show it on a screen. Listeners scan to join the Wi-Fi, scan again to listen, and use earphones. The audio QR code is always on the main window."
+          }
+        }
+      }
+    },
+    "Two macOS prompts to allow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Two macOS prompts to allow"
+          }
+        }
+      }
+    },
+    "• Microphone access, so RoomCast can hear your sound source.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "• Microphone access, so RoomCast can hear your sound source."
+          }
+        }
+      }
+    },
+    "• Incoming connections, if your firewall is on, so phones can reach this Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "• Incoming connections, if your firewall is on, so phones can reach this Mac."
+          }
+        }
+      }
+    },
+    "You're set to go!": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You're set to go!"
+          }
+        }
+      }
+    },
+    "Choose Sound Source": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Sound Source"
+          }
+        }
+      }
+    },
+    "Getting Started": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Getting Started"
           }
         }
       }

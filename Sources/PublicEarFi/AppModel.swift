@@ -248,6 +248,12 @@ final class AppModel: ObservableObject {
     pathWatcher.stop()
   }
 
+  /// Shows the welcome sheet again. Does not clear `roomcast.didFinishFirstRun`,
+  /// so a later launch still skips the sheet until the person finishes it.
+  func reopenGettingStarted() {
+    showFirstRun = true
+  }
+
   func finishFirstRun() {
     UserDefaults.standard.set(true, forKey: Self.firstRunKey)
     showFirstRun = false

@@ -11,9 +11,9 @@ struct PublicEarFiApp: App {
     WindowGroup {
       RootView()
         .environmentObject(model)
-        .frame(minWidth: 780, minHeight: 700)
+        .frame(minWidth: 780, minHeight: 748)
     }
-    .defaultSize(width: 880, height: 720)
+    .defaultSize(width: 880, height: 780)
     .commands {
       AppMenus(model: model)
     }
@@ -78,6 +78,11 @@ struct AppMenus: Commands {
         openWindow(id: "log")
       }
       .keyboardShortcut("l", modifiers: [.command])
+    }
+    CommandGroup(replacing: .help) {
+      Button("Getting Started") {
+        model.reopenGettingStarted()
+      }
     }
   }
 }

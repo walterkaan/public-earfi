@@ -303,35 +303,50 @@ struct FirstRunSheet: View {
         .frame(maxWidth: .infinity)
       Text("Welcome to RoomCast")
         .font(.title2.bold())
+        .foregroundStyle(AppChrome.startButton)
         .frame(maxWidth: .infinity)
       Text(
-        "RoomCast sends sound from your Mac to people's phones over your Wi-Fi. That sound gets to the Mac from your Mac’s microphone (or a headset or earbuds), or from a mixing desk for bigger events. Listeners simply scan a provided QR code and listen with earphones on their phone. No sign-in, no cloud involvement. Just you and the listeners."
+        "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, and the Wi-Fi doesn't even need to be on the internet."
       )
       .fixedSize(horizontal: false, vertical: true)
-      Text("Getting started")
-        .font(.headline)
+      Text(
+        "The sound can come from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events."
+      )
+      .fixedSize(horizontal: false, vertical: true)
+      sheetHeading("Getting started")
       VStack(alignment: .leading, spacing: 8) {
         Text(
-          "1. When you close this window, settings will open. Choose your sound source in Settings, such as a USB audio interface or a microphone, then close the settings window."
+          "1. Choose your sound source in Settings, which opens when you click the button below."
         )
-        Text("2. Press Start Broadcasting.")
+        Text("2. Optionally, add your Wi-Fi details so listeners get an easy join code.")
+        Text("3. Click Start Broadcasting.")
         Text(
-          "3. Print the QR poster, or show it on a screen, so people can scan it and listen. The QR code is always also shown on the main window."
+          "4. Print the QR poster or show it on a screen. Listeners scan to join the Wi-Fi, scan again to listen, and use earphones. The audio QR code is always on the main window."
         )
       }
       .fixedSize(horizontal: false, vertical: true)
-      Text(
-        "Two macOS prompts to expect. macOS will ask to let RoomCast use the microphone, so it can hear your sound source. If your firewall is on, it may also ask to allow incoming connections, which is how phones reach this Mac. Choose Allow for both and you’re set to go!"
-      )
+      sheetHeading("Two macOS prompts to allow")
+      VStack(alignment: .leading, spacing: 8) {
+        Text("• Microphone access, so RoomCast can hear your sound source.")
+        Text("• Incoming connections, if your firewall is on, so phones can reach this Mac.")
+      }
       .fixedSize(horizontal: false, vertical: true)
+      sheetHeading("You're set to go!")
       HStack {
         Spacer()
-        Button("Get started") { model.finishFirstRun() }
+        GreenPushButton("Choose Sound Source") { model.finishFirstRun() }
           .keyboardShortcut(.defaultAction)
+        Spacer()
       }
     }
     .padding(24)
     .frame(width: 560)
+  }
+
+  private func sheetHeading(_ text: LocalizedStringKey) -> some View {
+    Text(text)
+      .font(.headline)
+      .foregroundStyle(AppChrome.startButton)
   }
 }
 
