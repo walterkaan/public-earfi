@@ -12,6 +12,7 @@ struct PublicEarFiApp: App {
       RootView()
         .environmentObject(model)
         .frame(minWidth: 780, minHeight: 748)
+        .preferredColorScheme(.dark)
     }
     .defaultSize(width: 880, height: 780)
     .commands {
@@ -21,12 +22,14 @@ struct PublicEarFiApp: App {
     Settings {
       SettingsTab()
         .environmentObject(model)
+        .preferredColorScheme(.dark)
     }
 
     Window("Poster", id: "poster") {
       PosterTab()
         .environmentObject(model)
         .frame(minWidth: 860, minHeight: 640)
+        .preferredColorScheme(.dark)
     }
     .defaultSize(width: 980, height: 720)
 
@@ -34,6 +37,7 @@ struct PublicEarFiApp: App {
       LogWindow()
         .environmentObject(model)
         .frame(minWidth: 520, minHeight: 320)
+        .preferredColorScheme(.dark)
     }
     .defaultSize(width: 720, height: 480)
   }

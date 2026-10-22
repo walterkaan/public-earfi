@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Build the RoomCast app icon.
 
-The source artwork is design/icon-loudhailer.jpg (Walter's yellow loudhailer
-on purple). `python3 scripts/make_icon.py --generate` writes a macOS AppIcon
-set: every standard size, PNG, with the white page margin removed and the
-corners outside the squircle transparent.
+The source artwork is design/icon-room-source.jpg (a violet house, teal
+Wi-Fi waves, and pink headphones on dark navy, photographed on a white page).
+`python3 scripts/make_icon.py --generate` writes a macOS AppIcon set: every
+standard size, PNG, with the white page margin removed and the corners
+outside the squircle transparent.
 
 `python3 scripts/make_icon.py build/AppIcon.icns` packs that set with iconutil.
 The bundle loads the icns via CFBundleIconFile. The asset catalog is the
@@ -18,7 +19,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "design" / "icon-loudhailer.jpg"
+SOURCE = ROOT / "design" / "icon-room-source.jpg"
 APPICON = (
     ROOT
     / "Sources"
@@ -92,9 +93,9 @@ def generate() -> None:
                 if 0 <= nx < width and 0 <= ny < height and outside[ny * width + nx]:
                     touches_outside = True
                     break
-            if touches_outside and distance(red, green, blue) < 160:
-                # Green separates the purple squircle from the white page.
-                alpha = max(0, min(255, int(round((255 - green) / (255 - 55) * 255))))
+            if touches_outside and distance(red, green, blue) < 210:
+                # The JPEG blends the squircle into the white page.
+                alpha = max(0, min(255, distance(red, green, blue)))
                 if alpha < 20:
                     output[x, y] = (0, 0, 0, 0)
                     continue

@@ -18,7 +18,8 @@ let coreTarget: Target = .target(
   name: "PublicEarFiCore",
   path: "Sources/PublicEarFiCore",
   resources: [
-    .copy("ListenerPage.en.json")
+    .copy("ListenerPage.en.json"),
+    .copy("favicon.png"),
   ]
 )
 

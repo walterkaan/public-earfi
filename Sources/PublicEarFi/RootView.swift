@@ -21,7 +21,8 @@ struct RootView: View {
       MainWindowTitle(title: "RoomCast 1.0 Beta Release")
         .frame(width: 0, height: 0)
     }
-    .toolbarBackground(.automatic, for: .windowToolbar)
+    .preferredColorScheme(.dark)
+    .toolbarBackground(AppChrome.window, for: .windowToolbar)
     .onAppear { model.onAppear() }
     .sheet(isPresented: $model.showFirstRun) { FirstRunSheet() }
     .sheet(isPresented: $model.showWhy) { WhySheet() }
@@ -57,12 +58,12 @@ struct Card<Content: View>: View {
         stack
           .background {
             RoundedRectangle(cornerRadius: 8)
-              .fill(Color(nsColor: .textBackgroundColor))
+              .fill(AppChrome.card)
             RoundedRectangle(cornerRadius: 8)
               .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8))
           }
           .clipShape(RoundedRectangle(cornerRadius: 8))
-          .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.28)))
+          .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppChrome.cardBorder))
       } else {
         stack.modifier(OpaqueCardPlate())
       }
@@ -76,9 +77,9 @@ struct Card<Content: View>: View {
 private struct OpaqueCardPlate: ViewModifier {
   func body(content: Content) -> some View {
     content
-      .background(Color(nsColor: .textBackgroundColor))
+      .background(AppChrome.card)
       .clipShape(RoundedRectangle(cornerRadius: 8))
-      .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.28)))
+      .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppChrome.cardBorder))
   }
 }
 
@@ -107,16 +108,32 @@ private final class TitleView: NSView {
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
     window?.title = title
-    // Near-black field. Gaps stay this colour if a card does not cover them.
-    window?.backgroundColor = NSColor(
-      srgbRed: 11.0 / 255, green: 10.0 / 255, blue: 20.0 / 255, alpha: 1)
+    // Navy field. The dimmed hero shows in the gaps the cards do not cover.
+    window?.backgroundColor = AppChrome.windowNSColor
   }
 }
 
 enum AppChrome {
-  /// Fill of Start Broadcasting. Section headings keep this green while Stop is red.
-  static let startButton = Color(red: 0.16, green: 0.55, blue: 0.28)
+  static let windowRed = 22.0 / 255
+  static let windowGreen = 26.0 / 255
+  static let windowBlue = 66.0 / 255
+  /// Dark navy behind the dimmed hero. #161a42
+  static let window = Color(red: windowRed, green: windowGreen, blue: windowBlue)
+  static var windowNSColor: NSColor {
+    NSColor(srgbRed: windowRed, green: windowGreen, blue: windowBlue, alpha: 1)
+  }
+  /// Separate card fill. #1c1f3a
+  static let card = Color(red: 28.0 / 255, green: 31.0 / 255, blue: 58.0 / 255)
+  static let cardBorder = Color.white.opacity(0.14)
+  /// Section headings and the level meter. #2fd0bd
+  static let heading = Color(red: 47.0 / 255, green: 208.0 / 255, blue: 189.0 / 255)
+  /// Start, copy, settings, and the other primary actions. #8b5cf6
+  static let primary = Color(red: 139.0 / 255, green: 92.0 / 255, blue: 246.0 / 255)
+  /// Ko-fi, Patreon, and Buy Me a Coffee. #f472b6
+  static let support = Color(red: 244.0 / 255, green: 114.0 / 255, blue: 182.0 / 255)
   static let stopButton = Color(red: 0.84, green: 0.25, blue: 0.18)
+  /// The website hero stays visible in the gaps, softer than the cards.
+  static let heroOpacity = 0.72
 }
 
 struct SectionLabel: View {
@@ -126,7 +143,7 @@ struct SectionLabel: View {
     Text(text)
       .textCase(.uppercase)
       .font(.system(size: 11, weight: .semibold))
-      .foregroundStyle(AppChrome.startButton)
+      .foregroundStyle(AppChrome.heading)
       .tracking(0.6)
   }
 }
@@ -136,18 +153,27 @@ struct RunningTab: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      BroadcastButton(
-        title: buttonTitle,
-        isStop: isStop,
-        showsProgress: isStarting
-      ) {
-        model.toggleBroadcast()
+      HStack {
+        Image(nsImage: NSApp.applicationIconImage)
+          .resizable()
+          .interpolation(.high)
+          .frame(width: 48, height: 48)
+          .accessibilityLabel("RoomCast")
+        Spacer()
       }
 
       Card {
+        SectionLabel(text: "Broadcast")
         HStack(spacing: 8) {
           Circle().fill(statusColor).frame(width: 10, height: 10)
           Text(model.statusLine()).fontWeight(.semibold)
+        }
+        BroadcastButton(
+          title: buttonTitle,
+          isStop: isStop,
+          showsProgress: isStarting
+        ) {
+          model.toggleBroadcast()
         }
         if case .stopped = model.phase {
           GreenPushButton("Change Sound Source") { model.openSettings() }
@@ -167,6 +193,7 @@ struct RunningTab: View {
         HStack {
           Text("Volume").foregroundStyle(.secondary).frame(width: 90, alignment: .leading)
           Slider(value: gainBinding, in: InputGain.minimumDB...InputGain.maximumDB)
+            .tint(AppChrome.heading)
           Text(InputGain.label(model.settings.inputGainDB))
             .foregroundStyle(.secondary)
             .frame(width: 64, alignment: .trailing)
@@ -197,6 +224,7 @@ struct RunningTab: View {
       }
 
       Card {
+        SectionLabel(text: "Listen")
         HStack(alignment: .top, spacing: 14) {
           Button {
             model.showQR = true
@@ -206,7 +234,6 @@ struct RunningTab: View {
           .buttonStyle(.plain)
           .help("Show the QR code full screen")
           VStack(alignment: .leading, spacing: 6) {
-            SectionLabel(text: "Listeners open")
             Text(model.listenerURL ?? "No LAN address yet")
               .font(.system(.body, design: .monospaced))
               .textSelection(.enabled)
@@ -310,7 +337,7 @@ struct RunningTab: View {
   private var statusColor: Color {
     switch model.phase {
     case .live:
-      return .green
+      return AppChrome.heading
     case .starting:
       return .orange
     case .stopped:
@@ -364,28 +391,33 @@ enum AppLinks {
 struct SupportLinks: View {
   var body: some View {
     HStack(spacing: 10) {
-      GreenLinkButton("Ko-fi", destination: AppLinks.kofi)
-      GreenLinkButton("Patreon", destination: AppLinks.patreon)
-      GreenLinkButton("Buy Me a Coffee", destination: AppLinks.buyMeACoffee)
+      GreenLinkButton("Ko-fi", destination: AppLinks.kofi, fill: AppChrome.support)
+      GreenLinkButton("Patreon", destination: AppLinks.patreon, fill: AppChrome.support)
+      GreenLinkButton(
+        "Buy Me a Coffee", destination: AppLinks.buyMeACoffee, fill: AppChrome.support)
     }
     .frame(maxWidth: .infinity)
   }
 }
 
-/// Green fill and white text on every macOS version. The glass button style
-/// drew black on black on macOS 26, so these controls keep the solid fill.
+/// Solid violet fill and white text on every macOS version. The glass button
+/// style drew black on black on macOS 26, so these controls keep the solid fill.
 struct GreenPushButton: View {
   var title: LocalizedStringKey
+  var fill: Color
   var action: () -> Void
 
-  init(_ title: LocalizedStringKey, action: @escaping () -> Void) {
+  init(
+    _ title: LocalizedStringKey, fill: Color = AppChrome.primary, action: @escaping () -> Void
+  ) {
     self.title = title
+    self.fill = fill
     self.action = action
   }
 
   var body: some View {
     Button(action: action) {
-      SolidGreenLabel(title: title, large: false)
+      SolidGreenLabel(title: title, large: false, fill: fill)
     }
     .buttonStyle(.plain)
   }
@@ -394,21 +426,23 @@ struct GreenPushButton: View {
 struct GreenLinkButton: View {
   var title: LocalizedStringKey
   var destination: URL
+  var fill: Color
 
-  init(_ title: LocalizedStringKey, destination: URL) {
+  init(_ title: LocalizedStringKey, destination: URL, fill: Color = AppChrome.primary) {
     self.title = title
     self.destination = destination
+    self.fill = fill
   }
 
   var body: some View {
     Link(destination: destination) {
-      SolidGreenLabel(title: title, large: false)
+      SolidGreenLabel(title: title, large: false, fill: fill)
     }
     .buttonStyle(.plain)
   }
 }
 
-/// Start stays large and green. Stop stays solid red. Both keep a solid fill
+/// Start stays large and violet. Stop stays solid red. Both keep a solid fill
 /// so the label stays readable on macOS 26.
 struct BroadcastButton: View {
   var title: String
@@ -437,7 +471,7 @@ struct BroadcastButton: View {
     Button(action: action) {
       label
         .foregroundStyle(.white)
-        .background(isStop ? AppChrome.stopButton : AppChrome.startButton)
+        .background(isStop ? AppChrome.stopButton : AppChrome.primary)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .contentShape(RoundedRectangle(cornerRadius: 10))
     }
@@ -448,6 +482,7 @@ struct BroadcastButton: View {
 private struct SolidGreenLabel: View {
   var title: LocalizedStringKey
   var large: Bool
+  var fill: Color
 
   var body: some View {
     Text(title)
@@ -457,7 +492,7 @@ private struct SolidGreenLabel: View {
       .padding(.horizontal, large ? 16 : 12)
       .padding(.vertical, large ? 12 : 6)
       .frame(maxWidth: large ? .infinity : nil)
-      .background(AppChrome.startButton)
+      .background(fill)
       .clipShape(RoundedRectangle(cornerRadius: large ? 10 : 8))
       .contentShape(RoundedRectangle(cornerRadius: large ? 10 : 8))
   }
@@ -471,7 +506,7 @@ struct LevelBar: View {
       ZStack(alignment: .leading) {
         RoundedRectangle(cornerRadius: 3).fill(Color.gray.opacity(0.15))
         RoundedRectangle(cornerRadius: 3)
-          .fill(AppChrome.startButton)
+          .fill(AppChrome.heading)
           .frame(width: geometry.size.width * min(1, max(0, fraction)))
       }
     }
@@ -509,6 +544,7 @@ struct SettingsTab: View {
       }
       settingsSaveRow
     }
+    .background(AppChrome.window)
     .background(CloseSettingsWindow(request: closeSettingsRequest))
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .id(model.settingsRevision)

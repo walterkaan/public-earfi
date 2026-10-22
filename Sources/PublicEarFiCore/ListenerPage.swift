@@ -95,9 +95,24 @@ public enum ListenerPage {
       .replacingOccurrences(of: ">", with: "\\u003e")
   }
 
+  /// Tab icon for the listener page. Empty when the PNG is not in the bundle.
+  static let faviconHref: String = {
+    for bundle in [Bundle.main, Bundle.module] {
+      guard let url = bundle.url(forResource: "favicon", withExtension: "png"),
+        let data = try? Data(contentsOf: url), !data.isEmpty
+      else { continue }
+      return "data:image/png;base64," + data.base64EncodedString()
+    }
+    return ""
+  }()
+
   public static func html(title: String) -> String {
     let safeTitle = htmlEscape(title)
     let scriptTitle = jsonForScript(title: title)
+    let icon =
+      faviconHref.isEmpty
+      ? ""
+      : "<link rel=\"icon\" type=\"image/png\" href=\"\(faviconHref)\">"
     return """
       <!doctype html>
       <html>
@@ -105,9 +120,10 @@ public enum ListenerPage {
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width">
       <title>\(safeTitle)</title>
+      \(icon)
       <style>
-      html,body{margin:0;padding:0;height:100%;font-family:Arial,sans-serif}
-      #video{position:absolute;top:0;left:0;width:100%;height:100%;background:rgb(30,30,30)}
+      html,body{margin:0;padding:0;height:100%;background:#161a42;font-family:Arial,sans-serif;color:#fff}
+      #video{position:absolute;top:0;left:0;width:100%;height:100%;background:#161a42}
       #message{position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;text-align:center;justify-content:center;font-size:16px;font-weight:bold;color:#fff;pointer-events:none;padding:20px;box-sizing:border-box;text-shadow:0 0 5px #000}
       </style>
       <script defer src="\(readerPath)"></script>

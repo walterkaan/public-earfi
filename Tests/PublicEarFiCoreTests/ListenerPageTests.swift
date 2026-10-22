@@ -71,6 +71,8 @@ final class ListenerPageTests: XCTestCase {
     XCTAssertFalse(plain.contains("get(\"title\")"))
     XCTAssertTrue(plain.contains("new URL(\"/whep\""))
     XCTAssertTrue(plain.contains("The listener page could not load."))
+    XCTAssertTrue(plain.contains("background:#161a42"))
+    XCTAssertTrue(plain.contains("rel=\"icon\""))
 
     let awkward = ListenerPage.html(title: "A & B <live>")
     XCTAssertTrue(awkward.contains("<title>A &amp; B &lt;live&gt;</title>"))

@@ -2,7 +2,7 @@ import AppKit
 import Darwin
 import SwiftUI
 
-/// Website hero, drawn behind the main-window cards on a near-black field.
+/// Website hero, drawn dimmed behind the main-window cards on dark navy.
 ///
 /// A violet monitor sits on the left, with pink rings expanding behind it.
 /// Three teal arcs travel right and fade. Three pink phones on the right,
@@ -149,16 +149,20 @@ enum HeroMotion {
   ) {
     context.fill(
       Path(CGRect(origin: .zero, size: size)),
-      with: .color(HeroPalette.backdrop)
+      with: .color(AppChrome.window)
     )
     // Stretch to the window. A fitted scene sat in a short band and the gaps
-    // around the cards stayed empty.
+    // around the cards stayed empty. Dim the illustration on the navy field.
     var scene = context
     scene.scaleBy(x: size.width / sceneSize.width, y: size.height / sceneSize.height)
-    drawRings(in: &scene, time: time, live: live)
-    drawArcs(in: &scene, time: time, live: live)
+    var rings = scene
+    rings.opacity = AppChrome.heroOpacity
+    drawRings(in: &rings, time: time, live: live)
+    var arcs = scene
+    arcs.opacity = AppChrome.heroOpacity
+    drawArcs(in: &arcs, time: time, live: live)
     var devices = scene
-    devices.opacity = deviceOpacity(live: live)
+    devices.opacity = deviceOpacity(live: live) * AppChrome.heroOpacity
     drawMonitor(in: &devices)
     drawPhones(in: &devices, time: time, live: live, level: level)
   }

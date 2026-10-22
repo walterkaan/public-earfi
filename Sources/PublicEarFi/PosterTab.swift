@@ -100,7 +100,7 @@ struct PosterTab: View {
       VStack {
         preview
           .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .background(Color(nsColor: .controlBackgroundColor))
+          .background(AppChrome.card)
           .clipShape(RoundedRectangle(cornerRadius: 8))
         Text("Preview and PDF")
           .font(.caption)
@@ -109,6 +109,7 @@ struct PosterTab: View {
     }
     .padding(12)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .background(AppChrome.window)
     .sheet(isPresented: $model.showWhy) { WhySheet() }
   }
 
@@ -197,11 +198,10 @@ struct CreditsSheet: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack(alignment: .top, spacing: 12) {
-        ZStack {
-          RoundedRectangle(cornerRadius: 10).fill(Color(red: 0.18, green: 0.43, blue: 0.89))
-          Text("EF").font(.headline).foregroundStyle(.white)
-        }
-        .frame(width: 44, height: 44)
+        Image(nsImage: NSApp.applicationIconImage)
+          .resizable()
+          .interpolation(.high)
+          .frame(width: 44, height: 44)
         VStack(alignment: .leading, spacing: 2) {
           Text("RoomCast \(model.versionLabel)").font(.headline)
           Text("Copyright (c) 2026 Walter Kaan · MIT License")
@@ -225,7 +225,7 @@ struct CreditsSheet: View {
                   .font(.caption)
                   .padding(.horizontal, 6)
                   .padding(.vertical, 2)
-                  .background(Color.blue.opacity(0.12))
+                  .background(AppChrome.primary.opacity(0.22))
                   .clipShape(RoundedRectangle(cornerRadius: 4))
                 Text(component.notes)
                   .font(.caption)
@@ -274,7 +274,7 @@ struct LogWindow: View {
     VStack(alignment: .leading) {
       Text("Log")
         .font(.headline)
-        .foregroundStyle(AppChrome.startButton)
+        .foregroundStyle(AppChrome.heading)
       ScrollView {
         Text(model.logLines.joined(separator: "\n"))
           .font(.system(size: 11, design: .monospaced))
@@ -288,6 +288,7 @@ struct LogWindow: View {
     }
     .padding(16)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .background(AppChrome.window)
   }
 }
 
@@ -303,7 +304,7 @@ struct FirstRunSheet: View {
         .frame(maxWidth: .infinity)
       Text("Welcome to RoomCast")
         .font(.title2.bold())
-        .foregroundStyle(AppChrome.startButton)
+        .foregroundStyle(AppChrome.heading)
         .frame(maxWidth: .infinity)
       Text(
         "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, WiFi needs No Internet."
@@ -341,12 +342,13 @@ struct FirstRunSheet: View {
     }
     .padding(24)
     .frame(width: 560)
+    .background(AppChrome.window)
   }
 
   private func sheetHeading(_ text: LocalizedStringKey) -> some View {
     Text(text)
       .font(.headline)
-      .foregroundStyle(AppChrome.startButton)
+      .foregroundStyle(AppChrome.heading)
   }
 }
 
@@ -356,7 +358,7 @@ struct WhySheet: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      Text("Keep the printed address stable").font(.headline)
+      Text("Keep the printed address stable").font(.headline).foregroundStyle(AppChrome.heading)
       Text(
         "The poster QR code contains this Mac’s current IP address. If the address changes, phones still looking at the old poster cannot connect."
       )
