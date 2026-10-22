@@ -55,6 +55,9 @@ jobs:
       - name: Build and ad-hoc sign the app
         run: ./scripts/build-app.sh
 
+      - name: Serve the listener page from the app bundle
+        run: ./scripts/check-listener-page.sh dist/RoomCast.app
+
       - name: Check credits, architectures, and the signature
         run: |
           set -euo pipefail

@@ -59,31 +59,10 @@ public enum ListenerPage {
   }
 
   /// English copy for the phone page. `ListenerPage.en.json` is the file
-  /// translators edit. The running app reads that file from its Resources.
+  /// translators edit. The running app reads that file from its Resources,
+  /// then from the copied SwiftPM bundle. A missing file keeps the fallback.
   static func pageCopy(_ key: String) -> String {
-    jsEscape(pageStrings[key] ?? key)
-  }
-
-  private static let pageStringFallback = [
-    "loadError": "The listener page could not load."
-  ]
-
-  private static var pageStrings: [String: String] {
-    if let found = loadPageStrings(in: .main) {
-      return pageStringFallback.merging(found) { _, new in new }
-    }
-    if let found = loadPageStrings(in: .module) {
-      return pageStringFallback.merging(found) { _, new in new }
-    }
-    return pageStringFallback
-  }
-
-  private static func loadPageStrings(in bundle: Bundle) -> [String: String]? {
-    guard let url = bundle.url(forResource: "ListenerPage.en", withExtension: "json"),
-      let data = try? Data(contentsOf: url),
-      let object = try? JSONSerialization.jsonObject(with: data) as? [String: String]
-    else { return nil }
-    return object
+    jsEscape(CoreResources.pageStrings()[key] ?? key)
   }
 
   private static func jsEscape(_ text: String) -> String {
@@ -95,16 +74,9 @@ public enum ListenerPage {
       .replacingOccurrences(of: ">", with: "\\u003e")
   }
 
-  /// Tab icon for the listener page. Empty when the PNG is not in the bundle.
-  static let faviconHref: String = {
-    for bundle in [Bundle.main, Bundle.module] {
-      guard let url = bundle.url(forResource: "favicon", withExtension: "png"),
-        let data = try? Data(contentsOf: url), !data.isEmpty
-      else { continue }
-      return "data:image/png;base64," + data.base64EncodedString()
-    }
-    return ""
-  }()
+  /// Tab icon for the listener page. Empty when the PNG is not in the app,
+  /// so the page still loads. This does not call `Bundle.module`.
+  static let faviconHref: String = CoreResources.faviconDataURI()
 
   public static func html(title: String) -> String {
     let safeTitle = htmlEscape(title)

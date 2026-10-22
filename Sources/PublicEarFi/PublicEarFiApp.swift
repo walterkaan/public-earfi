@@ -3,6 +3,15 @@ import PublicEarFiCore
 import SwiftUI
 
 @main
+enum RoomCastMain {
+  static func main() {
+    if CommandLine.arguments.contains("--listener-page-self-test") {
+      exit(ListenerPageSelfTest.run())
+    }
+    PublicEarFiApp.main()
+  }
+}
+
 struct PublicEarFiApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
   @StateObject private var model = AppModel()

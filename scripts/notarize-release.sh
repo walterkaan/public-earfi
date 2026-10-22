@@ -17,6 +17,9 @@ export SIGN_IDENTITY="$IDENTITY"
 export PUBLIC_EARFI_VERSION="$VERSION"
 
 "$ROOT/scripts/build-app.sh"
+# build-app.sh installed the resource bundles before it signed. Serve the
+# listener page from that signed app, and refuse to notarise if they are gone.
+"$ROOT/scripts/check-listener-page.sh" "$ROOT/dist/RoomCast.app"
 "$ROOT/scripts/package-dmg.sh"
 
 APP="$ROOT/dist/RoomCast.app"

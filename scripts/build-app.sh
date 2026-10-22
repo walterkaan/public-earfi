@@ -53,12 +53,20 @@ cp "$ROOT/Sources/PublicEarFi/Resources/en.lproj/Localizable.strings" \
   "$APP/Contents/Resources/en.lproj/Localizable.strings"
 cp "$ROOT/Sources/PublicEarFiCore/ListenerPage.en.json" \
   "$APP/Contents/Resources/ListenerPage.en.json"
+# SwiftPM resource bundles, before the signature. The listener page reads
+# these from Contents/Resources and must not call Bundle.module.
+"$ROOT/scripts/install-app-resources.sh" "$APP" \
+  "$ROOT/build/swift-arm64/release" \
+  "$ROOT/build/swift-x86_64/release"
 
 sed \
   -e "s/__VERSION__/${VERSION}/g" \
   -e "s/__BUILD__/${BUILD_NUMBER}/g" \
   -e "s/__COMMIT__/${COMMIT}/g" \
   "$ROOT/scripts/Info.plist.in" > "$APP/Contents/Info.plist"
+# Serve the page from the assembled app before it is signed. Notarization
+# runs the same check again on the signed copy.
+"$ROOT/scripts/check-listener-page.sh" "$APP"
 
 export SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 "$ROOT/scripts/sign-app.sh" "$APP"

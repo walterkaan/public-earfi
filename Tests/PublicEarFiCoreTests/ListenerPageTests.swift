@@ -82,6 +82,55 @@ final class ListenerPageTests: XCTestCase {
     XCTAssertTrue(ListenerPage.json(title: "A & B").contains("\"title\":\"A & B\""))
   }
 
+  func testMissingAppResourcesDoNotCrashAndLeaveTheFaviconOff() throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    XCTAssertNil(CoreResources.file(name: "favicon", extension: "png", searching: root))
+    XCTAssertEqual(CoreResources.faviconDataURI(searching: root), "")
+    XCTAssertEqual(
+      CoreResources.pageStrings(searching: root)["loadError"],
+      "The listener page could not load."
+    )
+    let page = ListenerPage.html(title: "RoomCast Broadcast")
+    XCTAssertTrue(page.contains("<title>RoomCast Broadcast</title>"))
+  }
+
+  func testLooseAppResourcesWinAndThePackageBundleIsTheFallback() throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let resources = root.appendingPathComponent("Contents/Resources")
+    let bundle = resources.appendingPathComponent("\(CoreResources.packageBundleName).bundle")
+    try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+    let loose = Data([0x89, 0x50, 0x4E, 0x47, 0x01])
+    let nested = Data([0x89, 0x50, 0x4E, 0x47, 0x02])
+    try loose.write(to: resources.appendingPathComponent("favicon.png"))
+    try nested.write(to: bundle.appendingPathComponent("favicon.png"))
+    try Data("{\"loadError\":\"from the app\"}".utf8).write(
+      to: bundle.appendingPathComponent("ListenerPage.en.json"))
+
+    let fromLoose = CoreResources.faviconDataURI(searching: root)
+    XCTAssertEqual(fromLoose, "data:image/png;base64," + loose.base64EncodedString())
+    XCTAssertEqual(
+      CoreResources.pageStrings(searching: root)["loadError"], "from the app")
+
+    try FileManager.default.removeItem(at: resources.appendingPathComponent("favicon.png"))
+    let fromBundle = CoreResources.faviconDataURI(searching: root)
+    XCTAssertEqual(fromBundle, "data:image/png;base64," + nested.base64EncodedString())
+  }
+
+  func testDevelopmentBundleStillProvidesTheFaviconAndStrings() {
+    XCTAssertTrue(CoreResources.faviconDataURI().hasPrefix("data:image/png;base64,"))
+    XCTAssertEqual(
+      CoreResources.pageStrings()["loadError"], "The listener page could not load.")
+  }
+
+  private func temporaryDirectory() throws -> URL {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "roomcast-resources-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    return root
+  }
+
   func testListenerPageServesRootRedirectsLiveAndProxiesWHEP() throws {
     let upstream = try TestSocketServer()
     upstream.reply = """
