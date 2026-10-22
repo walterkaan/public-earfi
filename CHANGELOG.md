@@ -4,7 +4,8 @@
 
 First MVP build of RoomCast.
 
-- The app name is RoomCast. The bundle id is `channel.roomcast.app`, the program is `RoomCast.app`, and logs and settings use new RoomCast folders. An older `Public EarFi.app` helper is still recognised. The home screen links to Ko-fi and Patreon. The listener page copy is in `ListenerPage.en.json`, and the Mac UI strings are in `Localizable.xcstrings`.
+- The app name is RoomCast. The bundle id is `channel.roomcast.app`, the program is `RoomCast.app`, and logs and settings use new RoomCast folders. An older `Public EarFi.app` helper is still recognised. The home screen links to Ko-fi and Patreon. Buy Me a Coffee stays hidden until it has an address. The listener page copy is in `ListenerPage.en.json`, and the Mac UI strings are in `Localizable.xcstrings`.
+- Settings keeps Advanced open in its own card, the same shape as This Mac, with the controls on the left. Section headings on the main window, Settings, and the log use the Start Broadcasting green. The whole Start Broadcasting button accepts a click.
 - SwiftUI app. The main window is the broadcast. Settings opens with Cmd-, from the app menu. The poster and the log are their own windows. Credits stays in Settings and About.
 - App icon: Walter's yellow loudhailer on purple, masked to a squircle with transparent corners.
 - Default quality is Speech: mono, 32 kbps, for about 30 phones on venue Wi-Fi. The encode rate is fixed at 48 kHz in 20 ms frames. There is no sample-rate picker. The app captures with Core Audio and pipes 48 kHz PCM to ffmpeg, because ffmpeg's AVFoundation capture clicks even when the same device is clean in other apps.

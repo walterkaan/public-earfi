@@ -177,28 +177,6 @@
         }
       }
     },
-    "Buy Me a Coffee": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Buy Me a Coffee"
-          }
-        }
-      }
-    },
-    "Buy Me a Coffee is not linked yet.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Buy Me a Coffee is not linked yet."
-          }
-        }
-      }
-    },
     "Cancel": {
       "extractionState": "manual",
       "localizations": {

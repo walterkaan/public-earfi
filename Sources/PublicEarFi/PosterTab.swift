@@ -272,7 +272,9 @@ struct LogWindow: View {
 
   var body: some View {
     VStack(alignment: .leading) {
-      Text("Log").font(.headline)
+      Text("Log")
+        .font(.headline)
+        .foregroundStyle(AppChrome.startButton)
       ScrollView {
         Text(model.logLines.joined(separator: "\n"))
           .font(.system(size: 11, design: .monospaced))

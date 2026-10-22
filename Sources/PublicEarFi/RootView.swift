@@ -41,13 +41,19 @@ struct Card<Content: View>: View {
   }
 }
 
+enum AppChrome {
+  /// Fill of Start Broadcasting. Section headings keep this green while Stop is red.
+  static let startButton = Color(red: 0.16, green: 0.55, blue: 0.28)
+  static let stopButton = Color(red: 0.84, green: 0.25, blue: 0.18)
+}
+
 struct SectionLabel: View {
   var text: String
 
   var body: some View {
     Text(text.uppercased())
       .font(.system(size: 11, weight: .semibold))
-      .foregroundStyle(.secondary)
+      .foregroundStyle(AppChrome.startButton)
       .tracking(0.6)
   }
 }
@@ -67,11 +73,12 @@ struct RunningTab: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
+        .foregroundStyle(.white)
+        .background(buttonColor)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .contentShape(RoundedRectangle(cornerRadius: 10))
       }
       .buttonStyle(.plain)
-      .foregroundStyle(.white)
-      .background(buttonColor)
-      .clipShape(RoundedRectangle(cornerRadius: 10))
 
       Card {
         HStack(spacing: 8) {
@@ -214,9 +221,9 @@ struct RunningTab: View {
   private var buttonColor: Color {
     switch model.phase {
     case .stopped, .starting, .blocked:
-      return Color(red: 0.16, green: 0.55, blue: 0.28)
+      return AppChrome.startButton
     default:
-      return Color(red: 0.84, green: 0.25, blue: 0.18)
+      return AppChrome.stopButton
     }
   }
 
@@ -272,16 +279,13 @@ enum AppLinks {
   static let patreon = URL(string: "https://www.patreon.com/roomcastapp")!
 }
 
-/// Ko-fi and Patreon sit on the home screen. Buy Me a Coffee stays as a slot
-/// until its address is confirmed, and it does not open a page.
+/// Ko-fi and Patreon sit on the home screen. Buy Me a Coffee stays hidden
+/// until its address is confirmed.
 struct SupportLinks: View {
   var body: some View {
     HStack(spacing: 16) {
       Link("Ko-fi", destination: AppLinks.kofi)
       Link("Patreon", destination: AppLinks.patreon)
-      Text("Buy Me a Coffee")
-        .foregroundStyle(.tertiary)
-        .help("Buy Me a Coffee is not linked yet.")
     }
     .font(.caption)
     .frame(maxWidth: .infinity)
@@ -491,7 +495,8 @@ struct SettingsTab: View {
             Text(message).font(.caption).foregroundStyle(.orange)
           }
         }
-        DisclosureGroup("Advanced") {
+        Card {
+          SectionLabel(text: "Advanced")
           LabeledRow(title: "ICE port") {
             TextField("8189", text: iceText).frame(width: 80)
           }
