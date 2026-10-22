@@ -25,6 +25,7 @@
 "Change Sound Source" = "Change Sound Source";
 "Choose Sound Source" = "Choose Sound Source";
 "Closing the laptop lid will still sleep the Mac unless it is on power with an external display." = "Closing the laptop lid will still sleep the Mac unless it is on power with an external display.";
+"Collapsed" = "Collapsed";
 "Continue" = "Continue";
 "Copy Listener Link" = "Copy Listener Link";
 "Copy QR Image" = "Copy QR Image";
@@ -38,6 +39,7 @@
 "Description" = "Description";
 "Done" = "Done";
 "EF" = "EF";
+"Expanded" = "Expanded";
 "Export PDF…" = "Export PDF…";
 "Export Poster PDF…" = "Export Poster PDF…";
 "Getting Started" = "Getting Started";
@@ -45,6 +47,7 @@
 "Guest Wi-Fi with client isolation, and separate VLANs, also block listeners." = "Guest Wi-Fi with client isolation, and separate VLANs, also block listeners.";
 "Header" = "Header";
 "Hidden network" = "Hidden network";
+"ICE port, URL style, listeners, log, bitrate" = "ICE port, URL style, listeners, log, bitrate";
 "IP address" = "IP address";
 "IP" = "IP";
 "If the macOS firewall is on, it will ask to allow incoming connections for mediamtx. That is the listener server. Choose Allow. If phones cannot connect later, check System Settings → Network → Firewall." = "If the macOS firewall is on, it will ask to allow incoming connections for mediamtx. That is the listener server. Choose Allow. If phones cannot connect later, check System Settings → Network → Firewall.";
@@ -60,6 +63,7 @@
 "Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start." = "Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start.";
 "Mono" = "Mono";
 "Music 96k" = "Music 96k";
+"Name, port, title, network mode" = "Name, port, title, network mode";
 "No device" = "No device";
 "No input device is available." = "No input device is available.";
 "No signal for about 5 seconds. Check the desk feed and the selected input." = "No signal for about 5 seconds. Check the desk feed and the selected input.";
@@ -96,6 +100,7 @@
 "Start Broadcasting" = "Start Broadcasting";
 "Start broadcasting when the app opens" = "Start broadcasting when the app opens";
 "Starting…" = "Starting…";
+"Stay awake, launch at login, start when opened" = "Stay awake, launch at login, start when opened";
 "Stereo" = "Stereo";
 "Stop Broadcasting" = "Stop Broadcasting";
 "Stop leftover helper" = "Stop leftover helper";

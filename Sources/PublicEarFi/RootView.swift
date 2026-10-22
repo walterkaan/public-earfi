@@ -148,6 +148,71 @@ struct SectionLabel: View {
   }
 }
 
+/// Settings card that can fold. The whole heading row toggles it. The open
+/// or closed choice is kept in preferences across launches.
+struct CollapsibleSettingsCard<Content: View>: View {
+  var title: LocalizedStringKey
+  var hint: LocalizedStringKey
+  @Binding var expanded: Bool
+  @ViewBuilder var content: () -> Content
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  var body: some View {
+    Card {
+      Button(action: toggle) {
+        HStack(alignment: .center, spacing: 10) {
+          disclosureChevron
+          VStack(alignment: .leading, spacing: 3) {
+            SectionLabel(text: title)
+            if !expanded {
+              Text(hint)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+          }
+          Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .onHover { hovering in
+        if hovering {
+          NSCursor.pointingHand.set()
+        } else {
+          NSCursor.arrow.set()
+        }
+      }
+      .accessibilityLabel(title)
+      .accessibilityValue(Text(expanded ? "Expanded" : "Collapsed"))
+      .accessibilityHint(hint)
+      if expanded {
+        content()
+      }
+    }
+  }
+
+  private var disclosureChevron: some View {
+    Image(systemName: expanded ? "chevron.down" : "chevron.right")
+      .font(.system(size: 13, weight: .heavy))
+      .foregroundStyle(AppChrome.window)
+      .frame(width: 26, height: 26)
+      .background(Circle().fill(AppChrome.heading))
+      .accessibilityHidden(true)
+  }
+
+  private func toggle() {
+    if reduceMotion {
+      expanded.toggle()
+    } else {
+      withAnimation(.easeInOut(duration: 0.16)) {
+        expanded.toggle()
+      }
+    }
+  }
+}
+
 struct RunningTab: View {
   @EnvironmentObject private var model: AppModel
 
@@ -537,6 +602,9 @@ struct SettingsTab: View {
   @EnvironmentObject private var model: AppModel
   @State private var confirmReset = false
   @State private var closeSettingsRequest = 0
+  @AppStorage("roomcast.settingsSection.stream") private var streamExpanded = false
+  @AppStorage("roomcast.settingsSection.thisMac") private var thisMacExpanded = false
+  @AppStorage("roomcast.settingsSection.advanced") private var advancedExpanded = false
 
   var body: some View {
     VStack(spacing: 0) {
@@ -692,8 +760,11 @@ struct SettingsTab: View {
         }
         Toggle("Hidden network", isOn: posterHiddenBinding)
       }
-      Card {
-        SectionLabel(text: "Stream")
+      CollapsibleSettingsCard(
+        title: "Stream",
+        hint: "Name, port, title, network mode",
+        expanded: $streamExpanded
+      ) {
         LabeledRow(title: "Stream name") {
           TextField("live", text: streamBinding)
             .frame(width: 120)
@@ -723,8 +794,11 @@ struct SettingsTab: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
-      Card {
-        SectionLabel(text: "This Mac")
+      CollapsibleSettingsCard(
+        title: "This Mac",
+        hint: "Stay awake, launch at login, start when opened",
+        expanded: $thisMacExpanded
+      ) {
         Toggle("Keep Mac awake while broadcasting", isOn: awakeBinding)
         Text(
           "Closing the laptop lid will still sleep the Mac unless it is on power with an external display."
@@ -737,8 +811,11 @@ struct SettingsTab: View {
           Text(message).font(.caption).foregroundStyle(.orange)
         }
       }
-      Card {
-        SectionLabel(text: "Advanced")
+      CollapsibleSettingsCard(
+        title: "Advanced",
+        hint: "ICE port, URL style, listeners, log, bitrate",
+        expanded: $advancedExpanded
+      ) {
         LabeledRow(title: "ICE port") {
           TextField("8189", text: iceText).frame(width: 80)
         }

@@ -105,7 +105,7 @@ If macOS says the app **is damaged**, the download or the signature is broken. D
 
 ## Choose the input
 
-Open **RoomCast → Settings…** (Command-,). Settings is in the app menu, under the RoomCast name. It is not in the File menu.
+Open **RoomCast → Settings…** (Command-,). Settings is in the app menu, under the RoomCast name. It is not in the File menu. Audio input and Poster stay open. Stream, This Mac, and Advanced start collapsed. Click a heading to open that section. RoomCast remembers which ones you left open.
 
 - **Device.** Pick the USB interface. If you have not chosen one yet, the app prefers a USB interface over the built-in microphone.
 - **Bluetooth earbuds.** macOS switches Bluetooth earbuds (for example AirPods) to call mode when they are the microphone. The input menu lists them once. If they disappear for a moment during that switch, the selection stays on them instead of jumping to the Mac microphone. Choosing the Mac microphone afterwards stops the earbuds cleanly. The mic is speech quality, which is fine for interpreting. The earbuds' own playback drops to call quality while broadcasting, so the translator may hear the stage less clearly. If that matters, use a wired or USB microphone, or listen on separate wired headphones. If you do use AirPods or other Bluetooth earbuds as the mic, turn Bluetooth off on your phone, and on any other nearby device paired to them (such as an iPad), before you start broadcasting. Otherwise the phone can grab the earbuds back and interrupt the stream.

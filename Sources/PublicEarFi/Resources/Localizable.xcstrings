@@ -1342,6 +1342,61 @@
           }
         }
       }
+    },
+    "Name, port, title, network mode": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name, port, title, network mode"
+          }
+        }
+      }
+    },
+    "Stay awake, launch at login, start when opened": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stay awake, launch at login, start when opened"
+          }
+        }
+      }
+    },
+    "ICE port, URL style, listeners, log, bitrate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ICE port, URL style, listeners, log, bitrate"
+          }
+        }
+      }
+    },
+    "Expanded": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expanded"
+          }
+        }
+      }
+    },
+    "Collapsed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapsed"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
