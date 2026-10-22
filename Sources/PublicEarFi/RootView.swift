@@ -10,7 +10,12 @@ struct RootView: View {
       .padding(.top, 12)
       .padding(.bottom, 12)
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background(Color(nsColor: .windowBackgroundColor))
+      .background {
+        ZStack {
+          Color(nsColor: .windowBackgroundColor)
+          BroadcastBackdrop(live: model.isBroadcasting, level: model.levelFraction)
+        }
+      }
       .toolbarBackground(.automatic, for: .windowToolbar)
       .onAppear { model.onAppear() }
       .sheet(isPresented: $model.showFirstRun) { FirstRunSheet() }

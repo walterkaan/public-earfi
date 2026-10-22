@@ -456,6 +456,31 @@ final class AudioCaptureTests: XCTestCase {
     }
     return buffer
   }
+
+  func testHeroMotionMatchesTheWebsiteTiming() {
+    XCTAssertEqual(HeroMotion.unit(time: 0, duration: 2.4, delay: 0), 0, accuracy: 0.0001)
+    XCTAssertEqual(HeroMotion.unit(time: 2.4, duration: 2.4, delay: 0), 0, accuracy: 0.0001)
+    XCTAssertEqual(HeroMotion.unit(time: 1.2, duration: 2.4, delay: 0), 0.5, accuracy: 0.0001)
+    XCTAssertEqual(HeroMotion.unit(time: 0.8, duration: 2.4, delay: 0.8), 0, accuracy: 0.0001)
+    XCTAssertEqual(
+      HeroMotion.unit(time: 1.6, duration: 2.4, delay: 0.8), 1.0 / 3.0, accuracy: 0.0001)
+    XCTAssertEqual(HeroMotion.unit(time: 0, duration: 3, delay: 1), 2.0 / 3.0, accuracy: 0.0001)
+    XCTAssertEqual(HeroMotion.waveScale(progress: 0), 1, accuracy: 0.0001)
+    XCTAssertEqual(HeroMotion.waveScale(progress: 1), 2.2, accuracy: 0.0001)
+    XCTAssertEqual(HeroMotion.ringScale(progress: 0), 0.5, accuracy: 0.0001)
+    XCTAssertEqual(HeroMotion.ringScale(progress: 1), 6, accuracy: 0.0001)
+    XCTAssertEqual(HeroMotion.ringOpacity(progress: 0), 0.7, accuracy: 0.0001)
+    XCTAssertEqual(HeroMotion.ringOpacity(progress: 1), 0, accuracy: 0.0001)
+    XCTAssertGreaterThan(HeroMotion.fade(progress: 0), HeroMotion.fade(progress: 0.5))
+    XCTAssertGreaterThan(HeroMotion.presence(live: true), HeroMotion.presence(live: false))
+    let loud = HeroMotion.barScale(time: 0.4, index: 2, live: true, level: 1)
+    let quiet = HeroMotion.barScale(time: 0.4, index: 2, live: true, level: 0)
+    let stopped = HeroMotion.barScale(time: 0.4, index: 2, live: false, level: 1)
+    XCTAssertGreaterThan(loud, quiet)
+    XCTAssertGreaterThan(quiet, stopped)
+    XCTAssertEqual(HeroMotion.arcCount, 3)
+    XCTAssertEqual(HeroMotion.ringCount, 3)
+  }
 }
 
 final class SessionLedger {
