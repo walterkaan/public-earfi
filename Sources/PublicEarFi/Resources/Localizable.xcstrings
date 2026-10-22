@@ -947,17 +947,6 @@
         }
       }
     },
-    "Stopped": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stopped"
-          }
-        }
-      }
-    },
     "TCP only": {
       "extractionState": "manual",
       "localizations": {
@@ -1196,6 +1185,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Please Consider Supporting this Project"
+          }
+        }
+      }
+    },
+    "Stopped - %@ is sound source": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped - %@ is sound source"
+          }
+        }
+      }
+    },
+    "Change Sound Source": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change Sound Source"
+          }
+        }
+      }
+    },
+    "No device": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No device"
           }
         }
       }

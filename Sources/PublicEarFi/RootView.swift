@@ -10,7 +10,7 @@ struct RootView: View {
       .padding(.top, 12)
       .padding(.bottom, 12)
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background { opaqueWindowFill }
+      .background(Color(nsColor: .windowBackgroundColor))
       .toolbarBackground(.automatic, for: .windowToolbar)
       .onAppear { model.onAppear() }
       .sheet(isPresented: $model.showFirstRun) { FirstRunSheet() }
@@ -39,7 +39,18 @@ struct Card<Content: View>: View {
 
     #if compiler(>=6.2)
       if #available(macOS 26, *) {
-        stack.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        // Each card keeps its own dark fill. A shared glass container had
+        // merged these sections into one panel, so the glass stays inside
+        // this card's rounded rectangle.
+        stack
+          .background {
+            RoundedRectangle(cornerRadius: 8)
+              .fill(Color(nsColor: .textBackgroundColor))
+            RoundedRectangle(cornerRadius: 8)
+              .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8))
+          }
+          .clipShape(RoundedRectangle(cornerRadius: 8))
+          .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.28)))
       } else {
         stack.modifier(OpaqueCardPlate())
       }
@@ -49,7 +60,7 @@ struct Card<Content: View>: View {
   }
 }
 
-/// The macOS 13–15 card. macOS 26 uses Liquid Glass instead of this fill.
+/// Separate dark card used on macOS 13–15, and the same shape on macOS 26.
 private struct OpaqueCardPlate: ViewModifier {
   func body(content: Content) -> some View {
     content
@@ -57,53 +68,6 @@ private struct OpaqueCardPlate: ViewModifier {
       .clipShape(RoundedRectangle(cornerRadius: 8))
       .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.28)))
   }
-}
-
-/// Groups the glass cards and the window glass so they sample one background.
-@ViewBuilder
-private func liquidChrome<V: View>(@ViewBuilder content: () -> V) -> some View {
-  #if compiler(>=6.2)
-    if #available(macOS 26, *) {
-      GlassEffectContainer(spacing: 8) {
-        content()
-      }
-    } else {
-      content()
-    }
-  #else
-    content()
-  #endif
-}
-
-/// Opaque fill behind the window on macOS 13–15. On macOS 26 the system
-/// title bar is the glass, so this fill stays clear.
-@ViewBuilder
-private var opaqueWindowFill: some View {
-  #if compiler(>=6.2)
-    if #available(macOS 26, *) {
-      Color.clear
-    } else {
-      Color(nsColor: .windowBackgroundColor)
-    }
-  #else
-    Color(nsColor: .windowBackgroundColor)
-  #endif
-}
-
-/// Content-area glass, inside the same container as the cards.
-@ViewBuilder
-private var windowPlate: some View {
-  #if compiler(>=6.2)
-    if #available(macOS 26, *) {
-      Color.clear
-        .glassEffect(.regular, in: Rectangle())
-        .ignoresSafeArea()
-    } else {
-      Color.clear
-    }
-  #else
-    Color.clear
-  #endif
 }
 
 enum AppChrome {
@@ -128,145 +92,145 @@ struct RunningTab: View {
   @EnvironmentObject private var model: AppModel
 
   var body: some View {
-    liquidChrome {
-      VStack(alignment: .leading, spacing: 12) {
-        BroadcastButton(
-          title: buttonTitle,
-          isStop: isStop,
-          showsProgress: isStarting
-        ) {
-          model.toggleBroadcast()
-        }
-
-        Card {
-          HStack(spacing: 8) {
-            Circle().fill(statusColor).frame(width: 10, height: 10)
-            Text(model.statusLine()).fontWeight(.semibold)
-          }
-          if let stray = model.strayHelper {
-            Text(
-              "A leftover \(stray.processName) (pid \(stray.pid)) is using port \(stray.port)."
-            )
-            .font(.caption)
-            Button("Stop leftover helper") { model.stopStrayHelper() }
-          }
-          HStack {
-            Text("Input level").foregroundStyle(.secondary).frame(width: 90, alignment: .leading)
-            LevelBar(fraction: model.levelFraction)
-            Text(levelText).foregroundStyle(.secondary).frame(width: 64, alignment: .trailing)
-          }
-          HStack {
-            Text("Volume").foregroundStyle(.secondary).frame(width: 90, alignment: .leading)
-            Slider(value: gainBinding, in: InputGain.minimumDB...InputGain.maximumDB)
-            Text(InputGain.label(model.settings.inputGainDB))
-              .foregroundStyle(.secondary)
-              .frame(width: 64, alignment: .trailing)
-          }
-          .help(
-            "Volume, from -12 dB to +24 dB. 0 dB leaves the desk unchanged. Changes apply immediately, including while you are live."
-          )
-          Text("0 dB leaves the desk unchanged. Raise it when the interpreter is quiet.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-          if model.noSignal {
-            Text("No signal for about 5 seconds. Check the desk feed and the selected input.")
-              .font(.caption)
-              .foregroundStyle(.orange)
-          }
-        }
-
-        if let stale = model.staleAddress {
-          WarningBanner(text: stale.message) { model.showWhy = true }
-        }
-        if model.onBattery && model.isBroadcasting {
-          WarningBanner(
-            text:
-              "Running on battery. Plug in power for a long session. Closing the lid still sleeps the Mac."
-          ) {
-            model.showWhy = true
-          }
-        }
-
-        Card {
-          HStack(alignment: .top, spacing: 14) {
-            Button {
-              model.showQR = true
-            } label: {
-              qrView(side: 112)
-            }
-            .buttonStyle(.plain)
-            .help("Show the QR code full screen")
-            VStack(alignment: .leading, spacing: 6) {
-              SectionLabel(text: "Listeners open")
-              Text(model.listenerURL ?? "No LAN address yet")
-                .font(.system(.body, design: .monospaced))
-                .textSelection(.enabled)
-                .padding(6)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 5))
-              if let secondary = model.secondaryURL {
-                Text(secondary)
-                  .font(.caption.monospaced())
-                  .foregroundStyle(.secondary)
-                  .textSelection(.enabled)
-              }
-              if model.settings.urlStyle == .localHostname {
-                Text("Some Android phones can't open .local addresses.")
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-              }
-              HStack {
-                GreenPushButton("Copy link") { model.copyLink() }
-                  .disabled(model.listenerURL == nil)
-                GreenPushButton("Open PDF QR Poster") { model.openQuickPosterPDF() }
-                  .disabled(model.listenerURL == nil)
-                  .help("Save a PDF of the QR poster and open it. Print that PDF yourself.")
-              }
-              if model.rankedNetworks.count > 1 {
-                Picker("Address", selection: addressBinding) {
-                  Text("Auto").tag(nil as String?)
-                  ForEach(model.rankedNetworks) { candidate in
-                    Text("\(candidate.name) \(candidate.address)").tag(Optional(candidate.address))
-                  }
-                }
-                .frame(maxWidth: 220)
-              }
-              SectionLabel(text: "Listening now")
-              Text("\(model.listeners)")
-                .font(.system(size: 32, weight: .bold))
-            }
-          }
-        }
-
-        Card {
-          SectionLabel(text: "Health")
-          Text(model.healthLine)
-            .font(.system(.caption, design: .monospaced))
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .padding(6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.yellow.opacity(0.18))
-            .clipShape(RoundedRectangle(cornerRadius: 5))
-          GreenPushButton("Copy diagnostics") { model.copyDiagnostics() }
-        }
-        Card {
-          SectionLabel(text: "Please Consider Supporting this Project")
-          SupportLinks()
-        }
-        if model.hasPendingChanges {
-          WarningBanner(
-            text:
-              "Settings changed. Apply now (brief interruption), or they take effect on the next Start.",
-            buttonTitle: "Apply New Settings Now"
-          ) {
-            model.applyNow()
-          }
-        }
-        Spacer(minLength: 0)
+    VStack(alignment: .leading, spacing: 12) {
+      BroadcastButton(
+        title: buttonTitle,
+        isStop: isStop,
+        showsProgress: isStarting
+      ) {
+        model.toggleBroadcast()
       }
-      .background { windowPlate }
+
+      Card {
+        HStack(spacing: 8) {
+          Circle().fill(statusColor).frame(width: 10, height: 10)
+          Text(model.statusLine()).fontWeight(.semibold)
+        }
+        if case .stopped = model.phase {
+          GreenPushButton("Change Sound Source") { model.openSettings() }
+        }
+        if let stray = model.strayHelper {
+          Text(
+            "A leftover \(stray.processName) (pid \(stray.pid)) is using port \(stray.port)."
+          )
+          .font(.caption)
+          Button("Stop leftover helper") { model.stopStrayHelper() }
+        }
+        HStack {
+          Text("Input level").foregroundStyle(.secondary).frame(width: 90, alignment: .leading)
+          LevelBar(fraction: model.levelFraction)
+          Text(levelText).foregroundStyle(.secondary).frame(width: 64, alignment: .trailing)
+        }
+        HStack {
+          Text("Volume").foregroundStyle(.secondary).frame(width: 90, alignment: .leading)
+          Slider(value: gainBinding, in: InputGain.minimumDB...InputGain.maximumDB)
+          Text(InputGain.label(model.settings.inputGainDB))
+            .foregroundStyle(.secondary)
+            .frame(width: 64, alignment: .trailing)
+        }
+        .help(
+          "Volume, from -12 dB to +24 dB. 0 dB leaves the desk unchanged. Changes apply immediately, including while you are live."
+        )
+        Text("0 dB leaves the desk unchanged. Raise it when the interpreter is quiet.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        if model.noSignal {
+          Text("No signal for about 5 seconds. Check the desk feed and the selected input.")
+            .font(.caption)
+            .foregroundStyle(.orange)
+        }
+      }
+
+      if let stale = model.staleAddress {
+        WarningBanner(text: stale.message) { model.showWhy = true }
+      }
+      if model.onBattery && model.isBroadcasting {
+        WarningBanner(
+          text:
+            "Running on battery. Plug in power for a long session. Closing the lid still sleeps the Mac."
+        ) {
+          model.showWhy = true
+        }
+      }
+
+      Card {
+        HStack(alignment: .top, spacing: 14) {
+          Button {
+            model.showQR = true
+          } label: {
+            qrView(side: 112)
+          }
+          .buttonStyle(.plain)
+          .help("Show the QR code full screen")
+          VStack(alignment: .leading, spacing: 6) {
+            SectionLabel(text: "Listeners open")
+            Text(model.listenerURL ?? "No LAN address yet")
+              .font(.system(.body, design: .monospaced))
+              .textSelection(.enabled)
+              .padding(6)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .background(Color(nsColor: .controlBackgroundColor))
+              .clipShape(RoundedRectangle(cornerRadius: 5))
+            if let secondary = model.secondaryURL {
+              Text(secondary)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+            }
+            if model.settings.urlStyle == .localHostname {
+              Text("Some Android phones can't open .local addresses.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            HStack {
+              GreenPushButton("Copy link") { model.copyLink() }
+                .disabled(model.listenerURL == nil)
+              GreenPushButton("Open PDF QR Poster") { model.openQuickPosterPDF() }
+                .disabled(model.listenerURL == nil)
+                .help("Save a PDF of the QR poster and open it. Print that PDF yourself.")
+            }
+            if model.rankedNetworks.count > 1 {
+              Picker("Address", selection: addressBinding) {
+                Text("Auto").tag(nil as String?)
+                ForEach(model.rankedNetworks) { candidate in
+                  Text("\(candidate.name) \(candidate.address)").tag(Optional(candidate.address))
+                }
+              }
+              .frame(maxWidth: 220)
+            }
+            SectionLabel(text: "Listening now")
+            Text("\(model.listeners)")
+              .font(.system(size: 32, weight: .bold))
+          }
+        }
+      }
+
+      Card {
+        SectionLabel(text: "Health")
+        Text(model.healthLine)
+          .font(.system(.caption, design: .monospaced))
+          .lineLimit(1)
+          .truncationMode(.tail)
+          .padding(6)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(Color.yellow.opacity(0.18))
+          .clipShape(RoundedRectangle(cornerRadius: 5))
+        GreenPushButton("Copy diagnostics") { model.copyDiagnostics() }
+      }
+      Card {
+        SectionLabel(text: "Please Consider Supporting this Project")
+        SupportLinks()
+      }
+      if model.hasPendingChanges {
+        WarningBanner(
+          text:
+            "Settings changed. Apply now (brief interruption), or they take effect on the next Start.",
+          buttonTitle: "Apply New Settings Now"
+        ) {
+          model.applyNow()
+        }
+      }
+      Spacer(minLength: 0)
     }
   }
 
@@ -360,8 +324,8 @@ struct SupportLinks: View {
   }
 }
 
-/// Solid green on macOS 13–15. Prominent green glass on macOS 26, when this
-/// copy was built with a compiler that has the Liquid Glass APIs.
+/// Green fill and white text on every macOS version. The glass button style
+/// drew black on black on macOS 26, so these controls keep the solid fill.
 struct GreenPushButton: View {
   var title: LocalizedStringKey
   var action: () -> Void
@@ -372,25 +336,6 @@ struct GreenPushButton: View {
   }
 
   var body: some View {
-    #if compiler(>=6.2)
-      if #available(macOS 26, *) {
-        Button(action: action) {
-          Text(title)
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(.white)
-            .lineLimit(1)
-        }
-        .buttonStyle(.glassProminent)
-        .tint(AppChrome.startButton)
-      } else {
-        solid
-      }
-    #else
-      solid
-    #endif
-  }
-
-  private var solid: some View {
     Button(action: action) {
       SolidGreenLabel(title: title, large: false)
     }
@@ -408,25 +353,6 @@ struct GreenLinkButton: View {
   }
 
   var body: some View {
-    #if compiler(>=6.2)
-      if #available(macOS 26, *) {
-        Link(destination: destination) {
-          Text(title)
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(.white)
-            .lineLimit(1)
-        }
-        .buttonStyle(.glassProminent)
-        .tint(AppChrome.startButton)
-      } else {
-        solid
-      }
-    #else
-      solid
-    #endif
-  }
-
-  private var solid: some View {
     Link(destination: destination) {
       SolidGreenLabel(title: title, large: false)
     }
@@ -434,8 +360,8 @@ struct GreenLinkButton: View {
   }
 }
 
-/// Start stays large. Stop stays the solid red control. The green state uses
-/// the same glass as the other green buttons when macOS 26 is available.
+/// Start stays large and green. Stop stays solid red. Both keep a solid fill
+/// so the label stays readable on macOS 26.
 struct BroadcastButton: View {
   var title: String
   var isStop: Bool
@@ -443,19 +369,7 @@ struct BroadcastButton: View {
   var action: () -> Void
 
   var body: some View {
-    #if compiler(>=6.2)
-      if #available(macOS 26, *), !isStop {
-        Button(action: action) {
-          label.foregroundStyle(.white)
-        }
-        .buttonStyle(.glassProminent)
-        .tint(AppChrome.startButton)
-      } else {
-        solid
-      }
-    #else
-      solid
-    #endif
+    solid
   }
 
   private var label: some View {

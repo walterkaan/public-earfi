@@ -210,7 +210,8 @@ final class AppModel: ObservableObject {
   func statusLine() -> String {
     switch phase {
     case .stopped:
-      return "Stopped"
+      let name = selectedDevice?.name ?? String(localized: "No device")
+      return String(format: String(localized: "Stopped - %@ is sound source"), name)
     case .starting:
       return "Starting…"
     case .waitingForDevice(let name):
@@ -258,8 +259,12 @@ final class AppModel: ObservableObject {
     }
     // After the sheet closes, so Settings is not hidden behind it.
     DispatchQueue.main.async {
-      NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+      self.openSettings()
     }
+  }
+
+  func openSettings() {
+    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
   }
 
   func toggleBroadcast() {

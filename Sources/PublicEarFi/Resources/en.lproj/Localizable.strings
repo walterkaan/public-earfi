@@ -19,6 +19,7 @@
 "Bluetooth earbuds switch to call mode while they are the microphone. The mic stays speech quality. Their own playback drops to call quality, so the stage may be harder to hear. A wired or USB microphone, or separate wired headphones, avoids that. Turn Bluetooth off on your phone, and on any other nearby device paired to the earbuds, before you go live, so the phone does not take them back and cut the stream." = "Bluetooth earbuds switch to call mode while they are the microphone. The mic stays speech quality. Their own playback drops to call quality, so the stage may be harder to hear. A wired or USB microphone, or separate wired headphones, avoids that. Turn Bluetooth off on your phone, and on any other nearby device paired to the earbuds, before you go live, so the phone does not take them back and cut the stream.";
 "Buy Me a Coffee" = "Buy Me a Coffee";
 "Cancel" = "Cancel";
+"Change Sound Source" = "Change Sound Source";
 "Closing the laptop lid will still sleep the Mac unless it is on power with an external display." = "Closing the laptop lid will still sleep the Mac unless it is on power with an external display.";
 "Continue" = "Continue";
 "Copy Listener Link" = "Copy Listener Link";
@@ -54,6 +55,7 @@
 "Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start." = "Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start.";
 "Mono" = "Mono";
 "Music 96k" = "Music 96k";
+"No device" = "No device";
 "No input device is available." = "No input device is available.";
 "No signal for about 5 seconds. Check the desk feed and the selected input." = "No signal for about 5 seconds. Check the desk feed and the selected input.";
 "Not connected" = "Not connected";
@@ -89,7 +91,7 @@
 "Stereo" = "Stereo";
 "Stop Broadcasting" = "Stop Broadcasting";
 "Stop leftover helper" = "Stop leftover helper";
-"Stopped" = "Stopped";
+"Stopped - %@ is sound source" = "Stopped - %@ is sound source";
 "TCP only = Wi-Fi-friendly; try it if listeners hear dropouts." = "TCP only = Wi-Fi-friendly; try it if listeners hear dropouts.";
 "TCP only" = "TCP only";
 "The poster QR code contains this Mac’s current IP address. If the address changes, phones still looking at the old poster cannot connect." = "The poster QR code contains this Mac’s current IP address. If the address changes, phones still looking at the old poster cannot connect.";
