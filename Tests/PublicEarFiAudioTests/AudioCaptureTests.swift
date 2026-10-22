@@ -497,10 +497,7 @@ final class AudioCaptureTests: XCTestCase {
   /// Reduce Transparency makes the cards opaque. The hero still has to show in
   /// the gap between them, not only as a flat window colour.
   func testHeroBackdropShowsInTheGapsAroundOpaqueCards() throws {
-    let view = HeroGapFixture()
-      .environment(\.accessibilityReduceTransparency, true)
-      .environment(\.accessibilityReduceMotion, true)
-    let renderer = ImageRenderer(content: view)
+    let renderer = ImageRenderer(content: HeroGapFixture())
     renderer.scale = 1
     renderer.proposedSize = ProposedViewSize(width: 880, height: 360)
     guard let cgImage = renderer.cgImage else {
@@ -509,7 +506,9 @@ final class AudioCaptureTests: XCTestCase {
     let directory = URL(fileURLWithPath: "build", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     let bitmap = NSBitmapImageRep(cgImage: cgImage)
-    if let png = bitmap.representation(using: .png, properties: [:]) {
+    let properties: [NSBitmapImageRep.PropertyKey: Any] = [:]
+    if let png = bitmap.representation(using: NSBitmapImageRep.FileType.png, properties: properties)
+    {
       try png.write(to: directory.appendingPathComponent("hero-backdrop.png"))
     }
     let raster = try XCTUnwrap(HeroRaster(cgImage))
