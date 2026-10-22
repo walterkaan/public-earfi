@@ -1,6 +1,6 @@
 #!/bin/bash
-# Sign RoomCast with Walter's Developer ID, make the disk image, notarise it,
-# staple the ticket, and check it with spctl.
+# Sign RoomCast with Walter's Developer ID, make the disk image, sign that
+# image, notarise it, staple the ticket, and check it with spctl.
 #
 # Run this on Walter's Mac. The notary credentials stay in that Mac's keychain:
 #   xcrun notarytool store-credentials roomcast
@@ -26,6 +26,12 @@ if [[ ! -d "$APP" || ! -f "$DMG" ]]; then
   exit 1
 fi
 
+# The disk image needs its own Developer ID signature before notarization.
+# An unsigned image is rejected as "no usable signature" even after the app inside is accepted.
+echo "Signing $DMG"
+codesign --force --sign "$IDENTITY" --timestamp "$DMG"
+codesign --verify --verbose=2 "$DMG"
+
 echo "Submitting $DMG to the notary service (profile: $PROFILE)"
 xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
 
@@ -34,6 +40,12 @@ xcrun stapler staple "$APP"
 xcrun stapler validate "$DMG"
 xcrun stapler validate "$APP"
 
+# Signing and stapling change the file, so the checksum from package-dmg.sh is stale.
+(
+  cd "$ROOT/dist"
+  shasum -a 256 "RoomCast-${VERSION}.dmg" > SHA256SUMS
+)
+
 spctl --assess --type execute --verbose=4 "$APP"
-spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG"
+spctl -a -t open --context context:primary-signature -vv "$DMG"
 echo "Notarized and stapled: $DMG"
