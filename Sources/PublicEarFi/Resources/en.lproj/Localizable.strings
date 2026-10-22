@@ -63,6 +63,7 @@
 "Password, security, and hidden network are in Settings → Poster. The main-window PDF has a join code when this name is filled in. This window's PDF does not include the password." = "Password, security, and hidden network are in Settings → Poster. The main-window PDF has a join code when this name is filled in. This window's PDF does not include the password.";
 "Patreon" = "Patreon";
 "Phones join this network before the listen code works. Leave it blank to print a line you can write in. Use this Mac’s Wi-Fi only when that is the network people will join." = "Phones join this network before the listen code works. Leave it blank to print a line you can write in. Use this Mac’s Wi-Fi only when that is the network people will join.";
+"Please Consider Supporting this Project" = "Please Consider Supporting this Project";
 "Port" = "Port";
 "Poster…" = "Poster…";
 "Preview and PDF" = "Preview and PDF";

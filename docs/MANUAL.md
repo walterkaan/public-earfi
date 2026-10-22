@@ -227,7 +227,7 @@ That app is not available. There is nothing to download, and this manual’s ins
 
 ## Support
 
-RoomCast is free. [Ko-fi](https://ko-fi.com/roomcast), [Patreon](https://www.patreon.com/roomcastapp), and [Buy Me a Coffee](https://buymeacoffee.com/roomcast) are linked along the bottom of the home screen.
+RoomCast is free. [Ko-fi](https://ko-fi.com/roomcast), [Patreon](https://www.patreon.com/roomcastapp), and [Buy Me a Coffee](https://buymeacoffee.com/roomcast) are under Health on the home screen.
 
 ## Limits worth knowing
 

@@ -1188,6 +1188,17 @@
           }
         }
       }
+    },
+    "Please Consider Supporting this Project": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Please Consider Supporting this Project"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

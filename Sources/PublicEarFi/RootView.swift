@@ -48,10 +48,11 @@ enum AppChrome {
 }
 
 struct SectionLabel: View {
-  var text: String
+  var text: LocalizedStringKey
 
   var body: some View {
-    Text(text.uppercased())
+    Text(text)
+      .textCase(.uppercase)
       .font(.system(size: 11, weight: .semibold))
       .foregroundStyle(AppChrome.startButton)
       .tracking(0.6)
@@ -193,6 +194,10 @@ struct RunningTab: View {
           .clipShape(RoundedRectangle(cornerRadius: 5))
         Button("Copy diagnostics") { model.copyDiagnostics() }
       }
+      Card {
+        SectionLabel(text: "Please Consider Supporting this Project")
+        SupportLinks()
+      }
       if model.hasPendingChanges {
         WarningBanner(
           text:
@@ -203,7 +208,6 @@ struct RunningTab: View {
         }
       }
       Spacer(minLength: 0)
-      SupportLinks()
     }
   }
 
@@ -280,16 +284,30 @@ enum AppLinks {
   static let buyMeACoffee = URL(string: "https://buymeacoffee.com/roomcast")!
 }
 
-/// Ko-fi, Patreon, and Buy Me a Coffee sit on the home screen.
+/// Ko-fi, Patreon, and Buy Me a Coffee, in the card under Health.
 struct SupportLinks: View {
   var body: some View {
-    HStack(spacing: 16) {
-      Link("Ko-fi", destination: AppLinks.kofi)
-      Link("Patreon", destination: AppLinks.patreon)
-      Link("Buy Me a Coffee", destination: AppLinks.buyMeACoffee)
+    HStack(spacing: 10) {
+      supportButton("Ko-fi", destination: AppLinks.kofi)
+      supportButton("Patreon", destination: AppLinks.patreon)
+      supportButton("Buy Me a Coffee", destination: AppLinks.buyMeACoffee)
     }
-    .font(.caption)
     .frame(maxWidth: .infinity)
+  }
+
+  private func supportButton(_ title: LocalizedStringKey, destination: URL) -> some View {
+    Link(destination: destination) {
+      Text(title)
+        .font(.callout.weight(.semibold))
+        .foregroundStyle(.white)
+        .lineLimit(1)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(AppChrome.startButton)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .contentShape(RoundedRectangle(cornerRadius: 8))
+    }
+    .buttonStyle(.plain)
   }
 }
 

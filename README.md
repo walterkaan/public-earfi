@@ -115,7 +115,7 @@ Release tags (`v*`) sign with the `RELEASE_SIGNING_P12` and `RELEASE_SIGNING_PAS
 
 ## Support
 
-RoomCast is free. The home screen links to [Ko-fi](https://ko-fi.com/roomcast), [Patreon](https://www.patreon.com/roomcastapp), and [Buy Me a Coffee](https://buymeacoffee.com/roomcast).
+RoomCast is free. Under Health on the home screen: [Ko-fi](https://ko-fi.com/roomcast), [Patreon](https://www.patreon.com/roomcastapp), and [Buy Me a Coffee](https://buymeacoffee.com/roomcast).
 
 ## Licence
 

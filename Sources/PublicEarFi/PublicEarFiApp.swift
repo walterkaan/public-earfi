@@ -11,7 +11,7 @@ struct PublicEarFiApp: App {
     WindowGroup {
       RootView()
         .environmentObject(model)
-        .frame(minWidth: 780, minHeight: 640)
+        .frame(minWidth: 780, minHeight: 700)
     }
     .defaultSize(width: 880, height: 720)
     .commands {
