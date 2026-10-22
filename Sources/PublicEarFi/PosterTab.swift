@@ -289,6 +289,7 @@ struct LogWindow: View {
     .padding(16)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background(AppChrome.window)
+    .background(EscapeCloser {})
   }
 }
 
@@ -311,7 +312,7 @@ struct FirstRunSheet: View {
       )
       .fixedSize(horizontal: false, vertical: true)
       Text(
-        "Sound comes from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events."
+        "Sound comes from your Mac's microphone, an application, headset or earbuds or a mixing desk for larger events."
       )
       .fixedSize(horizontal: false, vertical: true)
       sheetHeading("Getting started")

@@ -34,17 +34,6 @@
         }
       }
     },
-    "0 dB leaves the desk unchanged. Raise it when the interpreter is quiet.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "0 dB leaves the desk unchanged. Raise it when the interpreter is quiet."
-          }
-        }
-      }
-    },
     "16–256 kbps": {
       "extractionState": "manual",
       "localizations": {
@@ -1024,17 +1013,6 @@
         }
       }
     },
-    "Volume, from -12 dB to +24 dB. 0 dB leaves the desk unchanged. Changes apply immediately, including while you are live.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Volume, from -12 dB to +24 dB. 0 dB leaves the desk unchanged. Changes apply immediately, including while you are live."
-          }
-        }
-      }
-    },
     "Wi-Fi network name (optional)": {
       "extractionState": "manual",
       "localizations": {
@@ -1277,17 +1255,6 @@
         }
       }
     },
-    "Sound comes from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sound comes from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events."
-          }
-        }
-      }
-    },
     "Save and Close": {
       "extractionState": "manual",
       "localizations": {
@@ -1328,6 +1295,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Listen"
+          }
+        }
+      }
+    },
+    "Sound comes from your Mac's microphone, an application, headset or earbuds or a mixing desk for larger events.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sound comes from your Mac's microphone, an application, headset or earbuds or a mixing desk for larger events."
+          }
+        }
+      }
+    },
+    "0db leaves the volume unchanged. Increase or decrease the broadcast's volume.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "0db leaves the volume unchanged. Increase or decrease the broadcast's volume."
+          }
+        }
+      }
+    },
+    "Volume, from -12 dB to +24 dB. Changes apply immediately, including while you are live.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volume, from -12 dB to +24 dB. Changes apply immediately, including while you are live."
           }
         }
       }

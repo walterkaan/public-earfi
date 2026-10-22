@@ -1,7 +1,7 @@
 ".local hostname" = ".local hostname";
 ".local" = ".local";
 "0 = unlimited" = "0 = unlimited";
-"0 dB leaves the desk unchanged. Raise it when the interpreter is quiet." = "0 dB leaves the desk unchanged. Raise it when the interpreter is quiet.";
+"0db leaves the volume unchanged. Increase or decrease the broadcast's volume." = "0db leaves the volume unchanged. Increase or decrease the broadcast's volume.";
 "1. Choose your sound source in Settings, which opens when you click the button below." = "1. Choose your sound source in Settings, which opens when you click the button below.";
 "16–256 kbps" = "16–256 kbps";
 "2. Optionally, add your Wi-Fi details so listeners get an easy join code." = "2. Optionally, add your Wi-Fi details so listeners get an easy join code.";
@@ -88,7 +88,7 @@
 "Show instructions" = "Show instructions";
 "Show the QR code full screen" = "Show the QR code full screen";
 "Some Android phones can't open .local addresses." = "Some Android phones can't open .local addresses.";
-"Sound comes from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events." = "Sound comes from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events.";
+"Sound comes from your Mac's microphone, an application, headset or earbuds or a mixing desk for larger events." = "Sound comes from your Mac's microphone, an application, headset or earbuds or a mixing desk for larger events.";
 "Speech 32k" = "Speech 32k";
 "Speech is mono, 32 kbps, for about 30 phones. The stream is always 48 kHz. Music is 96 kbps mono or 128 kbps stereo." = "Speech is mono, 32 kbps, for about 30 phones. The stream is always 48 kHz. Music is 96 kbps mono or 128 kbps stereo.";
 "Standard 64k" = "Standard 64k";
@@ -107,7 +107,7 @@
 "Use current network name" = "Use current network name";
 "View licence" = "View licence";
 "Volume" = "Volume";
-"Volume, from -12 dB to +24 dB. 0 dB leaves the desk unchanged. Changes apply immediately, including while you are live." = "Volume, from -12 dB to +24 dB. 0 dB leaves the desk unchanged. Changes apply immediately, including while you are live.";
+"Volume, from -12 dB to +24 dB. Changes apply immediately, including while you are live." = "Volume, from -12 dB to +24 dB. Changes apply immediately, including while you are live.";
 "Welcome to RoomCast" = "Welcome to RoomCast";
 "Wi-Fi network name (optional)" = "Wi-Fi network name (optional)";
 "You're set to go!" = "You're set to go!";

@@ -199,11 +199,13 @@ struct RunningTab: View {
             .frame(width: 64, alignment: .trailing)
         }
         .help(
-          "Volume, from -12 dB to +24 dB. 0 dB leaves the desk unchanged. Changes apply immediately, including while you are live."
+          "Volume, from -12 dB to +24 dB. Changes apply immediately, including while you are live."
         )
-        Text("0 dB leaves the desk unchanged. Raise it when the interpreter is quiet.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        Text(
+          "0db leaves the volume unchanged. Increase or decrease the broadcast's volume."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
         if model.noSignal {
           Text("No signal for about 5 seconds. Check the desk feed and the selected input.")
             .font(.caption)
@@ -538,7 +540,6 @@ struct SettingsTab: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      settingsSaveRow
       ScrollView {
         settingsForm
       }
@@ -546,6 +547,11 @@ struct SettingsTab: View {
     }
     .background(AppChrome.window)
     .background(CloseSettingsWindow(request: closeSettingsRequest))
+    .background(
+      EscapeCloser {
+        model.saveAndCloseSettings()
+      }
+    )
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .id(model.settingsRevision)
     .sheet(isPresented: $model.showCredits) { CreditsSheet() }
@@ -901,6 +907,70 @@ struct SettingsTab: View {
     Binding(
       get: { model.settings.posterWiFiHidden },
       set: { value in model.mutate { $0.posterWiFiHidden = value } })
+  }
+}
+
+/// Escape closes the window that contains this view. The main window does not
+/// use it, and a window titled as the broadcast is never closed from here.
+struct EscapeCloser: NSViewRepresentable {
+  var onEscape: () -> Void
+
+  func makeNSView(context: Context) -> EscapeMonitorView {
+    let view = EscapeMonitorView()
+    view.isHidden = true
+    view.onEscape = onEscape
+    return view
+  }
+
+  func updateNSView(_ view: EscapeMonitorView, context: Context) {
+    view.onEscape = onEscape
+  }
+}
+
+private final class EscapeMonitorView: NSView {
+  var onEscape: (() -> Void)?
+  private var monitor: Any?
+  private let mainTitle = "RoomCast 1.0 Beta Release"
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    install()
+  }
+
+  deinit {
+    remove()
+  }
+
+  private func remove() {
+    if let monitor {
+      NSEvent.removeMonitor(monitor)
+      self.monitor = nil
+    }
+  }
+
+  private func install() {
+    remove()
+    guard window != nil else { return }
+    monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+      MainActor.assumeIsolated {
+        self?.handle(event) ?? event
+      }
+    }
+  }
+
+  private func handle(_ event: NSEvent) -> NSEvent? {
+    guard let window, event.window === window, event.keyCode == 53 else { return event }
+    let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    if flags.contains(.command) || flags.contains(.control) || flags.contains(.option)
+      || flags.contains(.shift)
+    {
+      return event
+    }
+    guard window.attachedSheet == nil else { return event }
+    guard window.title != mainTitle else { return event }
+    onEscape?()
+    window.close()
+    return nil
   }
 }
 
