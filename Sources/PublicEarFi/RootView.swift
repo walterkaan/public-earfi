@@ -646,37 +646,6 @@ struct SettingsTab: View {
         .foregroundStyle(.secondary)
       }
       Card {
-        SectionLabel(text: "Stream")
-        LabeledRow(title: "Stream name") {
-          TextField("live", text: streamBinding)
-            .frame(width: 120)
-          Text("Port")
-          TextField("8889", text: portText)
-            .frame(width: 70)
-        }
-        LabeledRow(title: "Broadcast title") {
-          TextField(model.defaultBroadcastTitle, text: titleBinding)
-            .frame(maxWidth: 280)
-        }
-        Text(
-          "Shown on the lock screen and in the browser tab. Leave this blank for \(model.defaultBroadcastTitle). A blank title follows the app name. Changing it does not change the link."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        LabeledRow(title: "Network mode") {
-          Picker("Network", selection: networkBinding) {
-            Text("Auto (UDP+TCP)").tag(NetworkMode.auto)
-            Text("UDP only").tag(NetworkMode.udpOnly)
-            Text("TCP only").tag(NetworkMode.tcpOnly)
-          }
-          .pickerStyle(.segmented)
-          .labelsHidden()
-        }
-        Text("TCP only = Wi-Fi-friendly; try it if listeners hear dropouts.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-      }
-      Card {
         SectionLabel(text: "Poster")
         LabeledRow(title: "Wi-Fi name") {
           TextField("Network name", text: posterNetworkBinding)
@@ -722,6 +691,37 @@ struct SettingsTab: View {
             .foregroundStyle(.secondary)
         }
         Toggle("Hidden network", isOn: posterHiddenBinding)
+      }
+      Card {
+        SectionLabel(text: "Stream")
+        LabeledRow(title: "Stream name") {
+          TextField("live", text: streamBinding)
+            .frame(width: 120)
+          Text("Port")
+          TextField("8889", text: portText)
+            .frame(width: 70)
+        }
+        LabeledRow(title: "Broadcast title") {
+          TextField(model.defaultBroadcastTitle, text: titleBinding)
+            .frame(maxWidth: 280)
+        }
+        Text(
+          "Shown on the lock screen and in the browser tab. Leave this blank for \(model.defaultBroadcastTitle). A blank title follows the app name. Changing it does not change the link."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        LabeledRow(title: "Network mode") {
+          Picker("Network", selection: networkBinding) {
+            Text("Auto (UDP+TCP)").tag(NetworkMode.auto)
+            Text("UDP only").tag(NetworkMode.udpOnly)
+            Text("TCP only").tag(NetworkMode.tcpOnly)
+          }
+          .pickerStyle(.segmented)
+          .labelsHidden()
+        }
+        Text("TCP only = Wi-Fi-friendly; try it if listeners hear dropouts.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
       }
       Card {
         SectionLabel(text: "This Mac")
