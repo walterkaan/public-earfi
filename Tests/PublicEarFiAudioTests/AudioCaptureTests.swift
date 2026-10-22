@@ -1,7 +1,9 @@
 import AVFoundation
+import AppKit
 import AudioToolbox
 import Darwin
 import PublicEarFiCore
+import SwiftUI
 import XCTest
 
 @testable import PublicEarFi
@@ -491,6 +493,136 @@ final class AudioCaptureTests: XCTestCase {
     XCTAssertEqual(HeroMotion.arcCount, 3)
     XCTAssertEqual(HeroMotion.ringCount, 3)
   }
+
+  /// Reduce Transparency makes the cards opaque. The hero still has to show in
+  /// the gap between them, not only as a flat window colour.
+  func testHeroBackdropShowsInTheGapsAroundOpaqueCards() throws {
+    let view = HeroGapFixture()
+      .environment(\.accessibilityReduceTransparency, true)
+      .environment(\.accessibilityReduceMotion, true)
+    let renderer = ImageRenderer(content: view)
+    renderer.scale = 1
+    renderer.proposedSize = ProposedViewSize(width: 880, height: 360)
+    guard let cgImage = renderer.cgImage else {
+      return XCTFail("The hero backdrop did not render.")
+    }
+    let directory = URL(fileURLWithPath: "build", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let bitmap = NSBitmapImageRep(cgImage: cgImage)
+    if let png = bitmap.representation(using: .png, properties: [:]) {
+      try png.write(to: directory.appendingPathComponent("hero-backdrop.png"))
+    }
+    let raster = try XCTUnwrap(HeroRaster(cgImage))
+    let width = 880.0
+    let height = 360.0
+    let fromTop = raster.color(x: 400, y: 70, viewWidth: width, viewHeight: height, fromTop: true)
+    let fromBottom = raster.color(
+      x: 400, y: 70, viewWidth: width, viewHeight: height, fromTop: false)
+    let originAtTop = abs(fromTop.red - 0.16) <= abs(fromBottom.red - 0.16)
+    let scaleX = width / HeroMotion.sceneSize.width
+    let scaleY = height / HeroMotion.sceneSize.height
+    let dot = CGRect(
+      x: (HeroMotion.monitor.midX - 8) * scaleX,
+      y: (HeroMotion.monitor.midY - 8) * scaleY,
+      width: 16 * scaleX,
+      height: 16 * scaleY
+    )
+    var vivid = 0
+    var sampled = 0
+    var y = dot.minY
+    while y < dot.maxY {
+      var x = dot.minX
+      while x < dot.maxX {
+        let color = raster.color(
+          x: x, y: y, viewWidth: width, viewHeight: height, fromTop: originAtTop)
+        sampled += 1
+        if color.chroma > 0.18 { vivid += 1 }
+        x += 2
+      }
+      y += 2
+    }
+    XCTAssertGreaterThan(sampled, 20)
+    XCTAssertGreaterThan(
+      vivid, sampled / 2,
+      "Expected the pink monitor light in the card gap, found \(vivid) of \(sampled)."
+    )
+    let body = raster.color(
+      x: 120, y: dot.midY, viewWidth: width, viewHeight: height, fromTop: originAtTop)
+    XCTAssertLessThan(body.chroma, 0.12)
+    XCTAssertGreaterThan(body.blue, body.red + 0.03)
+    let plate = raster.color(
+      x: 400, y: 70, viewWidth: width, viewHeight: height, fromTop: originAtTop)
+    XCTAssertLessThan(plate.chroma, 0.05)
+    XCTAssertEqual(plate.red, 0.16, accuracy: 0.04)
+  }
+}
+
+private struct HeroGapFixture: View {
+  var body: some View {
+    ZStack(alignment: .top) {
+      BroadcastBackdrop(live: true, level: 0.8)
+      VStack(spacing: 24) {
+        RoundedRectangle(cornerRadius: 8)
+          .fill(Color(white: 0.16))
+          .frame(height: 100)
+        RoundedRectangle(cornerRadius: 8)
+          .fill(Color(white: 0.16))
+          .frame(height: 100)
+      }
+      .padding(.horizontal, 40)
+      .padding(.top, 30)
+    }
+    .frame(width: 880, height: 360)
+  }
+}
+
+private struct HeroRaster {
+  var width: Int
+  var height: Int
+  var rgba: [UInt8]
+
+  init?(_ image: CGImage) {
+    width = image.width
+    height = image.height
+    rgba = [UInt8](repeating: 0, count: width * height * 4)
+    let drew = rgba.withUnsafeMutableBytes { raw -> Bool in
+      guard
+        let context = CGContext(
+          data: raw.baseAddress,
+          width: width,
+          height: height,
+          bitsPerComponent: 8,
+          bytesPerRow: width * 4,
+          space: CGColorSpaceCreateDeviceRGB(),
+          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+      else { return false }
+      context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+      return true
+    }
+    if !drew { return nil }
+  }
+
+  func color(x: Double, y: Double, viewWidth: Double, viewHeight: Double, fromTop: Bool)
+    -> HeroSample
+  {
+    let px = min(width - 1, max(0, Int(x / viewWidth * Double(width))))
+    let py = min(height - 1, max(0, Int(y / viewHeight * Double(height))))
+    let row = fromTop ? py : height - 1 - py
+    let index = (row * width + px) * 4
+    let red = Double(rgba[index]) / 255
+    let green = Double(rgba[index + 1]) / 255
+    let blue = Double(rgba[index + 2]) / 255
+    return HeroSample(red: red, green: green, blue: blue)
+  }
+}
+
+private struct HeroSample {
+  var red: Double
+  var green: Double
+  var blue: Double
+
+  var chroma: Double { max(red, green, blue) - min(red, green, blue) }
 }
 
 final class SessionLedger {

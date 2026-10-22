@@ -75,15 +75,18 @@
 "Reset to defaults" = "Reset to defaults";
 "Reset to defaults…" = "Reset to defaults…";
 "Restore default instructions" = "Restore default instructions";
-"RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, and the Wi-Fi doesn't even need to be on the internet." = "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, and the Wi-Fi doesn't even need to be on the internet.";
+"RoomCast 1.0 Beta Release" = "RoomCast 1.0 Beta Release";
+"RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, WiFi needs No Internet." = "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, WiFi needs No Internet.";
 "RoomCast" = "RoomCast";
 "Save a PDF of the QR poster and open it. Print that PDF yourself." = "Save a PDF of the QR poster and open it. Print that PDF yourself.";
+"Save and Close" = "Save and Close";
 "Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code." = "Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code.";
 "Show Log" = "Show Log";
 "Show footer" = "Show footer";
 "Show instructions" = "Show instructions";
 "Show the QR code full screen" = "Show the QR code full screen";
 "Some Android phones can't open .local addresses." = "Some Android phones can't open .local addresses.";
+"Sound comes from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events." = "Sound comes from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events.";
 "Speech 32k" = "Speech 32k";
 "Speech is mono, 32 kbps, for about 30 phones. The stream is always 48 kHz. Music is 96 kbps mono or 128 kbps stereo." = "Speech is mono, 32 kbps, for about 30 phones. The stream is always 48 kHz. Music is 96 kbps mono or 128 kbps stereo.";
 "Standard 64k" = "Standard 64k";
@@ -97,7 +100,6 @@
 "TCP only = Wi-Fi-friendly; try it if listeners hear dropouts." = "TCP only = Wi-Fi-friendly; try it if listeners hear dropouts.";
 "TCP only" = "TCP only";
 "The poster QR code contains this Mac’s current IP address. If the address changes, phones still looking at the old poster cannot connect." = "The poster QR code contains this Mac’s current IP address. If the address changes, phones still looking at the old poster cannot connect.";
-"The sound can come from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events." = "The sound can come from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events.";
 "Two macOS prompts to allow" = "Two macOS prompts to allow";
 "UDP only" = "UDP only";
 "Use current network name" = "Use current network name";

@@ -1,3 +1,4 @@
+import AppKit
 import PublicEarFiCore
 import SwiftUI
 
@@ -5,34 +6,39 @@ struct RootView: View {
   @EnvironmentObject private var model: AppModel
 
   var body: some View {
-    RunningTab()
-      .padding(.horizontal, 16)
-      .padding(.top, 12)
-      .padding(.bottom, 12)
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background {
-        ZStack {
-          Color(nsColor: .windowBackgroundColor)
-          BroadcastBackdrop(live: model.isBroadcasting, level: model.levelFraction)
-        }
-      }
-      .toolbarBackground(.automatic, for: .windowToolbar)
-      .onAppear { model.onAppear() }
-      .sheet(isPresented: $model.showFirstRun) { FirstRunSheet() }
-      .sheet(isPresented: $model.showWhy) { WhySheet() }
-      .sheet(isPresented: $model.showQR) { QRSheet() }
-      .alert("Allow incoming connections?", isPresented: $model.showFirewall) {
-        Button("Continue") { model.confirmFirewallAndStart() }
-        Button("Cancel", role: .cancel) {}
-      } message: {
-        Text(
-          "If the macOS firewall is on, it will ask to allow incoming connections for mediamtx. That is the listener server. Choose Allow. If phones cannot connect later, check System Settings → Network → Firewall."
-        )
-      }
+    ZStack {
+      BroadcastBackdrop(live: model.isBroadcasting, level: model.levelFraction)
+        .ignoresSafeArea()
+      RunningTab()
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 12)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .navigationTitle("RoomCast 1.0 Beta Release")
+    .background {
+      // Zero size so this AppKit view cannot paint over the hero.
+      MainWindowTitle(title: "RoomCast 1.0 Beta Release")
+        .frame(width: 0, height: 0)
+    }
+    .toolbarBackground(.automatic, for: .windowToolbar)
+    .onAppear { model.onAppear() }
+    .sheet(isPresented: $model.showFirstRun) { FirstRunSheet() }
+    .sheet(isPresented: $model.showWhy) { WhySheet() }
+    .sheet(isPresented: $model.showQR) { QRSheet() }
+    .alert("Allow incoming connections?", isPresented: $model.showFirewall) {
+      Button("Continue") { model.confirmFirewallAndStart() }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text(
+        "If the macOS firewall is on, it will ask to allow incoming connections for mediamtx. That is the listener server. Choose Allow. If phones cannot connect later, check System Settings → Network → Firewall."
+      )
+    }
   }
 }
 
 struct Card<Content: View>: View {
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
   @ViewBuilder var content: () -> Content
 
   var body: some View {
@@ -43,10 +49,11 @@ struct Card<Content: View>: View {
     .frame(maxWidth: .infinity, alignment: .leading)
 
     #if compiler(>=6.2)
-      if #available(macOS 26, *) {
+      if #available(macOS 26, *), !reduceTransparency {
         // Each card keeps its own dark fill. A shared glass container had
         // merged these sections into one panel, so the glass stays inside
-        // this card's rounded rectangle.
+        // this card's rounded rectangle. Reduce Transparency skips the glass
+        // so the card stays a solid plate and the hero still shows in the gaps.
         stack
           .background {
             RoundedRectangle(cornerRadius: 8)
@@ -72,6 +79,37 @@ private struct OpaqueCardPlate: ViewModifier {
       .background(Color(nsColor: .textBackgroundColor))
       .clipShape(RoundedRectangle(cornerRadius: 8))
       .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.28)))
+  }
+}
+
+/// Sets the main window title. `navigationTitle` does not always reach the
+/// title bar of a plain window group.
+private struct MainWindowTitle: NSViewRepresentable {
+  var title: String
+
+  func makeNSView(context: Context) -> TitleView {
+    let view = TitleView()
+    view.title = title
+    return view
+  }
+
+  func updateNSView(_ view: TitleView, context: Context) {
+    view.title = title
+    view.window?.title = title
+  }
+}
+
+private final class TitleView: NSView {
+  var title = ""
+
+  override var isOpaque: Bool { false }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    window?.title = title
+    // Near-black field. Gaps stay this colour if a card does not cover them.
+    window?.backgroundColor = NSColor(
+      srgbRed: 11.0 / 255, green: 10.0 / 255, blue: 20.0 / 255, alpha: 1)
   }
 }
 
@@ -432,18 +470,9 @@ struct LevelBar: View {
     GeometryReader { geometry in
       ZStack(alignment: .leading) {
         RoundedRectangle(cornerRadius: 3).fill(Color.gray.opacity(0.15))
-        LinearGradient(
-          stops: [
-            .init(color: .green, location: 0),
-            .init(color: .green, location: 0.7),
-            .init(color: .yellow, location: 0.88),
-            .init(color: .red, location: 1),
-          ],
-          startPoint: .leading,
-          endPoint: .trailing
-        )
-        .frame(width: geometry.size.width * min(1, max(0, fraction)))
-        .clipShape(RoundedRectangle(cornerRadius: 3))
+        RoundedRectangle(cornerRadius: 3)
+          .fill(AppChrome.startButton)
+          .frame(width: geometry.size.width * min(1, max(0, fraction)))
       }
     }
     .frame(height: 12)
@@ -470,223 +499,17 @@ struct WarningBanner: View {
 struct SettingsTab: View {
   @EnvironmentObject private var model: AppModel
   @State private var confirmReset = false
+  @State private var closeSettingsRequest = 0
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 12) {
-        Card {
-          SectionLabel(text: "Audio input")
-          LabeledRow(title: "Device") {
-            Picker("Device", selection: deviceBinding) {
-              Text("Automatic").tag(String?.none)
-              ForEach(model.devices) { device in
-                Text(device.name).tag(Optional(device.id))
-              }
-              if let uid = model.settings.inputDeviceUID,
-                !model.devices.contains(where: { $0.id == uid })
-              {
-                Text("Not connected").tag(Optional(uid))
-              }
-            }
-            .labelsHidden()
-          }
-          if model.selectedDevice?.isBluetooth == true {
-            Text(
-              "Bluetooth earbuds switch to call mode while they are the microphone. The mic stays speech quality. Their own playback drops to call quality, so the stage may be harder to hear. A wired or USB microphone, or separate wired headphones, avoids that. Turn Bluetooth off on your phone, and on any other nearby device paired to the earbuds, before you go live, so the phone does not take them back and cut the stream."
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-          }
-          LabeledRow(title: "Channels") {
-            Picker("Mode", selection: modeBinding) {
-              Text("Mono").tag(ChannelMode.mono)
-              Text("Stereo").tag(ChannelMode.stereo)
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 150)
-            if model.settings.channelMode == .stereo {
-              Picker("Input", selection: channelBinding) {
-                ForEach(1...channelUpper, id: \.self) { channel in
-                  Text("Input \(channel)").tag(channel)
-                }
-              }
-              .labelsHidden()
-              .frame(width: 110)
-            } else {
-              Text("All inputs summed")
-                .foregroundStyle(.secondary)
-            }
-          }
-          LabeledRow(title: "Quality") {
-            Picker("Quality", selection: qualityBinding) {
-              Text("Speech 32k").tag(QualityPreset.speech)
-              Text("Standard 64k").tag(QualityPreset.standard)
-              Text("Music 96k").tag(QualityPreset.music)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-          }
-          Text(model.settings.bandwidthHint)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-          Text(
-            "Speech is mono, 32 kbps, for about 30 phones. The stream is always 48 kHz. Music is 96 kbps mono or 128 kbps stereo."
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        }
-        Card {
-          SectionLabel(text: "Stream")
-          LabeledRow(title: "Stream name") {
-            TextField("live", text: streamBinding)
-              .frame(width: 120)
-            Text("Port")
-            TextField("8889", text: portText)
-              .frame(width: 70)
-          }
-          LabeledRow(title: "Broadcast title") {
-            TextField(model.defaultBroadcastTitle, text: titleBinding)
-              .frame(maxWidth: 280)
-          }
-          Text(
-            "Shown on the lock screen and in the browser tab. Leave this blank for \(model.defaultBroadcastTitle). A blank title follows the app name. Changing it does not change the link."
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          LabeledRow(title: "Network mode") {
-            Picker("Network", selection: networkBinding) {
-              Text("Auto (UDP+TCP)").tag(NetworkMode.auto)
-              Text("UDP only").tag(NetworkMode.udpOnly)
-              Text("TCP only").tag(NetworkMode.tcpOnly)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-          }
-          Text("TCP only = Wi-Fi-friendly; try it if listeners hear dropouts.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        Card {
-          SectionLabel(text: "Poster")
-          LabeledRow(title: "Wi-Fi name") {
-            TextField("Network name", text: posterNetworkBinding)
-              .frame(maxWidth: 280)
-          }
-          if let ssid = model.knownSSID, !ssid.isEmpty,
-            ssid != model.settings.posterNetworkName.trimmingCharacters(in: .whitespacesAndNewlines)
-          {
-            Button("Use this Mac’s Wi-Fi (\(ssid))") { model.useCurrentNetworkName() }
-              .font(.caption)
-          }
-          Text(
-            "Phones join this network before the listen code works. Leave it blank to print a line you can write in. Use this Mac’s Wi-Fi only when that is the network people will join."
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
-          LabeledRow(title: "Password") {
-            SecureField("Wi-Fi password", text: posterPasswordBinding)
-              .frame(maxWidth: 280)
-          }
-          if let notice = model.posterPasswordNotice {
-            Text(notice).font(.caption).foregroundStyle(.orange)
-          }
-          Text(
-            "Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code."
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
-          LabeledRow(title: "Security") {
-            Picker("Security", selection: posterSecurityBinding) {
-              ForEach(WiFiSecurity.allCases, id: \.self) { security in
-                Text(security.menuLabel).tag(security)
-              }
-            }
-            .labelsHidden()
-            .frame(width: 180)
-          }
-          if model.settings.posterWiFiSecurity == .none {
-            Text("An open network has no password. The poster will not print one.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-          Toggle("Hidden network", isOn: posterHiddenBinding)
-        }
-        Card {
-          SectionLabel(text: "This Mac")
-          Toggle("Keep Mac awake while broadcasting", isOn: awakeBinding)
-          Text(
-            "Closing the laptop lid will still sleep the Mac unless it is on power with an external display."
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          Toggle("Launch at login", isOn: loginBinding)
-          Toggle("Start broadcasting when the app opens", isOn: autoStartBinding)
-          if let message = model.loginItemMessage {
-            Text(message).font(.caption).foregroundStyle(.orange)
-          }
-        }
-        Card {
-          SectionLabel(text: "Advanced")
-          LabeledRow(title: "ICE port") {
-            TextField("8189", text: iceText).frame(width: 80)
-          }
-          LabeledRow(title: "URL style") {
-            Picker("URL", selection: styleBinding) {
-              Text("IP address").tag(URLStyle.ip)
-              Text(".local hostname").tag(URLStyle.localHostname)
-            }
-            .labelsHidden()
-            .frame(width: 180)
-          }
-          if model.settings.urlStyle == .localHostname {
-            Text("Some Android phones can't open .local addresses.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-          LabeledRow(title: "Max listeners") {
-            TextField("0", text: maxText).frame(width: 80)
-            Text("0 = unlimited").font(.caption).foregroundStyle(.secondary)
-          }
-          LabeledRow(title: "Log level") {
-            Picker("Log", selection: logBinding) {
-              ForEach(LogLevel.allCases, id: \.self) { level in
-                Text(level.rawValue).tag(level)
-              }
-            }
-            .labelsHidden()
-            .frame(width: 120)
-          }
-          Toggle("Custom bitrate", isOn: customToggle)
-          if model.settings.quality == .custom {
-            LabeledRow(title: "Bitrate") {
-              TextField("64", text: bitrateText).frame(width: 80)
-              Text("16–256 kbps").font(.caption).foregroundStyle(.secondary)
-            }
-          }
-        }
-        if let issue = validate(model.settings).first {
-          Text(issue.message).foregroundStyle(.red)
-        }
-        HStack {
-          Button("Reset to defaults…") { confirmReset = true }
-          Button("Credits…") { model.showCredits = true }
-          Text(
-            model.hasPendingChanges
-              ? "Apply now, or on the next Start." : "Changes apply on the next Start."
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        }
-        if model.hasPendingChanges {
-          Button("Apply now (brief interruption)") { model.applyNow() }
-        }
+    VStack(spacing: 0) {
+      settingsSaveRow
+      ScrollView {
+        settingsForm
       }
-      .padding(.bottom, 8)
+      settingsSaveRow
     }
-    .padding(16)
+    .background(CloseSettingsWindow(request: closeSettingsRequest))
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .id(model.settingsRevision)
     .sheet(isPresented: $model.showCredits) { CreditsSheet() }
@@ -701,6 +524,234 @@ struct SettingsTab: View {
         "Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start."
       )
     }
+  }
+
+  private var settingsSaveRow: some View {
+    HStack {
+      GreenPushButton("Save and Close") {
+        model.saveAndCloseSettings()
+        closeSettingsRequest += 1
+      }
+      Spacer()
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
+  }
+
+  private var settingsForm: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Card {
+        SectionLabel(text: "Audio input")
+        LabeledRow(title: "Device") {
+          Picker("Device", selection: deviceBinding) {
+            Text("Automatic").tag(String?.none)
+            ForEach(model.devices) { device in
+              Text(device.name).tag(Optional(device.id))
+            }
+            if let uid = model.settings.inputDeviceUID,
+              !model.devices.contains(where: { $0.id == uid })
+            {
+              Text("Not connected").tag(Optional(uid))
+            }
+          }
+          .labelsHidden()
+        }
+        if model.selectedDevice?.isBluetooth == true {
+          Text(
+            "Bluetooth earbuds switch to call mode while they are the microphone. The mic stays speech quality. Their own playback drops to call quality, so the stage may be harder to hear. A wired or USB microphone, or separate wired headphones, avoids that. Turn Bluetooth off on your phone, and on any other nearby device paired to the earbuds, before you go live, so the phone does not take them back and cut the stream."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        }
+        LabeledRow(title: "Channels") {
+          Picker("Mode", selection: modeBinding) {
+            Text("Mono").tag(ChannelMode.mono)
+            Text("Stereo").tag(ChannelMode.stereo)
+          }
+          .pickerStyle(.segmented)
+          .frame(width: 150)
+          if model.settings.channelMode == .stereo {
+            Picker("Input", selection: channelBinding) {
+              ForEach(1...channelUpper, id: \.self) { channel in
+                Text("Input \(channel)").tag(channel)
+              }
+            }
+            .labelsHidden()
+            .frame(width: 110)
+          } else {
+            Text("All inputs summed")
+              .foregroundStyle(.secondary)
+          }
+        }
+        LabeledRow(title: "Quality") {
+          Picker("Quality", selection: qualityBinding) {
+            Text("Speech 32k").tag(QualityPreset.speech)
+            Text("Standard 64k").tag(QualityPreset.standard)
+            Text("Music 96k").tag(QualityPreset.music)
+          }
+          .pickerStyle(.segmented)
+          .labelsHidden()
+        }
+        Text(model.settings.bandwidthHint)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        Text(
+          "Speech is mono, 32 kbps, for about 30 phones. The stream is always 48 kHz. Music is 96 kbps mono or 128 kbps stereo."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
+      Card {
+        SectionLabel(text: "Stream")
+        LabeledRow(title: "Stream name") {
+          TextField("live", text: streamBinding)
+            .frame(width: 120)
+          Text("Port")
+          TextField("8889", text: portText)
+            .frame(width: 70)
+        }
+        LabeledRow(title: "Broadcast title") {
+          TextField(model.defaultBroadcastTitle, text: titleBinding)
+            .frame(maxWidth: 280)
+        }
+        Text(
+          "Shown on the lock screen and in the browser tab. Leave this blank for \(model.defaultBroadcastTitle). A blank title follows the app name. Changing it does not change the link."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        LabeledRow(title: "Network mode") {
+          Picker("Network", selection: networkBinding) {
+            Text("Auto (UDP+TCP)").tag(NetworkMode.auto)
+            Text("UDP only").tag(NetworkMode.udpOnly)
+            Text("TCP only").tag(NetworkMode.tcpOnly)
+          }
+          .pickerStyle(.segmented)
+          .labelsHidden()
+        }
+        Text("TCP only = Wi-Fi-friendly; try it if listeners hear dropouts.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      Card {
+        SectionLabel(text: "Poster")
+        LabeledRow(title: "Wi-Fi name") {
+          TextField("Network name", text: posterNetworkBinding)
+            .frame(maxWidth: 280)
+        }
+        if let ssid = model.knownSSID, !ssid.isEmpty,
+          ssid != model.settings.posterNetworkName.trimmingCharacters(in: .whitespacesAndNewlines)
+        {
+          Button("Use this Mac’s Wi-Fi (\(ssid))") { model.useCurrentNetworkName() }
+            .font(.caption)
+        }
+        Text(
+          "Phones join this network before the listen code works. Leave it blank to print a line you can write in. Use this Mac’s Wi-Fi only when that is the network people will join."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        LabeledRow(title: "Password") {
+          SecureField("Wi-Fi password", text: posterPasswordBinding)
+            .frame(maxWidth: 280)
+        }
+        if let notice = model.posterPasswordNotice {
+          Text(notice).font(.caption).foregroundStyle(.orange)
+        }
+        Text(
+          "Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        LabeledRow(title: "Security") {
+          Picker("Security", selection: posterSecurityBinding) {
+            ForEach(WiFiSecurity.allCases, id: \.self) { security in
+              Text(security.menuLabel).tag(security)
+            }
+          }
+          .labelsHidden()
+          .frame(width: 180)
+        }
+        if model.settings.posterWiFiSecurity == .none {
+          Text("An open network has no password. The poster will not print one.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        Toggle("Hidden network", isOn: posterHiddenBinding)
+      }
+      Card {
+        SectionLabel(text: "This Mac")
+        Toggle("Keep Mac awake while broadcasting", isOn: awakeBinding)
+        Text(
+          "Closing the laptop lid will still sleep the Mac unless it is on power with an external display."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        Toggle("Launch at login", isOn: loginBinding)
+        Toggle("Start broadcasting when the app opens", isOn: autoStartBinding)
+        if let message = model.loginItemMessage {
+          Text(message).font(.caption).foregroundStyle(.orange)
+        }
+      }
+      Card {
+        SectionLabel(text: "Advanced")
+        LabeledRow(title: "ICE port") {
+          TextField("8189", text: iceText).frame(width: 80)
+        }
+        LabeledRow(title: "URL style") {
+          Picker("URL", selection: styleBinding) {
+            Text("IP address").tag(URLStyle.ip)
+            Text(".local hostname").tag(URLStyle.localHostname)
+          }
+          .labelsHidden()
+          .frame(width: 180)
+        }
+        if model.settings.urlStyle == .localHostname {
+          Text("Some Android phones can't open .local addresses.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        LabeledRow(title: "Max listeners") {
+          TextField("0", text: maxText).frame(width: 80)
+          Text("0 = unlimited").font(.caption).foregroundStyle(.secondary)
+        }
+        LabeledRow(title: "Log level") {
+          Picker("Log", selection: logBinding) {
+            ForEach(LogLevel.allCases, id: \.self) { level in
+              Text(level.rawValue).tag(level)
+            }
+          }
+          .labelsHidden()
+          .frame(width: 120)
+        }
+        Toggle("Custom bitrate", isOn: customToggle)
+        if model.settings.quality == .custom {
+          LabeledRow(title: "Bitrate") {
+            TextField("64", text: bitrateText).frame(width: 80)
+            Text("16–256 kbps").font(.caption).foregroundStyle(.secondary)
+          }
+        }
+      }
+      if let issue = validate(model.settings).first {
+        Text(issue.message).foregroundStyle(.red)
+      }
+      HStack {
+        Button("Reset to defaults…") { confirmReset = true }
+        Button("Credits…") { model.showCredits = true }
+        Text(
+          model.hasPendingChanges
+            ? "Apply now, or on the next Start." : "Changes apply on the next Start."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
+      if model.hasPendingChanges {
+        Button("Apply now (brief interruption)") { model.applyNow() }
+      }
+    }
+    .padding(.bottom, 8)
+    .padding(16)
   }
 
   private var deviceBinding: Binding<String?> {
@@ -814,6 +865,32 @@ struct SettingsTab: View {
     Binding(
       get: { model.settings.posterWiFiHidden },
       set: { value in model.mutate { $0.posterWiFiHidden = value } })
+  }
+}
+
+/// Closes the Settings window that contains this view, not the broadcast window.
+private struct CloseSettingsWindow: NSViewRepresentable {
+  var request: Int
+
+  func makeNSView(context: Context) -> NSView {
+    let view = NSView(frame: .zero)
+    view.isHidden = true
+    return view
+  }
+
+  func updateNSView(_ view: NSView, context: Context) {
+    guard request != context.coordinator.applied else { return }
+    context.coordinator.applied = request
+    guard request > 0 else { return }
+    DispatchQueue.main.async {
+      view.window?.close()
+    }
+  }
+
+  func makeCoordinator() -> Coordinator { Coordinator() }
+
+  final class Coordinator {
+    var applied = 0
   }
 }
 

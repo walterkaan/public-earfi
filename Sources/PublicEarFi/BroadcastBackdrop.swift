@@ -9,18 +9,20 @@ import SwiftUI
 /// staggered vertically, each carry three teal bars. Buttons stay the brand
 /// green; this scene does not. Stopped is dimmer than a live broadcast.
 /// Reduce Motion holds one frame, and a hidden window pauses the timeline.
+/// The scene is stretched across the whole window so it shows in the gaps
+/// around the cards, including when Reduce Transparency makes those cards opaque.
 struct BroadcastBackdrop: View {
   var live: Bool
   var level: Double
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @State private var windowVisible = true
+  @State private var pausedByOcclusion = false
 
   var body: some View {
-    let paused = reduceMotion || !windowVisible
+    let paused = reduceMotion || pausedByOcclusion
     TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: paused)) { timeline in
       Canvas { context, size in
-        guard windowVisible, size.width > 2, size.height > 2 else { return }
+        guard size.width > 2, size.height > 2 else { return }
         let time =
           reduceMotion
           ? HeroMotion.stillTime
@@ -36,7 +38,7 @@ struct BroadcastBackdrop: View {
     }
     .allowsHitTesting(false)
     .accessibilityHidden(true)
-    .background(WindowVisibility(isVisible: $windowVisible))
+    .background(WindowVisibility(isOccluded: $pausedByOcclusion))
   }
 }
 
@@ -116,15 +118,15 @@ enum HeroMotion {
 
   /// How strongly the teal arcs are drawn. Live is brighter than stopped.
   static func presence(live: Bool) -> Double {
-    live ? 0.85 : 0.48
+    live ? 1 : 0.82
   }
 
   static func ringStrength(live: Bool) -> Double {
-    live ? 0.50 : 0.28
+    live ? 0.85 : 0.62
   }
 
   static func deviceOpacity(live: Bool) -> Double {
-    live ? 0.92 : 0.58
+    live ? 1 : 0.9
   }
 
   /// Bar height as a fraction of its maximum. Live follows the input level.
@@ -149,14 +151,10 @@ enum HeroMotion {
       Path(CGRect(origin: .zero, size: size)),
       with: .color(HeroPalette.backdrop)
     )
-    let fit = min(size.width / sceneSize.width, size.height / sceneSize.height)
-    let scale = fit * 0.94
+    // Stretch to the window. A fitted scene sat in a short band and the gaps
+    // around the cards stayed empty.
     var scene = context
-    scene.translateBy(
-      x: (size.width - sceneSize.width * scale) / 2,
-      y: (size.height - sceneSize.height * scale) / 2
-    )
-    scene.scaleBy(x: scale, y: scale)
+    scene.scaleBy(x: size.width / sceneSize.width, y: size.height / sceneSize.height)
     drawRings(in: &scene, time: time, live: live)
     drawArcs(in: &scene, time: time, live: live)
     var devices = scene
@@ -176,10 +174,15 @@ enum HeroMotion {
       let radius = CGFloat(46 * ringScale(progress: progress))
       let rect = CGRect(
         x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+      // A soft disc plus a thick stroke, so a 12 pt gap still catches the ring.
+      context.fill(
+        Path(ellipseIn: rect),
+        with: .color(HeroPalette.pink.opacity(alpha * 0.35))
+      )
       context.stroke(
         Path(ellipseIn: rect),
         with: .color(HeroPalette.pink.opacity(alpha)),
-        lineWidth: 2
+        lineWidth: 7
       )
     }
   }
@@ -206,7 +209,7 @@ enum HeroMotion {
       context.stroke(
         path,
         with: .color(HeroPalette.teal.opacity(alpha)),
-        style: StrokeStyle(lineWidth: 3, lineCap: .round)
+        style: StrokeStyle(lineWidth: 7, lineCap: .round)
       )
     }
   }
@@ -260,23 +263,25 @@ enum HeroMotion {
 }
 
 /// Pauses the hero when this window is hidden, miniaturized, or fully covered.
+/// A view that is not in a window yet is not treated as hidden, or the first
+/// frames never draw.
 private struct WindowVisibility: NSViewRepresentable {
-  @Binding var isVisible: Bool
+  @Binding var isOccluded: Bool
 
   func makeNSView(context: Context) -> VisibilityProbe {
     let view = VisibilityProbe()
-    view.onChange = { visible in
-      if isVisible != visible {
-        isVisible = visible
+    view.onChange = { occluded in
+      if isOccluded != occluded {
+        isOccluded = occluded
       }
     }
     return view
   }
 
   func updateNSView(_ view: VisibilityProbe, context: Context) {
-    view.onChange = { visible in
-      if isVisible != visible {
-        isVisible = visible
+    view.onChange = { occluded in
+      if isOccluded != occluded {
+        isOccluded = occluded
       }
     }
   }
@@ -293,10 +298,7 @@ private final class VisibilityProbe: NSView {
       NotificationCenter.default.removeObserver(observer)
     }
     observers.removeAll()
-    guard let window else {
-      publish(false)
-      return
-    }
+    guard let window else { return }
     let names = [
       NSWindow.didChangeOcclusionStateNotification,
       NSWindow.didMiniaturizeNotification,
@@ -333,7 +335,7 @@ private final class VisibilityProbe: NSView {
       && window?.isMiniaturized != true
       && NSApp.isHidden == false
       && window?.occlusionState.contains(.visible) == true
-    publish(shown)
+    publish(!shown)
   }
 
   private func publish(_ shown: Bool) {

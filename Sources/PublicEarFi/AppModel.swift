@@ -273,6 +273,12 @@ final class AppModel: ObservableObject {
     NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
   }
 
+  /// Settings are already written on each change. This flushes that copy.
+  /// The Settings window closes itself from the button that called this.
+  func saveAndCloseSettings() {
+    store.save(settings)
+  }
+
   func toggleBroadcast() {
     if isBroadcasting {
       controller.stop()

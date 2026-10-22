@@ -306,11 +306,11 @@ struct FirstRunSheet: View {
         .foregroundStyle(AppChrome.startButton)
         .frame(maxWidth: .infinity)
       Text(
-        "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, and the Wi-Fi doesn't even need to be on the internet."
+        "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, WiFi needs No Internet."
       )
       .fixedSize(horizontal: false, vertical: true)
       Text(
-        "The sound can come from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events."
+        "Sound comes from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events."
       )
       .fixedSize(horizontal: false, vertical: true)
       sheetHeading("Getting started")

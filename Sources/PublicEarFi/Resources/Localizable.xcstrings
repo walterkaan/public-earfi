@@ -1156,28 +1156,6 @@
         }
       }
     },
-    "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, and the Wi-Fi doesn't even need to be on the internet.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, and the Wi-Fi doesn't even need to be on the internet."
-          }
-        }
-      }
-    },
-    "The sound can come from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The sound can come from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events."
-          }
-        }
-      }
-    },
     "1. Choose your sound source in Settings, which opens when you click the button below.": {
       "extractionState": "manual",
       "localizations": {
@@ -1284,6 +1262,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Getting Started"
+          }
+        }
+      }
+    },
+    "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, WiFi needs No Internet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, WiFi needs No Internet."
+          }
+        }
+      }
+    },
+    "Sound comes from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sound comes from your Mac's microphone, a headset or earbuds, or a mixing desk for bigger events."
+          }
+        }
+      }
+    },
+    "Save and Close": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save and Close"
+          }
+        }
+      }
+    },
+    "RoomCast 1.0 Beta Release": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RoomCast 1.0 Beta Release"
           }
         }
       }
