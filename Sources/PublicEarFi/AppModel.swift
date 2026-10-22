@@ -524,6 +524,13 @@ final class AppModel: ObservableObject {
     }
   }
 
+  /// How to send another app's audio through a loopback device.
+  func openMusicFAQ() {
+    if let url = URL(string: "https://roomcast.channel/faq.html#music") {
+      NSWorkspace.shared.open(url)
+    }
+  }
+
   func openNotices() {
     if let url = URL(
       string: "https://github.com/walterkaan/public-earfi/blob/main/THIRD_PARTY_NOTICES.md")

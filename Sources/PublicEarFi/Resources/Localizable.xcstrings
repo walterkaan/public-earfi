@@ -1331,6 +1331,17 @@
           }
         }
       }
+    },
+    "Broadcast music from an app": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Broadcast music from an app"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

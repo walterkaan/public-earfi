@@ -87,6 +87,9 @@ struct AppMenus: Commands {
       Button("Getting Started") {
         model.reopenGettingStarted()
       }
+      Button("Broadcast music from an app") {
+        model.openMusicFAQ()
+      }
     }
   }
 }
