@@ -551,17 +551,6 @@
         }
       }
     },
-    "macOS will ask for the microphone so RoomCast can hear the interface. Allow it. If the firewall is on, a later prompt asks to allow incoming connections for mediamtx. That is expected.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "macOS will ask for the microphone so RoomCast can hear the interface. Allow it. If the firewall is on, a later prompt asks to allow incoming connections for mediamtx. That is expected."
-          }
-        }
-      }
-    },
     "Mono": {
       "extractionState": "manual",
       "localizations": {
@@ -679,17 +668,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Phones join this network before the listen code works. Leave it blank to print a line you can write in. Use this Mac’s Wi-Fi only when that is the network people will join."
-          }
-        }
-      }
-    },
-    "Pick the USB interface in Settings if the automatic choice is wrong, then press Start Broadcasting.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pick the USB interface in Settings if the automatic choice is wrong, then press Start Broadcasting."
           }
         }
       }
@@ -1013,17 +991,6 @@
         }
       }
     },
-    "This app captures the sound desk from an audio interface and shares it with phones on the same Wi-Fi. Listeners open a link. They do not need an account.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This app captures the sound desk from an audio interface and shares it with phones on the same Wi-Fi. Listeners open a link. They do not need an account."
-          }
-        }
-      }
-    },
     "UDP only": {
       "extractionState": "manual",
       "localizations": {
@@ -1130,6 +1097,94 @@
           "stringUnit": {
             "state": "translated",
             "value": "• Or switch the poster address to the .local hostname. iPhone and Mac resolve it. Many Android phones and guest networks do not."
+          }
+        }
+      }
+    },
+    "Welcome to RoomCast": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Welcome to RoomCast"
+          }
+        }
+      }
+    },
+    "RoomCast sends sound from your Mac to people's phones over your Wi-Fi. That sound gets to the Mac from your Mac’s microphone (or a headset or earbuds), or from a mixing desk for bigger events. Listeners simply scan a provided QR code and listen with earphones on their phone. No sign-in, no cloud involvement. Just you and the listeners.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RoomCast sends sound from your Mac to people's phones over your Wi-Fi. That sound gets to the Mac from your Mac’s microphone (or a headset or earbuds), or from a mixing desk for bigger events. Listeners simply scan a provided QR code and listen with earphones on their phone. No sign-in, no cloud involvement. Just you and the listeners."
+          }
+        }
+      }
+    },
+    "Getting started": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Getting started"
+          }
+        }
+      }
+    },
+    "1. When you close this window, settings will open. Choose your sound source in Settings, such as a USB audio interface or a microphone, then close the settings window.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. When you close this window, settings will open. Choose your sound source in Settings, such as a USB audio interface or a microphone, then close the settings window."
+          }
+        }
+      }
+    },
+    "2. Press Start Broadcasting.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. Press Start Broadcasting."
+          }
+        }
+      }
+    },
+    "3. Print the QR poster, or show it on a screen, so people can scan it and listen. The QR code is always also shown on the main window.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3. Print the QR poster, or show it on a screen, so people can scan it and listen. The QR code is always also shown on the main window."
+          }
+        }
+      }
+    },
+    "Two macOS prompts to expect. macOS will ask to let RoomCast use the microphone, so it can hear your sound source. If your firewall is on, it may also ask to allow incoming connections, which is how phones reach this Mac. Choose Allow for both and you’re set to go!": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Two macOS prompts to expect. macOS will ask to let RoomCast use the microphone, so it can hear your sound source. If your firewall is on, it may also ask to allow incoming connections, which is how phones reach this Mac. Choose Allow for both and you’re set to go!"
+          }
+        }
+      }
+    },
+    "Get started": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get started"
           }
         }
       }

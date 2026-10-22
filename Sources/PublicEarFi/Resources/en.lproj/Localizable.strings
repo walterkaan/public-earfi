@@ -2,7 +2,10 @@
 ".local" = ".local";
 "0 = unlimited" = "0 = unlimited";
 "0 dB leaves the desk unchanged. Raise it when the interpreter is quiet." = "0 dB leaves the desk unchanged. Raise it when the interpreter is quiet.";
+"1. When you close this window, settings will open. Choose your sound source in Settings, such as a USB audio interface or a microphone, then close the settings window." = "1. When you close this window, settings will open. Choose your sound source in Settings, such as a USB audio interface or a microphone, then close the settings window.";
 "16–256 kbps" = "16–256 kbps";
+"2. Press Start Broadcasting." = "2. Press Start Broadcasting.";
+"3. Print the QR poster, or show it on a screen, so people can scan it and listen. The QR code is always also shown on the main window." = "3. Print the QR poster, or show it on a screen, so people can scan it and listen. The QR code is always also shown on the main window.";
 "A4" = "A4";
 "About RoomCast" = "About RoomCast";
 "All inputs summed" = "All inputs summed";
@@ -32,6 +35,8 @@
 "EF" = "EF";
 "Export PDF…" = "Export PDF…";
 "Export Poster PDF…" = "Export Poster PDF…";
+"Get started" = "Get started";
+"Getting started" = "Getting started";
 "Guest Wi-Fi with client isolation, and separate VLANs, also block listeners." = "Guest Wi-Fi with client isolation, and separate VLANs, also block listeners.";
 "Header" = "Header";
 "Hidden network" = "Hidden network";
@@ -58,7 +63,6 @@
 "Password, security, and hidden network are in Settings → Poster. The main-window PDF has a join code when this name is filled in. This window's PDF does not include the password." = "Password, security, and hidden network are in Settings → Poster. The main-window PDF has a join code when this name is filled in. This window's PDF does not include the password.";
 "Patreon" = "Patreon";
 "Phones join this network before the listen code works. Leave it blank to print a line you can write in. Use this Mac’s Wi-Fi only when that is the network people will join." = "Phones join this network before the listen code works. Leave it blank to print a line you can write in. Use this Mac’s Wi-Fi only when that is the network people will join.";
-"Pick the USB interface in Settings if the automatic choice is wrong, then press Start Broadcasting." = "Pick the USB interface in Settings if the automatic choice is wrong, then press Start Broadcasting.";
 "Port" = "Port";
 "Poster…" = "Poster…";
 "Preview and PDF" = "Preview and PDF";
@@ -66,6 +70,7 @@
 "Reset to defaults" = "Reset to defaults";
 "Reset to defaults…" = "Reset to defaults…";
 "Restore default instructions" = "Restore default instructions";
+"RoomCast sends sound from your Mac to people's phones over your Wi-Fi. That sound gets to the Mac from your Mac’s microphone (or a headset or earbuds), or from a mixing desk for bigger events. Listeners simply scan a provided QR code and listen with earphones on their phone. No sign-in, no cloud involvement. Just you and the listeners." = "RoomCast sends sound from your Mac to people's phones over your Wi-Fi. That sound gets to the Mac from your Mac’s microphone (or a headset or earbuds), or from a mixing desk for bigger events. Listeners simply scan a provided QR code and listen with earphones on their phone. No sign-in, no cloud involvement. Just you and the listeners.";
 "RoomCast" = "RoomCast";
 "Save a PDF of the QR poster and open it. Print that PDF yourself." = "Save a PDF of the QR poster and open it. Print that PDF yourself.";
 "Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code." = "Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code.";
@@ -87,15 +92,15 @@
 "TCP only = Wi-Fi-friendly; try it if listeners hear dropouts." = "TCP only = Wi-Fi-friendly; try it if listeners hear dropouts.";
 "TCP only" = "TCP only";
 "The poster QR code contains this Mac’s current IP address. If the address changes, phones still looking at the old poster cannot connect." = "The poster QR code contains this Mac’s current IP address. If the address changes, phones still looking at the old poster cannot connect.";
-"This app captures the sound desk from an audio interface and shares it with phones on the same Wi-Fi. Listeners open a link. They do not need an account." = "This app captures the sound desk from an audio interface and shares it with phones on the same Wi-Fi. Listeners open a link. They do not need an account.";
+"Two macOS prompts to expect. macOS will ask to let RoomCast use the microphone, so it can hear your sound source. If your firewall is on, it may also ask to allow incoming connections, which is how phones reach this Mac. Choose Allow for both and you’re set to go!" = "Two macOS prompts to expect. macOS will ask to let RoomCast use the microphone, so it can hear your sound source. If your firewall is on, it may also ask to allow incoming connections, which is how phones reach this Mac. Choose Allow for both and you’re set to go!";
 "UDP only" = "UDP only";
 "Use current network name" = "Use current network name";
 "View licence" = "View licence";
 "Volume" = "Volume";
 "Volume, from -12 dB to +24 dB. 0 dB leaves the desk unchanged. Changes apply immediately, including while you are live." = "Volume, from -12 dB to +24 dB. 0 dB leaves the desk unchanged. Changes apply immediately, including while you are live.";
+"Welcome to RoomCast" = "Welcome to RoomCast";
 "Wi-Fi network name (optional)" = "Wi-Fi network name (optional)";
 "github.com/walterkaan/public-earfi" = "github.com/walterkaan/public-earfi";
-"macOS will ask for the microphone so RoomCast can hear the interface. Allow it. If the firewall is on, a later prompt asks to allow incoming connections for mediamtx. That is expected." = "macOS will ask for the microphone so RoomCast can hear the interface. Allow it. If the firewall is on, a later prompt asks to allow incoming connections for mediamtx. That is expected.";
 "stereo" = "stereo";
 "— dB" = "— dB";
 "• Ask the venue for a DHCP reservation for this Mac (recommended)." = "• Ask the venue for a DHCP reservation for this Mac (recommended).";

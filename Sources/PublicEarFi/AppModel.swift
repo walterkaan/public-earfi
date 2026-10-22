@@ -256,6 +256,10 @@ final class AppModel: ObservableObject {
         self.restartMeter()
       }
     }
+    // After the sheet closes, so Settings is not hidden behind it.
+    DispatchQueue.main.async {
+      NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
   }
 
   func toggleBroadcast() {

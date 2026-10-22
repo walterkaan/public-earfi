@@ -295,26 +295,43 @@ struct FirstRunSheet: View {
   @EnvironmentObject private var model: AppModel
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Text("RoomCast").font(.title2.bold())
+    VStack(alignment: .leading, spacing: 14) {
+      Image(nsImage: NSApp.applicationIconImage)
+        .resizable()
+        .interpolation(.high)
+        .frame(width: 80, height: 80)
+        .frame(maxWidth: .infinity)
+      Text("Welcome to RoomCast")
+        .font(.title2.bold())
+        .frame(maxWidth: .infinity)
       Text(
-        "This app captures the sound desk from an audio interface and shares it with phones on the same Wi-Fi. Listeners open a link. They do not need an account."
+        "RoomCast sends sound from your Mac to people's phones over your Wi-Fi. That sound gets to the Mac from your Mac’s microphone (or a headset or earbuds), or from a mixing desk for bigger events. Listeners simply scan a provided QR code and listen with earphones on their phone. No sign-in, no cloud involvement. Just you and the listeners."
       )
+      .fixedSize(horizontal: false, vertical: true)
+      Text("Getting started")
+        .font(.headline)
+      VStack(alignment: .leading, spacing: 8) {
+        Text(
+          "1. When you close this window, settings will open. Choose your sound source in Settings, such as a USB audio interface or a microphone, then close the settings window."
+        )
+        Text("2. Press Start Broadcasting.")
+        Text(
+          "3. Print the QR poster, or show it on a screen, so people can scan it and listen. The QR code is always also shown on the main window."
+        )
+      }
+      .fixedSize(horizontal: false, vertical: true)
       Text(
-        "macOS will ask for the microphone so RoomCast can hear the interface. Allow it. If the firewall is on, a later prompt asks to allow incoming connections for mediamtx. That is expected."
+        "Two macOS prompts to expect. macOS will ask to let RoomCast use the microphone, so it can hear your sound source. If your firewall is on, it may also ask to allow incoming connections, which is how phones reach this Mac. Choose Allow for both and you’re set to go!"
       )
-      Text(
-        "Pick the USB interface in Settings if the automatic choice is wrong, then press Start Broadcasting."
-      )
-      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
       HStack {
         Spacer()
-        Button("Continue") { model.finishFirstRun() }
+        Button("Get started") { model.finishFirstRun() }
           .keyboardShortcut(.defaultAction)
       }
     }
-    .padding(20)
-    .frame(width: 460)
+    .padding(24)
+    .frame(width: 560)
   }
 }
 
