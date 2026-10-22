@@ -1,11 +1,20 @@
 import AVFoundation
 import AudioToolbox
+import Darwin
 import PublicEarFiCore
 import XCTest
 
 @testable import PublicEarFi
 
 final class AudioCaptureTests: XCTestCase {
+  override func setUp() {
+    super.setUp()
+    // The capture writer blocks SIGPIPE on its own thread. A write from this
+    // process on any other thread still uses the default action and kills
+    // xctest with signal 13. Ignore it so write returns EPIPE.
+    _ = signal(SIGPIPE, SIG_IGN)
+  }
+
   /// The Start failure path used to call `terminationStatus` while ffmpeg was
   /// still running, which raises NSInvalidArgumentException. `/bin/sleep`
   /// stands in for that still-running ffmpeg.

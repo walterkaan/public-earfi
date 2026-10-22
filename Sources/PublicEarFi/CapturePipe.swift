@@ -207,6 +207,10 @@ final class CapturePipe {
     if flags >= 0 {
       _ = fcntl(descriptor, F_SETFL, flags | O_NONBLOCK)
     }
+    // A closed ffmpeg stdin must come back as EPIPE on every thread. Blocking
+    // SIGPIPE only on the writer leaves the rest of the process on the default
+    // action, which quits the app, and xctest, with signal 13.
+    ignoreBrokenPipe(descriptor: descriptor)
     bytesOut.withLock { $0 = 0 }
     deliveryLock.lock()
     callbackCount = 0
@@ -633,9 +637,17 @@ final class CapturePipe {
     var at: Date
   }
 
+  /// `write` raises SIGPIPE in the calling thread when the pipe has no reader.
+  /// Ignore that signal for the process, and mark this descriptor so the
+  /// write still returns EPIPE if something later restores the default.
+  private func ignoreBrokenPipe(descriptor: Int32) {
+    _ = signal(SIGPIPE, SIG_IGN)
+    _ = fcntl(descriptor, F_SETNOSIGPIPE, 1)
+  }
+
   private func writerMain() {
-    // ffmpeg closes stdin when it exits. A write to that pipe must return
-    // EPIPE. The default SIGPIPE would quit the whole app.
+    // The process ignores SIGPIPE. This thread still blocks it, so a pending
+    // signal is not delivered here if the disposition is restored.
     var blocked = sigset_t()
     sigemptyset(&blocked)
     sigaddset(&blocked, SIGPIPE)
