@@ -26,7 +26,7 @@ struct BroadcastBackdrop: View {
           ? HeroMotion.stillTime
           : timeline.date.timeIntervalSinceReferenceDate
         HeroMotion.draw(
-          in: context,
+          in: &context,
           size: size,
           time: time,
           live: live,
@@ -111,7 +111,7 @@ enum HeroMotion {
   }
 
   static func ringOpacity(progress: Double) -> Double {
-    ringOpacityStart * fade(progress)
+    ringOpacityStart * fade(progress: progress)
   }
 
   /// How strongly the teal arcs are drawn. Live is brighter than stopped.
