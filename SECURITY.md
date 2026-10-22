@@ -1,6 +1,6 @@
 # Security
 
-Public EarFi is a local, unauthenticated audio stream. Anyone who can reach the Mac on the listener port can hear it. That is intentional. Do not put the Mac on a network you do not trust, and do not forward the port to the internet.
+RoomCast is a local, unauthenticated audio stream. Anyone who can reach the Mac on the listener port can hear it. That is intentional. Do not put the Mac on a network you do not trust, and do not forward the port to the internet.
 
 ## Reporting a vulnerability
 

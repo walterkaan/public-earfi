@@ -2,14 +2,15 @@
 
 ## 1.0.0 — 2026-10-20
 
-First MVP build of Public EarFi.
+First MVP build of RoomCast.
 
+- The app name is RoomCast. The bundle id is `channel.roomcast.app`, the program is `RoomCast.app`, and logs and settings use new RoomCast folders. An older `Public EarFi.app` helper is still recognised. The home screen links to Ko-fi and Patreon. The listener page copy is in `ListenerPage.en.json`, and the Mac UI strings are in `Localizable.xcstrings`.
 - SwiftUI app. The main window is the broadcast. Settings opens with Cmd-, from the app menu. The poster and the log are their own windows. Credits stays in Settings and About.
 - App icon: Walter's yellow loudhailer on purple, masked to a squircle with transparent corners.
 - Default quality is Speech: mono, 32 kbps, for about 30 phones on venue Wi-Fi. The encode rate is fixed at 48 kHz in 20 ms frames. There is no sample-rate picker. The app captures with Core Audio and pipes 48 kHz PCM to ffmpeg, because ffmpeg's AVFoundation capture clicks even when the same device is clean in other apps.
 - Bundled MediaMTX 1.21.2 and an LGPL FFmpeg 9.0.2 with libopus 1.6.1, built from pinned source.
 - Generated `mediamtx.yml`, device selection by Core Audio UID, defaults from the spec, and Reset.
-- Start/stop supervision, auto-restart, stall detection, LAN address selection, and file logging. A port that is already in use is named, including the other program, and is not retried. A leftover Public EarFi helper can be stopped from the window.
+- Start/stop supervision, auto-restart, stall detection, LAN address selection, and file logging. A port that is already in use is named, including the other program, and is not retried. A leftover RoomCast helper can be stopped from the window.
 - Invalid saved settings are replaced with defaults instead of crashing Start. A missing audio device is reported and cleared. Reset to defaults writes a full default set back to preferences.
 - Start no longer quits while reading ffmpeg output. Progress lines that end with a carriage return, and a chunk that ends on a newline, are split as bytes on one queue. Saved settings were not the cause of that crash.
 - Stop, quit, and the next launch end mediamtx and ffmpeg with SIGTERM, then SIGKILL, including the process group. A TCP port that is only closing is not treated as still in use, so Start works again immediately. The UDP ICE port is released with the process.
@@ -17,7 +18,7 @@ First MVP build of Public EarFi.
 - The main window has a Volume slider from -12 dB to +24 dB, default 0 dB. It applies live, without restarting, and a soft limiter keeps a boost from hard-clipping. The level meter next to it shows the boosted level.
 - Start and the input picker no longer crash. The meter publishes its level on a timer, and capture finishes the current buffer before the device is closed.
 - Capture converts whatever format the device is already using (any rate, sample type, or channel count) to 48 kHz. The app does not change the device's sample rate. A format it cannot open is reported once, instead of retrying. The log records the native format and a peak level every few seconds. Silence for about 5 seconds while live shows a no-signal warning. After a settings change, the button says Apply New Settings Now.
-- The listener page title is a Settings field, Broadcast title. Blank stays “Public EarFi Broadcast” and follows the app name. The live status line is Live, the elapsed time, and the input device feeding the stream. The no-signal line waits for sustained silence and does not flicker.
+- The listener page title is a Settings field, Broadcast title. Blank stays “RoomCast Broadcast” and follows the app name. The live status line is Live, the elapsed time, and the input device feeding the stream. The no-signal line waits for sustained silence and does not flicker.
 - Bluetooth earbuds (for example AirPods) are reopened after macOS switches them to call mode, including a moment with no input channels. The log records the transport and the format after that switch. While they are the mic, their own playback is call quality; a wired or USB mic, or separate wired headphones, keeps the stage clearer. Speech from the mic is still fine for interpreting. Turn Bluetooth off on the phone, and on any other nearby device paired to the earbuds, so the phone does not take them back and interrupt the stream.
 - Start no longer crashes when ffmpeg is still running but the stream is not ready yet. The exit status is read only after the process has launched and exited.
 - A 48 kHz stereo input (BlackHole, USB PnP) is left on the format the engine already opened. Rewriting that format had stopped the tap, so ffmpeg saw no samples. The log now records tap callbacks, frames in and out, and stdin bytes after 2 seconds, plus each input stream's format. A same-rate, same-channel notification no longer reopens a wired device.

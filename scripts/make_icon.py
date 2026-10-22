@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the Public EarFi app icon.
+"""Build the RoomCast app icon.
 
 The source artwork is design/icon-loudhailer.jpg (Walter's yellow loudhailer
 on purple). `python3 scripts/make_icon.py --generate` writes a macOS AppIcon

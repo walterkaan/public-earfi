@@ -1,15 +1,15 @@
-# Public EarFi user manual
+# RoomCast user manual
 
 This guide is for the person running the event. You do not need to be comfortable with networks or audio software. Listeners do even less: they join a Wi-Fi network, scan a QR code, and listen in the browser. They do not install an app or sign in.
 
-Public EarFi sends sound from a Mac to phones in the same room. The usual job is a live interpreter, with about 30 listeners on venue Wi-Fi. The audio stays on the local network. It is not uploaded to the internet, and the app does not record.
+RoomCast sends sound from a Mac to phones in the same room. The usual job is a live interpreter, with about 30 listeners on venue Wi-Fi. The audio stays on the local network. It is not uploaded to the internet, and the app does not record.
 
 The full setup that is available today uses a **Mac as the server**. A **phone as the server** is a planned future app. It is described at the end so you can see where this is going. Do not plan an event around the phone app until it exists.
 
 ## What to bring
 
 - A Mac with macOS 13 Ventura or later (Apple silicon or Intel).
-- Public EarFi, installed in the Applications folder.
+- RoomCast, installed in the Applications folder.
 - The sound source: a USB or Thunderbolt audio interface from the sound desk, or the Mac’s built-in microphone for a small room.
 - Your own small Wi-Fi network for the phones and the Mac. A portable or travel router is the reliable choice. The venue’s Wi-Fi often blocks phones from seeing each other.
 - Power for the Mac and that router. Closing the laptop lid puts the Mac to sleep.
@@ -18,7 +18,7 @@ The full setup that is available today uses a **Mac as the server**. A **phone a
 
 | | Mac as the server | Phone as the server |
 |---|---|---|
-| Status | Available now. This is the Public EarFi Mac app. | Planned. There is no phone app yet. |
+| Status | Available now. This is the RoomCast Mac app. | Planned. There is no phone app yet. |
 | What the server does | The Mac takes the sound and serves it to the phones. | A future phone app would do that job, so you might leave the Mac at home. |
 | What listeners do | Join the Wi-Fi, scan the listen QR, and press play in the browser. | The same listener steps are the goal. |
 | What you should do now | Follow the rest of this manual. | Read the planned section at the end, then use the Mac. |
@@ -27,7 +27,7 @@ The full setup that is available today uses a **Mac as the server**. A **phone a
 
 Venue Wi-Fi often blocks this. Guest networks isolate each phone, so a phone can reach the internet and still be unable to reach the Mac. Bring a small network of your own and the venue’s Wi-Fi no longer matters.
 
-Any portable or travel Wi-Fi router will do. It does not need an internet connection. Public EarFi only needs the phones and the Mac on that same private Wi-Fi.
+Any portable or travel Wi-Fi router will do. It does not need an internet connection. RoomCast only needs the phones and the Mac on that same private Wi-Fi.
 
 What to look for when you buy or borrow one:
 
@@ -63,7 +63,7 @@ Do this once, on the Wi-Fi you will take to the venue.
 
 1. Turn on your router. It does not need the internet.
 2. Join the Mac to it, with the Mac’s address reserved so it stays the same.
-3. Install Public EarFi and open it (the next section). Allow the microphone. If the firewall asks, allow incoming connections for mediamtx. That program is what the phones connect to.
+3. Install RoomCast and open it (the next section). Allow the microphone. If the firewall asks, allow incoming connections for mediamtx. That program is what the phones connect to.
 4. Plug in the audio interface, or use the built-in microphone for this test. In Settings, choose the input. Leave quality on **Speech 32k**.
 5. Watch the level meter on the main window. Talk, or play the desk. The meter moves before you go live. If it stays empty, the Mac is listening to the wrong input.
 6. Press **Start Broadcasting**. The window should say Live and show a link like `http://192.168.1.20:8889/`. An older poster or QR code that still ends in `/live` opens the same page.
@@ -76,9 +76,9 @@ Take the same router, the same Mac, and that PDF to the event.
 
 ## Install and first open
 
-1. Download `Public-EarFi-x.y.z.dmg` from the GitHub Releases page.
-2. Open the disk image and drag **Public EarFi** to **Applications**. Running it from the disk image or from Downloads makes macOS treat it as untrusted, and it then behaves oddly.
-3. Open Public EarFi from the Applications folder.
+1. Download `RoomCast-x.y.z.dmg` from [roomcast.channel](https://roomcast.channel).
+2. Open the disk image and drag **RoomCast** to **Applications**. Running it from the disk image or from Downloads makes macOS treat it as untrusted, and it then behaves oddly.
+3. Open RoomCast from the Applications folder.
 4. Allow the microphone when asked. That permission is how the app hears the sound desk.
 5. If macOS asks about incoming connections for mediamtx, allow them.
 
@@ -86,16 +86,16 @@ The app is ad-hoc signed, or signed with a self-made certificate. It is not nota
 
 ### macOS 15 Sequoia and later
 
-1. A dialog says *"Public EarFi" Not Opened – Apple could not verify…*. Click **Done**. Do not click Move to Trash.
+1. A dialog says *"RoomCast" Not Opened – Apple could not verify…*. Click **Done**. Do not click Move to Trash.
 2. Open **System Settings → Privacy & Security**.
-3. Scroll to **Security**, find *"Public EarFi was blocked…"*, and click **Open Anyway**.
+3. Scroll to **Security**, find *"RoomCast was blocked…"*, and click **Open Anyway**.
 4. Confirm with your password or Touch ID, then click **Open**.
 
 Right-click → Open does not bypass this dialog on macOS 15 or later.
 
 ### macOS 13 and 14
 
-Control-click (right-click) Public EarFi in Applications → **Open** → **Open**. The **Open Anyway** button in System Settings → Privacy & Security works as well.
+Control-click (right-click) RoomCast in Applications → **Open** → **Open**. The **Open Anyway** button in System Settings → Privacy & Security works as well.
 
 ### After an update
 
@@ -105,7 +105,7 @@ If macOS says the app **is damaged**, the download or the signature is broken. D
 
 ## Choose the input
 
-Open **Public EarFi → Settings…** (Command-,). Settings is in the app menu, under the Public EarFi name. It is not in the File menu.
+Open **RoomCast → Settings…** (Command-,). Settings is in the app menu, under the RoomCast name. It is not in the File menu.
 
 - **Device.** Pick the USB interface. If you have not chosen one yet, the app prefers a USB interface over the built-in microphone.
 - **Bluetooth earbuds.** macOS switches Bluetooth earbuds (for example AirPods) to call mode when they are the microphone. The input menu lists them once. If they disappear for a moment during that switch, the selection stays on them instead of jumping to the Mac microphone. Choosing the Mac microphone afterwards stops the earbuds cleanly. The mic is speech quality, which is fine for interpreting. The earbuds' own playback drops to call quality while broadcasting, so the translator may hear the stage less clearly. If that matters, use a wired or USB microphone, or listen on separate wired headphones. If you do use AirPods or other Bluetooth earbuds as the mic, turn Bluetooth off on your phone, and on any other nearby device paired to them (such as an iPad), before you start broadcasting. Otherwise the phone can grab the earbuds back and interrupt the stream.
@@ -121,7 +121,7 @@ That uses the least Wi-Fi. Standard and Music use more for the same number of li
 
 Standard (64 kbps) and Music (96 kbps mono, or 128 kbps stereo) use more of the Wi-Fi for the same number of listeners. Speech is the one sized for about 30 phones.
 
-**Broadcast title**, under Stream, is the name in the browser tab and on the phone’s lock screen. Leave it blank for “Public EarFi Broadcast”. That blank default follows the app name, so a rename updates it. A name you type is used as it is. It does not change the listener link, and it does not restart the audio. A phone that already has the page open picks up a new name when the person comes back to that tab. The listener page leaves the player’s own controls clear, including the mute button.
+**Broadcast title**, under Stream, is the name in the browser tab and on the phone’s lock screen. Leave it blank for “RoomCast Broadcast”. That blank default follows the app name, so a rename updates it. A name you type is used as it is. It does not change the listener link, and it does not restart the audio. A phone that already has the page open picks up a new name when the person comes back to that tab. The listener page leaves the player’s own controls clear, including the mute button.
 
 **TCP only**, under Network mode, is the setting to try if listeners hear dropouts on Wi-Fi. Auto is the normal choice.
 
@@ -129,7 +129,7 @@ Standard (64 kbps) and Music (96 kbps mono, or 128 kbps stereo) use more of the 
 
 ## The poster and the QR code
 
-Next to **Copy link** on the main window, **Open PDF QR Poster** saves a PDF and opens it. Print that PDF yourself. The app does not send the poster to a printer, because a printed page from the app left the QR blank. That PDF is replaced each time, in the Public EarFi folder inside Application Support. The poster is A4, or Letter in the US and Canada. The title is the broadcast title. A small line at the bottom says Powered by Public EarFi.
+Next to **Copy link** on the main window, **Open PDF QR Poster** saves a PDF and opens it. Print that PDF yourself. The app does not send the poster to a printer, because a printed page from the app left the QR blank. That PDF is replaced each time, in the RoomCast folder inside Application Support. The poster is A4, or Letter in the US and Canada. The title is the broadcast title. A small line at the bottom says Powered by RoomCast.
 
 When **Settings → Poster** has a Wi-Fi name, the page has two codes. The first is labelled **1. Join the Wi-Fi**. A phone camera can join from it. The network name and password are printed under that code. The second is labelled **2. Open the broadcast**. It is the same link as the QR code in the window, and that link is printed under it. The last line is **3. Tap play; use your own earphones**. Scan them in that order.
 
@@ -172,7 +172,7 @@ There is no password on the stream. Anyone on that Wi-Fi who has the link can li
 ## On the day
 
 1. Turn on your own Wi-Fi. It does not need the internet.
-2. Join the Mac to it and open Public EarFi. Confirm the listener link matches the poster.
+2. Join the Mac to it and open RoomCast. Confirm the listener link matches the poster.
 3. Connect the sound desk to the interface. Check the level meter.
 4. Press **Start Broadcasting**. The status line stays on Live, the elapsed time, and the input device that is feeding the stream. It does not switch between quiet and healthy; the level meter shows the level. After about 5 seconds of real silence it adds a no-signal line, and that line stays until the sound has been back for a moment.
 5. Listen on your own phone once, on that Wi-Fi, before people arrive. The page title is the broadcast title from Settings.
@@ -215,13 +215,13 @@ Your own Wi-Fi still has to carry that 1 Mbps, plus a little overhead, shared am
 | The sound breaks up, or you hear a regular click | Leave quality on Speech. In Settings, try **TCP only**. |
 | The Mac slept | The lid was closed, or it was on battery and idle. Power is connected, the lid is open, and “Keep Mac awake while broadcasting” is on. |
 | The microphone prompt appears after an update | Expected. Allow it again. See Install and first open. |
-| It says a port is already in use | Another program is using that port. The message names the program. Quit it, or in Settings change the listener port or the ICE port. Public EarFi stops and waits. It does not keep restarting. If the program is a leftover Public EarFi helper, press **Stop leftover helper**, then Start. |
+| It says a port is already in use | Another program is using that port. The message names the program. Quit it, or in Settings change the listener port or the ICE port. RoomCast stops and waits. It does not keep restarting. If the program is a leftover RoomCast helper, press **Stop leftover helper**, then Start. |
 
-**Copy diagnostics** on the main window puts the version, the settings, and the recent log on the clipboard. That is the useful thing to attach to a bug report. Logs are also in `~/Library/Logs/Public EarFi/`.
+**Copy diagnostics** on the main window puts the version, the settings, and the recent log on the clipboard. That is the useful thing to attach to a bug report. Logs are also in `~/Library/Logs/RoomCast/`.
 
 ## Phone as the server (planned)
 
-A future Public EarFi app on a phone would let that phone be the server: it would take the sound and serve the same kind of browser link and QR code. Listeners would still join the Wi-Fi and listen in the browser, without installing anything.
+A future RoomCast app on a phone would let that phone be the server: it would take the sound and serve the same kind of browser link and QR code. Listeners would still join the Wi-Fi and listen in the browser, without installing anything.
 
 That app is not available. There is nothing to download, and this manual’s install steps are for the Mac only. Use the Mac as the server, with your own Wi-Fi and the home test above, for every event until a phone server is actually released.
 

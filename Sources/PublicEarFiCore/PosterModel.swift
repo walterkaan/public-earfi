@@ -121,8 +121,8 @@ public struct QuickPosterPlan: Equatable {
 }
 
 public enum PosterBuilder {
-  public static let footer = "Public EarFi: free and open source"
-  public static let poweredBy = "Powered by Public EarFi"
+  public static let footer = "RoomCast: free and open source"
+  public static let poweredBy = "Powered by RoomCast"
   public static let joinWiFi = "Join the Wi-Fi"
   public static let openBroadcast = "Open the broadcast"
   public static let tapPlay = "Tap play; use your own earphones"

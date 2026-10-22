@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="${1:-$ROOT/dist/Public EarFi.app}"
+APP="${1:-$ROOT/dist/RoomCast.app}"
 LICENSES="$APP/Contents/Resources/Licenses"
 if [[ ! -d "$LICENSES" ]]; then
   LICENSES="$ROOT/Sources/PublicEarFi/Resources/Licenses"

@@ -17,7 +17,7 @@ public enum ChildStop {
     }
 
     /// Signal the process group only when this pid leads it.
-    /// Any other group is the app's, and signaling it would kill Public EarFi.
+    /// Any other group is the app's, and signaling it would kill RoomCast.
     public var signalTarget: Int32 {
       if pid > 1, group > 1, group == pid {
         return -group

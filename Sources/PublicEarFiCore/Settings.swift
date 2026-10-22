@@ -510,8 +510,8 @@ public struct StoredSettingsLoad: Equatable {
 public enum SettingsRepair {
   public static let maxInputChannel = 64
   /// UserDefaults domain for the signed app. The file is
-  /// ~/Library/Preferences/io.github.walterkaan.public-earfi.plist
-  public static let defaultsDomain = "io.github.walterkaan.public-earfi"
+  /// ~/Library/Preferences/channel.roomcast.app.plist
+  public static let defaultsDomain = "channel.roomcast.app"
 
   public static let missingDeviceNotice =
     "The saved audio device is not connected. It was cleared. Choose a device in Settings, then press Start."
@@ -635,9 +635,9 @@ private struct StoredSettings: Codable {
 }
 
 public struct SettingsStore {
-  public static let storageKey = "publicEarfi.settings.v1"
-  public static let posterURLKey = "publicEarfi.posterLastURL"
-  public static let posterMadeAtKey = "publicEarfi.posterLastMadeAt"
+  public static let storageKey = "roomcast.settings.v1"
+  public static let posterURLKey = "roomcast.posterLastURL"
+  public static let posterMadeAtKey = "roomcast.posterLastMadeAt"
 
   public var userDefaults: UserDefaults
 

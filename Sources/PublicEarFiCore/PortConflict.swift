@@ -221,8 +221,12 @@ public enum LsofText {
 }
 
 public enum HelperIdentity {
+  /// Current bundle, plus the name used before the RoomCast rename.
+  public static let bundledAppNames = ["RoomCast.app", "Public EarFi.app"]
+
   /// True for this app's mediamtx or ffmpeg, including an older copy still
-  /// inside Public EarFi.app. A Homebrew or hand-run mediamtx is not ours.
+  /// inside RoomCast.app or Public EarFi.app. A Homebrew or hand-run mediamtx
+  /// is not ours.
   public static func isBundledHelper(executablePath: String?, knownHelperPaths: [String] = [])
     -> Bool
   {
@@ -233,8 +237,8 @@ public enum HelperIdentity {
     }
     let parts = standard.split(separator: "/").map(String.init)
     guard
-      let appIndex = parts.lastIndex(where: {
-        $0.caseInsensitiveCompare("Public EarFi.app") == .orderedSame
+      let appIndex = parts.lastIndex(where: { part in
+        bundledAppNames.contains { part.caseInsensitiveCompare($0) == .orderedSame }
       })
     else { return false }
     let rest = Array(parts[(appIndex + 1)...])

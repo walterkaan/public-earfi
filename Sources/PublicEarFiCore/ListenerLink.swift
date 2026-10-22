@@ -16,7 +16,7 @@ public struct StaleAddress: Equatable {
 /// the app name, so a rename becomes "<App name> Broadcast" without a stored
 /// string to edit.
 public enum BroadcastTitle {
-  public static let fallbackAppName = "Public EarFi"
+  public static let fallbackAppName = "RoomCast"
   public static let maximumLength = 80
 
   public static func resolved(stored: String, appName: String) -> String {

@@ -196,6 +196,7 @@ struct RunningTab: View {
         }
       }
       Spacer(minLength: 0)
+      SupportLinks()
     }
   }
 
@@ -263,6 +264,27 @@ struct RunningTab: View {
         .stroke(Color.gray.opacity(0.4))
         .frame(width: side, height: side)
     }
+  }
+}
+
+enum AppLinks {
+  static let kofi = URL(string: "https://ko-fi.com/roomcast")!
+  static let patreon = URL(string: "https://www.patreon.com/roomcastapp")!
+}
+
+/// Ko-fi and Patreon sit on the home screen. Buy Me a Coffee stays as a slot
+/// until its address is confirmed, and it does not open a page.
+struct SupportLinks: View {
+  var body: some View {
+    HStack(spacing: 16) {
+      Link("Ko-fi", destination: AppLinks.kofi)
+      Link("Patreon", destination: AppLinks.patreon)
+      Text("Buy Me a Coffee")
+        .foregroundStyle(.tertiary)
+        .help("Buy Me a Coffee is not linked yet.")
+    }
+    .font(.caption)
+    .frame(maxWidth: .infinity)
   }
 }
 

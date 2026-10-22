@@ -1,6 +1,6 @@
-# Contributing to Public EarFi
+# Contributing to RoomCast
 
-Public EarFi is an MIT-licensed macOS app. Small pull requests are the easiest to review. Include a short description and a test when the change is in the logic that does not need a Mac GUI.
+RoomCast is an MIT-licensed macOS app. Small pull requests are the easiest to review. Include a short description and a test when the change is in the logic that does not need a Mac GUI.
 
 ## Build
 
@@ -9,7 +9,7 @@ Requirements: macOS 13 or later, Xcode or the Swift toolchain, and `pkg-config`.
 ```bash
 ./scripts/build-helpers.sh
 ./scripts/build-app.sh
-open "dist/Public EarFi.app"
+open "dist/RoomCast.app"
 ```
 
 `scripts/build-helpers.sh` downloads the pinned MediaMTX release and builds libopus plus an LGPL FFmpeg from source for arm64 and x86_64. Do not commit those binaries. The script checks the SHA-256 values in `scripts/versions.env`.

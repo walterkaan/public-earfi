@@ -5,7 +5,7 @@ import Security
 /// to preferences, logs, or the diagnostics report. Do not interpolate it
 /// into a log line or an error string.
 enum PosterPasswordStore {
-  static let service = "io.github.walterkaan.public-earfi.poster-wifi"
+  static let service = "channel.roomcast.app.poster-wifi"
   static let account = "poster"
 
   struct Load {
@@ -52,7 +52,7 @@ enum PosterPasswordStore {
     var query = baseQuery()
     query[kSecValueData as String] = data
     query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-    query[kSecAttrLabel as String] = "Public EarFi poster Wi-Fi"
+    query[kSecAttrLabel as String] = "RoomCast poster Wi-Fi"
     let added = SecItemAdd(query as CFDictionary, nil)
     if added == errSecSuccess {
       return .saved

@@ -2,11 +2,11 @@
   "components": [
     {
       "id": "public-earfi",
-      "name": "Public EarFi",
+      "name": "RoomCast",
       "version": "1.0.0",
       "license": "MIT",
       "copyright": "Copyright (c) 2026 Walter Kaan",
-      "url": "https://github.com/walterkaan/public-earfi",
+      "url": "https://roomcast.channel",
       "licenseFile": "PublicEarFi-LICENSE",
       "notes": "App code."
     },

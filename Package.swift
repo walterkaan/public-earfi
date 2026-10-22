@@ -6,7 +6,7 @@ import PackageDescription
 #if os(macOS)
   let products: [Product] = [
     .library(name: "PublicEarFiCore", targets: ["PublicEarFiCore"]),
-    .executable(name: "PublicEarFi", targets: ["PublicEarFi"]),
+    .executable(name: "RoomCast", targets: ["PublicEarFi"]),
   ]
 #else
   let products: [Product] = [
@@ -16,7 +16,10 @@ import PackageDescription
 
 let coreTarget: Target = .target(
   name: "PublicEarFiCore",
-  path: "Sources/PublicEarFiCore"
+  path: "Sources/PublicEarFiCore",
+  resources: [
+    .copy("ListenerPage.en.json")
+  ]
 )
 
 let testTarget: Target = .testTarget(

@@ -485,20 +485,20 @@ final class NetworkAndURLTests: XCTestCase {
 
   func testBroadcastTitleFollowsTheAppName() {
     XCTAssertEqual(
-      BroadcastTitle.resolved(stored: "", appName: "Public EarFi"),
-      "Public EarFi Broadcast"
+      BroadcastTitle.resolved(stored: "", appName: "RoomCast"),
+      "RoomCast Broadcast"
     )
     XCTAssertEqual(
-      BroadcastTitle.resolved(stored: "   ", appName: "Public EarFi"),
-      "Public EarFi Broadcast"
+      BroadcastTitle.resolved(stored: "   ", appName: "RoomCast"),
+      "RoomCast Broadcast"
     )
     XCTAssertEqual(BroadcastTitle.resolved(stored: "", appName: "Hall Ear"), "Hall Ear Broadcast")
     XCTAssertEqual(
       BroadcastTitle.resolved(stored: "", appName: ""),
-      "Public EarFi Broadcast"
+      "RoomCast Broadcast"
     )
     XCTAssertEqual(
-      BroadcastTitle.resolved(stored: "Morning session", appName: "Public EarFi"),
+      BroadcastTitle.resolved(stored: "Morning session", appName: "RoomCast"),
       "Morning session"
     )
     let long = String(repeating: "a", count: 90)
@@ -587,7 +587,7 @@ final class PosterAndSupervisorTests: XCTestCase {
     XCTAssertTrue(blank[0].hasPrefix("Join Wi-Fi "))
     XCTAssertTrue(blank[0].contains("____"))
     XCTAssertFalse(blank[0].contains("Hall"))
-    XCTAssertEqual(PosterBuilder.poweredBy, "Powered by Public EarFi")
+    XCTAssertEqual(PosterBuilder.poweredBy, "Powered by RoomCast")
   }
 
   func testQuickPosterAddsAWiFiCodeWhenTheNetworkIsSet() {
@@ -845,8 +845,13 @@ final class PortConflictTests: XCTestCase {
     XCTAssertFalse(LsofText.matches(name: "192.168.1.5:50000->192.168.1.9:8889", port: 8889))
     XCTAssertTrue(LsofText.matches(name: "[::1]:8189", port: 8189))
 
-    let bundled = "/Applications/Public EarFi.app/Contents/Helpers/mediamtx"
+    let bundled = "/Applications/RoomCast.app/Contents/Helpers/mediamtx"
     XCTAssertTrue(HelperIdentity.isBundledHelper(executablePath: bundled))
+    XCTAssertTrue(
+      HelperIdentity.isBundledHelper(
+        executablePath: "/Applications/Public EarFi.app/Contents/Helpers/ffmpeg"
+      )
+    )
     XCTAssertTrue(
       HelperIdentity.isBundledHelper(
         executablePath: "/tmp/elsewhere/mediamtx",
@@ -971,7 +976,7 @@ final class APIAndCreditsTests: XCTestCase {
     XCTAssertTrue(report.contains("line 250"))
     XCTAssertFalse(report.contains("line 1\n"))
     XCTAssertTrue(report.contains("stream: live"))
-    XCTAssertTrue(report.contains("broadcast title: Public EarFi Broadcast"))
+    XCTAssertTrue(report.contains("broadcast title: RoomCast Broadcast"))
     XCTAssertTrue(report.contains("poster Wi-Fi password: not included"))
     XCTAssertTrue(report.contains("Recent log (200 lines)"))
   }
@@ -1360,15 +1365,15 @@ final class APIAndCreditsTests: XCTestCase {
     let home = URL(fileURLWithPath: "/Users/volunteer")
     XCTAssertEqual(
       AppPaths.configFile(home: home).path,
-      "/Users/volunteer/Library/Application Support/Public EarFi/mediamtx.yml"
+      "/Users/volunteer/Library/Application Support/RoomCast/mediamtx.yml"
     )
     XCTAssertEqual(
       AppPaths.logDirectory(home: home).path,
-      "/Users/volunteer/Library/Logs/Public EarFi"
+      "/Users/volunteer/Library/Logs/RoomCast"
     )
     XCTAssertEqual(
       AppPaths.posterFile(home: home).path,
-      "/Users/volunteer/Library/Application Support/Public EarFi/Public EarFi poster.pdf"
+      "/Users/volunteer/Library/Application Support/RoomCast/RoomCast poster.pdf"
     )
   }
 }

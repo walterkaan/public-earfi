@@ -1,7 +1,7 @@
 import Foundation
 
 public enum AppPaths {
-  public static let folderName = "Public EarFi"
+  public static let folderName = "RoomCast"
 
   public static func supportDirectory(home: URL) -> URL {
     home.appendingPathComponent("Library/Application Support/\(folderName)", isDirectory: true)
@@ -21,7 +21,7 @@ public enum AppPaths {
 
   /// Replaced each time Open PDF QR Poster is used.
   public static func posterFile(home: URL) -> URL {
-    supportDirectory(home: home).appendingPathComponent("Public EarFi poster.pdf")
+    supportDirectory(home: home).appendingPathComponent("RoomCast poster.pdf")
   }
 }
 
@@ -64,7 +64,7 @@ public enum DiagnosticsReport {
     let tail = Array(logLines.suffix(logLimit))
     let summary = settingsSummary(settings, appName: appName)
     return """
-      Public EarFi \(appVersion)
+      RoomCast \(appVersion)
       \(systemDescription)
       Listener URL: \(listenerURL)
       \(helperSummary)

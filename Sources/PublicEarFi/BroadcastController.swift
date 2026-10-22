@@ -77,7 +77,7 @@ final class BroadcastController {
   private var helperPaths: [String] = []
   private var mediamtxLog: FileHandle?
   private var listenerServer: ListenerHTTPServer?
-  private var pageTitle = "Public EarFi Broadcast"
+  private var pageTitle = "RoomCast Broadcast"
 
   init(logger: FileLogger) {
     self.logger = logger
@@ -637,7 +637,7 @@ final class BroadcastController {
     guard path == helper.executablePath,
       HelperIdentity.isBundledHelper(executablePath: path, knownHelperPaths: helperPaths)
     else {
-      logger.log("supervisor", "refused to stop pid \(helper.pid); it is not a Public EarFi helper")
+      logger.log("supervisor", "refused to stop pid \(helper.pid); it is not a RoomCast helper")
       return false
     }
     let target = ChildStop.Target(pid: helper.pid, group: getpgid(helper.pid))
@@ -945,7 +945,7 @@ final class BroadcastController {
     deviceWentQuiet = false
     guard formatBudget.allow(at: Date()) else {
       stopWithProblem(
-        "The audio device keeps changing format. Public EarFi left its sample rate unchanged. Pick the device again, or set its format in Audio MIDI Setup."
+        "The audio device keeps changing format. RoomCast left its sample rate unchanged. Pick the device again, or set its format in Audio MIDI Setup."
       )
       return
     }

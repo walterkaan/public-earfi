@@ -1,14 +1,14 @@
 # Third-party notices
 
-Public EarFi is Copyright (c) 2026 Walter Kaan and is released under the MIT License (see `LICENSE`).
+RoomCast is Copyright (c) 2026 Walter Kaan and is released under the MIT License (see `LICENSE`).
 
 The app runs two separate programs. They keep their own licences. The app is not linked against FFmpeg or libopus, so the app's MIT licence is independent of the LGPL. libopus is statically linked into the FFmpeg executable only.
 
-The same information is shown in the app (Settings → Credits…, and About Public EarFi) from `Sources/PublicEarFi/Resources/Licenses/credits.json`.
+The same information is shown in the app (Settings → Credits…, and About RoomCast) from `Sources/PublicEarFi/Resources/Licenses/credits.json`.
 
 | Component | Version | Licence | Source |
 |---|---|---|---|
-| Public EarFi | 1.0.0 | MIT | https://github.com/walterkaan/public-earfi |
+| RoomCast | 1.0.0 | MIT | https://github.com/walterkaan/public-earfi |
 | MediaMTX | 1.21.2 | MIT | https://github.com/bluenviron/mediamtx |
 | FFmpeg | 9.0.2 | LGPL-2.1-or-later | https://ffmpeg.org |
 | libopus | 1.6.1 | BSD-3-Clause | https://opus-codec.org |

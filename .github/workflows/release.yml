@@ -70,10 +70,10 @@ jobs:
           export PUBLIC_EARFI_COMMIT="$(git rev-parse --short HEAD)"
           ./scripts/build-helpers.sh
           ./scripts/build-app.sh
-          ./scripts/check-credits.sh "dist/Public EarFi.app"
-          codesign --verify --deep --strict --verbose=2 "dist/Public EarFi.app"
+          ./scripts/check-credits.sh "dist/RoomCast.app"
+          codesign --verify --deep --strict --verbose=2 "dist/RoomCast.app"
           # spctl rejects ad-hoc and self-signed apps. That is expected without notarization.
-          if spctl --assess --type execute "dist/Public EarFi.app"; then
+          if spctl --assess --type execute "dist/RoomCast.app"; then
             echo "spctl accepted the app"
           else
             echo "spctl rejected the app, which is expected until it is notarized."
@@ -91,14 +91,14 @@ jobs:
           echo "${FFMPEG_SHA256}  dist/source/ffmpeg-${FFMPEG_VERSION}-source.tar.xz" | shasum -a 256 -c -
           cp scripts/build-helpers.sh scripts/versions.env scripts/ffmpeg-configure-flags.txt dist/source/
           {
-            echo "Public EarFi FFmpeg ${FFMPEG_VERSION}"
+            echo "RoomCast FFmpeg ${FFMPEG_VERSION}"
             echo "Built without --enable-gpl and without --enable-nonfree."
             echo "Configure flags:"
             cat scripts/ffmpeg-configure-flags.txt
           } > dist/source/FFMPEG-BUILD.txt
           (
             cd dist
-            shasum -a 256 "Public-EarFi-${GITHUB_REF_NAME#v}.dmg" source/* > SHA256SUMS
+            shasum -a 256 "RoomCast-${GITHUB_REF_NAME#v}.dmg" source/* > SHA256SUMS
           )
 
       - name: Publish the GitHub release
@@ -114,13 +114,13 @@ jobs:
             SIGNING="self-signed release certificate"
           fi
           cat > release-notes.md << EOF
-          ## Public EarFi ${VERSION}
+          ## RoomCast ${VERSION}
 
           This build is signed ${SIGNING}. It is not notarized.
 
           ### First open
-          1. Open the DMG and drag Public EarFi to Applications. Do not run it from the DMG or from Downloads.
-          2. Double-click Public EarFi in Applications.
+          1. Open the DMG and drag RoomCast to Applications. Do not run it from the DMG or from Downloads.
+          2. Double-click RoomCast in Applications.
           3. macOS 15 and later: click Done, then System Settings → Privacy & Security → Open Anyway.
           4. macOS 13–14: Control-click the app → Open → Open.
           5. Allow the microphone. If the firewall asks, allow incoming connections for mediamtx.
@@ -129,10 +129,10 @@ jobs:
           EOF
           sed -i 's/^          //' release-notes.md
           gh release create "$GITHUB_REF_NAME" \
-            "dist/Public-EarFi-${VERSION}.dmg" \
+            "dist/RoomCast-${VERSION}.dmg" \
             "dist/SHA256SUMS" \
             dist/source/* \
-            --title "Public EarFi ${VERSION}" \
+            --title "RoomCast ${VERSION}" \
             --notes-file release-notes.md
 
       - name: Notarize when a Developer ID is configured

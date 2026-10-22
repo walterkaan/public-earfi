@@ -189,7 +189,7 @@ final class AppModel: ObservableObject {
     let info = Bundle.main.infoDictionary
     let short = info?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     let build = info?["CFBundleVersion"] as? String ?? "0"
-    let commit = info?["PublicEarFiCommit"] as? String ?? "dev"
+    let commit = info?["RoomCastCommit"] as? String ?? "dev"
     return "\(short) (\(build), \(commit))"
   }
 
@@ -354,7 +354,7 @@ final class AppModel: ObservableObject {
         loginItemMessage = nil
       } catch {
         loginItemMessage =
-          "Launch at login needs the installed Public EarFi.app (\(error.localizedDescription))."
+          "Launch at login needs the installed RoomCast.app (\(error.localizedDescription))."
       }
     } else {
       try? LoginItemController.apply(false)
@@ -491,7 +491,7 @@ final class AppModel: ObservableObject {
   }
 
   func showAboutPanel() {
-    let text = credits?.plainText() ?? "Public EarFi\nCopyright (c) 2026 Walter Kaan. MIT License."
+    let text = credits?.plainText() ?? "RoomCast\nCopyright (c) 2026 Walter Kaan. MIT License."
     NSApp.orderFrontStandardAboutPanel(options: [
       .credits: NSAttributedString(string: text)
     ])
@@ -819,7 +819,7 @@ final class AppModel: ObservableObject {
     return String(format: "%02d:%02d:%02d", interval / 3600, (interval / 60) % 60, interval % 60)
   }
 
-  private static let firstRunKey = "publicEarfi.didFinishFirstRun"
-  private static let firewallKey = "publicEarfi.didExplainFirewall"
+  private static let firstRunKey = "roomcast.didFinishFirstRun"
+  private static let firewallKey = "roomcast.didExplainFirewall"
   static weak var shared: AppModel?
 }

@@ -5,24 +5,24 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleExecutable</key>
-	<string>PublicEarFi</string>
+	<string>RoomCast</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>io.github.walterkaan.public-earfi</string>
+	<string>channel.roomcast.app</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Public EarFi</string>
+	<string>RoomCast</string>
 	<key>CFBundleDisplayName</key>
-	<string>Public EarFi</string>
+	<string>RoomCast</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>__VERSION__</string>
 	<key>CFBundleVersion</key>
 	<string>__BUILD__</string>
-	<key>PublicEarFiCommit</key>
+	<key>RoomCastCommit</key>
 	<string>__COMMIT__</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
@@ -33,7 +33,7 @@
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Public EarFi needs the microphone to capture your sound desk / audio interface.</string>
+	<string>RoomCast needs the microphone to capture your sound desk / audio interface.</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<false/>
 	<key>NSSupportsSuddenTermination</key>

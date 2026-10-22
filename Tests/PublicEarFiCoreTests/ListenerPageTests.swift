@@ -62,14 +62,15 @@ final class ListenerPageTests: XCTestCase {
   }
 
   func testPageShowsTheBroadcastTitleInTheTabAndMediaSession() {
-    let plain = ListenerPage.html(title: "Public EarFi Broadcast")
-    XCTAssertTrue(plain.contains("<title>Public EarFi Broadcast</title>"))
+    let plain = ListenerPage.html(title: "RoomCast Broadcast")
+    XCTAssertTrue(plain.contains("<title>RoomCast Broadcast</title>"))
     XCTAssertFalse(plain.contains("playerTitle"))
     XCTAssertFalse(plain.contains("status-label"))
-    XCTAssertTrue(plain.contains("title=\"Public EarFi Broadcast\""))
+    XCTAssertTrue(plain.contains("title=\"RoomCast Broadcast\""))
     XCTAssertTrue(plain.contains("new MediaMetadata({title:title})"))
     XCTAssertFalse(plain.contains("get(\"title\")"))
     XCTAssertTrue(plain.contains("new URL(\"/whep\""))
+    XCTAssertTrue(plain.contains("The listener page could not load."))
 
     let awkward = ListenerPage.html(title: "A & B <live>")
     XCTAssertTrue(awkward.contains("<title>A &amp; B &lt;live&gt;</title>"))

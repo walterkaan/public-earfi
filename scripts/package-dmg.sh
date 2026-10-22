@@ -3,9 +3,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${PUBLIC_EARFI_VERSION:-1.0.0}"
-APP="$ROOT/dist/Public EarFi.app"
+APP="$ROOT/dist/RoomCast.app"
 STAGE="$ROOT/build/dmg-root"
-DMG="$ROOT/dist/Public-EarFi-${VERSION}.dmg"
+DMG="$ROOT/dist/RoomCast-${VERSION}.dmg"
 
 if [[ ! -d "$APP" ]]; then
   echo "Missing $APP. Run scripts/build-app.sh first." >&2
@@ -25,7 +25,7 @@ python3 "$ROOT/scripts/make_dmg_background.py" "$STAGE/.background/background.pn
 # while another image is still attached. A short retry clears it.
 attempt=1
 until hdiutil create \
-  -volname "Public EarFi" \
+  -volname "RoomCast" \
   -srcfolder "$STAGE" \
   -ov \
   -format UDZO \
@@ -36,7 +36,7 @@ do
     exit 1
   fi
   echo "hdiutil was busy (attempt ${attempt}). Retrying."
-  hdiutil detach "/Volumes/Public EarFi" -force >/dev/null 2>&1 || true
+  hdiutil detach "/Volumes/RoomCast" -force >/dev/null 2>&1 || true
   rm -f "$DMG"
   sleep $((attempt * 5))
   attempt=$((attempt + 1))
@@ -44,6 +44,6 @@ done
 
 (
   cd "$ROOT/dist"
-  shasum -a 256 "Public-EarFi-${VERSION}.dmg" > SHA256SUMS
+  shasum -a 256 "RoomCast-${VERSION}.dmg" > SHA256SUMS
 )
 echo "DMG: $DMG"

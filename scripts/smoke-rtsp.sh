@@ -5,7 +5,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="${1:-$ROOT/dist/Public EarFi.app}"
+APP="${1:-$ROOT/dist/RoomCast.app}"
 FFMPEG="$APP/Contents/Helpers/ffmpeg"
 MEDIAMTX="$APP/Contents/Helpers/mediamtx"
 

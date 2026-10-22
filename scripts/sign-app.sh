@@ -24,8 +24,8 @@ sign_one() {
   codesign "${args[@]}" "$target"
 }
 
-sign_one "$APP/Contents/Helpers/ffmpeg" "io.github.walterkaan.public-earfi.ffmpeg" "$ROOT/scripts/ffmpeg.entitlements"
-sign_one "$APP/Contents/Helpers/mediamtx" "io.github.walterkaan.public-earfi.mediamtx" "$ROOT/scripts/mediamtx.entitlements"
-sign_one "$APP" "io.github.walterkaan.public-earfi" "$ROOT/Sources/PublicEarFi/PublicEarFi.entitlements"
+sign_one "$APP/Contents/Helpers/ffmpeg" "channel.roomcast.app.ffmpeg" "$ROOT/scripts/ffmpeg.entitlements"
+sign_one "$APP/Contents/Helpers/mediamtx" "channel.roomcast.app.mediamtx" "$ROOT/scripts/mediamtx.entitlements"
+sign_one "$APP" "channel.roomcast.app" "$ROOT/Sources/PublicEarFi/PublicEarFi.entitlements"
 codesign --verify --deep --strict --verbose=2 "$APP"
 echo "Signature verified"

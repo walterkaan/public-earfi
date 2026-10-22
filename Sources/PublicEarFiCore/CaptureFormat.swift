@@ -1,6 +1,6 @@
 import Foundation
 
-/// The device's own input format. Public EarFi converts this to 48 kHz.
+/// The device's own input format. RoomCast converts this to 48 kHz.
 /// It does not change the interface clock.
 public struct CaptureStreamDescription: Equatable, Sendable {
   public var sampleRate: Double
@@ -173,17 +173,17 @@ public enum CaptureFormatPlan {
   {
     let name = deviceName.isEmpty ? "The selected audio device" : deviceName
     if !stream.canOpen {
-      return "\(name) has no input Public EarFi can open. Pick another device in Settings."
+      return "\(name) has no input RoomCast can open. Pick another device in Settings."
     }
     return
-      "\(name) is sending \(stream.summary). Public EarFi cannot convert that to 48 kHz. Pick another device, or choose a different format in Audio MIDI Setup. The app does not change the device's sample rate."
+      "\(name) is sending \(stream.summary). RoomCast cannot convert that to 48 kHz. Pick another device, or choose a different format in Audio MIDI Setup. The app does not change the device's sample rate."
   }
 
   /// Zero channels, or an unreadable format, while the device is still
   /// connected. Wording avoids the permanent phrases in `shouldRetry`.
   public static func notReadyMessage(deviceName: String) -> String {
     let name = deviceName.isEmpty ? "The selected audio device" : deviceName
-    return "\(name) is still switching its input. Public EarFi will try again shortly."
+    return "\(name) is still switching its input. RoomCast will try again shortly."
   }
 
   public static func isInputSettling(_ message: String) -> Bool {
@@ -200,13 +200,13 @@ public enum CaptureFormatPlan {
   public static func inputGaveUpMessage(deviceName: String) -> String {
     let name = deviceName.isEmpty ? "The selected audio device" : deviceName
     return
-      "\(name) did not present an input Public EarFi could use. Pick it again in Settings, or choose another microphone. The app does not change the device's sample rate."
+      "\(name) did not present an input RoomCast could use. Pick it again in Settings, or choose another microphone. The app does not change the device's sample rate."
   }
 
   public static func conversionStoppedMessage(deviceName: String, summary: String) -> String {
     let name = deviceName.isEmpty ? "this device" : deviceName
     return
-      "Audio from \(name) is not reaching the broadcast (\(summary)). Check the selected input. Public EarFi does not change the device's sample rate."
+      "Audio from \(name) is not reaching the broadcast (\(summary)). Check the selected input. RoomCast does not change the device's sample rate."
   }
 }
 

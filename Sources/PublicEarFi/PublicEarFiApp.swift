@@ -45,7 +45,7 @@ struct AppMenus: Commands {
 
   var body: some Commands {
     CommandGroup(replacing: .appInfo) {
-      Button("About Public EarFi") {
+      Button("About RoomCast") {
         model.showAboutPanel()
       }
     }

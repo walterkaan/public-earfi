@@ -164,7 +164,7 @@ enum PosterActions {
     let panel = NSSavePanel()
     panel.allowedContentTypes = [.pdf]
     panel.canCreateDirectories = true
-    panel.nameFieldStringValue = "Public EarFi poster \(fileDate()).pdf"
+    panel.nameFieldStringValue = "RoomCast poster \(fileDate()).pdf"
     panel.begin { response in
       guard response == .OK, let url = panel.url else { return }
       guard let data = pdfData(page: page, paper: model.paper) else { return }

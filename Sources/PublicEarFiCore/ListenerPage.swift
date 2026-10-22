@@ -58,6 +58,43 @@ public enum ListenerPage {
       .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
   }
 
+  /// English copy for the phone page. `ListenerPage.en.json` is the file
+  /// translators edit. The running app reads that file from its Resources.
+  static func pageCopy(_ key: String) -> String {
+    jsEscape(pageStrings[key] ?? key)
+  }
+
+  private static let pageStringFallback = [
+    "loadError": "The listener page could not load."
+  ]
+
+  private static var pageStrings: [String: String] {
+    if let found = loadPageStrings(in: .main) {
+      return pageStringFallback.merging(found) { _, new in new }
+    }
+    if let found = loadPageStrings(in: .module) {
+      return pageStringFallback.merging(found) { _, new in new }
+    }
+    return pageStringFallback
+  }
+
+  private static func loadPageStrings(in bundle: Bundle) -> [String: String]? {
+    guard let url = bundle.url(forResource: "ListenerPage.en", withExtension: "json"),
+      let data = try? Data(contentsOf: url),
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+    else { return nil }
+    return object
+  }
+
+  private static func jsEscape(_ text: String) -> String {
+    text
+      .replacingOccurrences(of: "\\", with: "\\\\")
+      .replacingOccurrences(of: "\"", with: "\\\"")
+      .replacingOccurrences(of: "\n", with: "\\n")
+      .replacingOccurrences(of: "<", with: "\\u003c")
+      .replacingOccurrences(of: ">", with: "\\u003e")
+  }
+
   public static func html(title: String) -> String {
     let safeTitle = htmlEscape(title)
     let scriptTitle = jsonForScript(title: title)
@@ -120,7 +157,7 @@ public enum ListenerPage {
       };
       window.addEventListener("load",()=>{
       if(typeof MediaMTXWebRTCReader!=="function"){
-      setMessage("The listener page could not load.");
+      setMessage("\(Self.pageCopy("loadError"))");
       return;
       }
       loadAttributesFromQuery();

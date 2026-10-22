@@ -58,31 +58,31 @@ jobs:
       - name: Check credits, architectures, and the signature
         run: |
           set -euo pipefail
-          ./scripts/check-credits.sh "dist/Public EarFi.app"
-          codesign --verify --deep --strict --verbose=2 "dist/Public EarFi.app"
-          lipo -info "dist/Public EarFi.app/Contents/MacOS/PublicEarFi" | grep arm64
-          lipo -info "dist/Public EarFi.app/Contents/MacOS/PublicEarFi" | grep x86_64
-          lipo -info "dist/Public EarFi.app/Contents/Helpers/ffmpeg" | grep arm64
-          lipo -info "dist/Public EarFi.app/Contents/Helpers/ffmpeg" | grep x86_64
-          lipo -info "dist/Public EarFi.app/Contents/Helpers/mediamtx" | grep arm64
-          lipo -info "dist/Public EarFi.app/Contents/Helpers/mediamtx" | grep x86_64
-          "dist/Public EarFi.app/Contents/Helpers/ffmpeg" -version | grep -- '--enable-libopus'
-          "dist/Public EarFi.app/Contents/Helpers/ffmpeg" -hide_banner -buildconf | grep -q -- '--disable-gpl'
+          ./scripts/check-credits.sh "dist/RoomCast.app"
+          codesign --verify --deep --strict --verbose=2 "dist/RoomCast.app"
+          lipo -info "dist/RoomCast.app/Contents/MacOS/RoomCast" | grep arm64
+          lipo -info "dist/RoomCast.app/Contents/MacOS/RoomCast" | grep x86_64
+          lipo -info "dist/RoomCast.app/Contents/Helpers/ffmpeg" | grep arm64
+          lipo -info "dist/RoomCast.app/Contents/Helpers/ffmpeg" | grep x86_64
+          lipo -info "dist/RoomCast.app/Contents/Helpers/mediamtx" | grep arm64
+          lipo -info "dist/RoomCast.app/Contents/Helpers/mediamtx" | grep x86_64
+          "dist/RoomCast.app/Contents/Helpers/ffmpeg" -version | grep -- '--enable-libopus'
+          "dist/RoomCast.app/Contents/Helpers/ffmpeg" -hide_banner -buildconf | grep -q -- '--disable-gpl'
 
       - name: Smoke test pcm_f32le publish to MediaMTX
-        run: ./scripts/smoke-rtsp.sh "dist/Public EarFi.app"
+        run: ./scripts/smoke-rtsp.sh "dist/RoomCast.app"
 
       - name: Package a DMG
         run: ./scripts/package-dmg.sh
 
       - name: Zip the app
-        run: ditto -c -k --keepParent "dist/Public EarFi.app" "dist/Public-EarFi-app.zip"
+        run: ditto -c -k --keepParent "dist/RoomCast.app" "dist/RoomCast-app.zip"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Public-EarFi-macos
+          name: RoomCast-macos
           if-no-files-found: error
           path: |
             dist/*.dmg
-            dist/Public-EarFi-app.zip
+            dist/RoomCast-app.zip
             dist/SHA256SUMS

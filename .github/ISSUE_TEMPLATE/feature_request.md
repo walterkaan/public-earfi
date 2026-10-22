@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest a change to Public EarFi
+about: Suggest a change to RoomCast
 title: ""
 labels: enhancement
 ---

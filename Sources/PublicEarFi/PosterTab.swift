@@ -203,7 +203,7 @@ struct CreditsSheet: View {
         }
         .frame(width: 44, height: 44)
         VStack(alignment: .leading, spacing: 2) {
-          Text("Public EarFi \(model.versionLabel)").font(.headline)
+          Text("RoomCast \(model.versionLabel)").font(.headline)
           Text("Copyright (c) 2026 Walter Kaan · MIT License")
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -294,12 +294,12 @@ struct FirstRunSheet: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("Public EarFi").font(.title2.bold())
+      Text("RoomCast").font(.title2.bold())
       Text(
         "This app captures the sound desk from an audio interface and shares it with phones on the same Wi-Fi. Listeners open a link. They do not need an account."
       )
       Text(
-        "macOS will ask for the microphone so Public EarFi can hear the interface. Allow it. If the firewall is on, a later prompt asks to allow incoming connections for mediamtx. That is expected."
+        "macOS will ask for the microphone so RoomCast can hear the interface. Allow it. If the firewall is on, a later prompt asks to allow incoming connections for mediamtx. That is expected."
       )
       Text(
         "Pick the USB interface in Settings if the automatic choice is wrong, then press Start Broadcasting."
