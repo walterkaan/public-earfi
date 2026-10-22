@@ -277,15 +277,16 @@ struct RunningTab: View {
 enum AppLinks {
   static let kofi = URL(string: "https://ko-fi.com/roomcast")!
   static let patreon = URL(string: "https://www.patreon.com/roomcastapp")!
+  static let buyMeACoffee = URL(string: "https://buymeacoffee.com/roomcast")!
 }
 
-/// Ko-fi and Patreon sit on the home screen. Buy Me a Coffee stays hidden
-/// until its address is confirmed.
+/// Ko-fi, Patreon, and Buy Me a Coffee sit on the home screen.
 struct SupportLinks: View {
   var body: some View {
     HStack(spacing: 16) {
       Link("Ko-fi", destination: AppLinks.kofi)
       Link("Patreon", destination: AppLinks.patreon)
+      Link("Buy Me a Coffee", destination: AppLinks.buyMeACoffee)
     }
     .font(.caption)
     .frame(maxWidth: .infinity)

@@ -113,6 +113,10 @@ The helper script checks SHA-256 sums, builds libopus and FFmpeg with `--disable
 
 Release tags (`v*`) sign with the `RELEASE_SIGNING_P12` and `RELEASE_SIGNING_PASSWORD` secrets when those secrets exist, and fall back to ad-hoc signing when they do not. Notarization stays off until a Developer ID account exists.
 
+## Support
+
+RoomCast is free. The home screen links to [Ko-fi](https://ko-fi.com/roomcast), [Patreon](https://www.patreon.com/roomcastapp), and [Buy Me a Coffee](https://buymeacoffee.com/roomcast).
+
 ## Licence
 
 App code: [MIT](LICENSE), Copyright (c) 2026 Walter Kaan.

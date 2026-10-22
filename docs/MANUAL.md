@@ -225,6 +225,10 @@ A future RoomCast app on a phone would let that phone be the server: it would ta
 
 That app is not available. There is nothing to download, and this manual’s install steps are for the Mac only. Use the Mac as the server, with your own Wi-Fi and the home test above, for every event until a phone server is actually released.
 
+## Support
+
+RoomCast is free. [Ko-fi](https://ko-fi.com/roomcast), [Patreon](https://www.patreon.com/roomcastapp), and [Buy Me a Coffee](https://buymeacoffee.com/roomcast) are linked along the bottom of the home screen.
+
 ## Limits worth knowing
 
 - The stream is local. People off your Wi-Fi cannot listen, including people at home.
