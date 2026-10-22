@@ -5,7 +5,7 @@
 First MVP build of RoomCast.
 
 - Copy link, Open PDF QR Poster, and Copy diagnostics use the same green button as Start. On macOS 26 each section stays its own dark card, with glass inside that card, and the green buttons keep a solid fill and white text. While stopped, the status names the sound source and Change Sound Source opens Settings.
-- The main window plays the website hero behind the cards: three green arcs, three expanding rings, and equaliser bars. It is fainter while stopped, follows the input level while live, holds still for Reduce Motion, and pauses when the window is hidden.
+- The main window plays the website hero behind the cards, on a near-black field: a violet monitor, pink rings, three teal arcs, and three pink phones with teal bars. It is fainter while stopped, the bars follow the input level while live, Reduce Motion holds one frame, and a hidden window pauses it. The buttons stay green.
 - A closed audio pipe returns an error instead of quitting the app. The writer thread already blocked that signal; the rest of the process ignores it as well, so a write from another thread cannot end the broadcast with signal 13.
 - The first window says Welcome to RoomCast, shows the app icon, and Get started opens Settings.
 - The app name is RoomCast. The bundle id is `channel.roomcast.app`, the program is `RoomCast.app`, and logs and settings use new RoomCast folders. An older `Public EarFi.app` helper is still recognised. Ko-fi, Patreon, and Buy Me a Coffee are green buttons in a section under Health. The listener page copy is in `ListenerPage.en.json`, and the Mac UI strings are in `Localizable.xcstrings`.

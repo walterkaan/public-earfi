@@ -2,13 +2,13 @@ import AppKit
 import Darwin
 import SwiftUI
 
-/// Website hero, drawn behind the main-window cards.
+/// Website hero, drawn behind the main-window cards on a near-black field.
 ///
-/// Three arcs move right and scale to 2.2× over 2.4 s, staggered by 0.8 s.
-/// Three rings scale from 0.5× to 6× and fade from 0.7 opacity over 3 s,
-/// staggered by 1 s. Equaliser bars pulse on scaleY. Stopped stays fainter
-/// than a live broadcast. Reduce Motion holds one frame, and a hidden or
-/// fully occluded window pauses the timeline.
+/// A violet monitor sits on the left, with pink rings expanding behind it.
+/// Three teal arcs travel right and fade. Three pink phones on the right,
+/// staggered vertically, each carry three teal bars. Buttons stay the brand
+/// green; this scene does not. Stopped is dimmer than a live broadcast.
+/// Reduce Motion holds one frame, and a hidden window pauses the timeline.
 struct BroadcastBackdrop: View {
   var live: Bool
   var level: Double
@@ -40,6 +40,27 @@ struct BroadcastBackdrop: View {
   }
 }
 
+enum HeroPalette {
+  static let backdropHex: UInt32 = 0x0B0A14
+  static let violetHex: UInt32 = 0x6B6CF0
+  static let pinkHex: UInt32 = 0xFF5FA2
+  static let tealHex: UInt32 = 0x3FD9C6
+  static let navyHex: UInt32 = 0x121022
+
+  static var backdrop: Color { color(backdropHex) }
+  static var violet: Color { color(violetHex) }
+  static var pink: Color { color(pinkHex) }
+  static var teal: Color { color(tealHex) }
+  static var navy: Color { color(navyHex) }
+
+  static func color(_ hex: UInt32) -> Color {
+    let red = Double((hex >> 16) & 0xFF) / 255
+    let green = Double((hex >> 8) & 0xFF) / 255
+    let blue = Double(hex & 0xFF) / 255
+    return Color(red: red, green: green, blue: blue)
+  }
+}
+
 enum HeroMotion {
   static let waveDuration = 2.4
   static let waveStagger = 0.8
@@ -52,7 +73,17 @@ enum HeroMotion {
   static let stillTime = 1.15
   static let arcCount = 3
   static let ringCount = 3
-  static let barCount = 7
+  static let phoneCount = 3
+  static let barsPerPhone = 3
+  static let sceneSize = CGSize(width: 980, height: 440)
+  static let monitor = CGRect(x: 92, y: 96, width: 236, height: 156)
+  static let phoneSize = CGSize(width: 86, height: 156)
+  /// Left phone highest, middle lowest, right between them.
+  static let phoneOrigins = [
+    CGPoint(x: 628, y: 72),
+    CGPoint(x: 708, y: 128),
+    CGPoint(x: 788, y: 96),
+  ]
 
   static func unit(time: Double, duration: Double, delay: Double) -> Double {
     let elapsed = time - delay
@@ -83,9 +114,17 @@ enum HeroMotion {
     ringOpacityStart * fade(progress)
   }
 
-  /// How strongly the hero is drawn. Live is brighter; stopped stays calm.
+  /// How strongly the teal arcs are drawn. Live is brighter than stopped.
   static func presence(live: Bool) -> Double {
-    live ? 0.48 : 0.26
+    live ? 0.85 : 0.48
+  }
+
+  static func ringStrength(live: Bool) -> Double {
+    live ? 0.50 : 0.28
+  }
+
+  static func deviceOpacity(live: Bool) -> Double {
+    live ? 0.92 : 0.58
   }
 
   /// Bar height as a fraction of its maximum. Live follows the input level.
@@ -106,33 +145,56 @@ enum HeroMotion {
     live: Bool,
     level: Double
   ) {
-    let anchor = CGPoint(x: size.width * 0.50, y: size.height * 0.40)
-    let gain = presence(live: live)
-    let green = AppChrome.startButton
+    context.fill(
+      Path(CGRect(origin: .zero, size: size)),
+      with: .color(HeroPalette.backdrop)
+    )
+    let fit = min(size.width / sceneSize.width, size.height / sceneSize.height)
+    let scale = fit * 0.94
+    var scene = context
+    scene.translateBy(
+      x: (size.width - sceneSize.width * scale) / 2,
+      y: (size.height - sceneSize.height * scale) / 2
+    )
+    scene.scaleBy(x: scale, y: scale)
+    drawRings(in: &scene, time: time, live: live)
+    drawArcs(in: &scene, time: time, live: live)
+    var devices = scene
+    devices.opacity = deviceOpacity(live: live)
+    drawMonitor(in: &devices)
+    drawPhones(in: &devices, time: time, live: live, level: level)
+  }
+
+  private static func drawRings(in context: inout GraphicsContext, time: Double, live: Bool) {
+    let center = CGPoint(x: monitor.midX, y: monitor.midY)
+    let strength = ringStrength(live: live)
     for index in 0..<ringCount {
-      let progress = unit(time: time, duration: ringDuration, delay: Double(index) * ringStagger)
-      let alpha = ringOpacity(progress: progress) * gain
-      guard alpha > 0.015 else { continue }
-      let radius = CGFloat(40 * ringScale(progress: progress))
+      let progress = unit(
+        time: time, duration: ringDuration, delay: Double(index) * ringStagger)
+      let alpha = ringOpacity(progress: progress) * strength
+      guard alpha > 0.02 else { continue }
+      let radius = CGFloat(46 * ringScale(progress: progress))
       let rect = CGRect(
-        x: anchor.x - radius,
-        y: anchor.y - radius,
-        width: radius * 2,
-        height: radius * 2
-      )
+        x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
       context.stroke(
         Path(ellipseIn: rect),
-        with: .color(green.opacity(alpha)),
-        lineWidth: 1.25
+        with: .color(HeroPalette.pink.opacity(alpha)),
+        lineWidth: 2
       )
     }
+  }
+
+  private static func drawArcs(in context: inout GraphicsContext, time: Double, live: Bool) {
+    let anchor = CGPoint(x: monitor.maxX + 78, y: monitor.midY)
+    let strength = presence(live: live)
     for index in 0..<arcCount {
-      let progress = unit(time: time, duration: waveDuration, delay: Double(index) * waveStagger)
-      let alpha = fade(progress: progress) * gain
-      guard alpha > 0.015 else { continue }
+      let progress = unit(
+        time: time, duration: waveDuration, delay: Double(index) * waveStagger)
+      let alpha = fade(progress: progress) * strength
+      guard alpha > 0.02 else { continue }
       let eased = easeOut(progress)
-      let radius = CGFloat(36 * waveScale(progress: progress))
-      let center = CGPoint(x: anchor.x - 28 + CGFloat(78 * eased), y: anchor.y)
+      let radius = CGFloat(34 * waveScale(progress: progress))
+      let center = CGPoint(x: anchor.x + CGFloat(120 * eased), y: anchor.y)
       var path = Path()
       path.addArc(
         center: center,
@@ -143,46 +205,56 @@ enum HeroMotion {
       )
       context.stroke(
         path,
-        with: .color(green.opacity(alpha)),
-        style: StrokeStyle(lineWidth: 1.7, lineCap: .round)
+        with: .color(HeroPalette.teal.opacity(alpha)),
+        style: StrokeStyle(lineWidth: 3, lineCap: .round)
       )
     }
-    drawBars(
-      in: &context,
-      size: size,
-      time: time,
-      live: live,
-      level: level,
-      green: green,
-      gain: gain
-    )
   }
 
-  private static func drawBars(
+  private static func drawMonitor(in context: inout GraphicsContext) {
+    let screen = Path(roundedRect: monitor, cornerRadius: 18)
+    context.fill(screen, with: .color(HeroPalette.navy))
+    context.stroke(screen, with: .color(HeroPalette.violet), lineWidth: 3)
+    let dot = CGRect(x: monitor.midX - 8, y: monitor.midY - 8, width: 16, height: 16)
+    context.fill(Path(ellipseIn: dot), with: .color(HeroPalette.pink))
+    let neck = CGRect(x: monitor.midX - 16, y: monitor.maxY - 2, width: 32, height: 24)
+    context.fill(Path(neck), with: .color(HeroPalette.navy))
+    context.stroke(Path(neck), with: .color(HeroPalette.violet), lineWidth: 3)
+    let base = CGRect(x: monitor.midX - 62, y: neck.maxY - 3, width: 124, height: 12)
+    let foot = Path(roundedRect: base, cornerRadius: 4)
+    context.fill(foot, with: .color(HeroPalette.navy))
+    context.stroke(foot, with: .color(HeroPalette.violet), lineWidth: 3)
+  }
+
+  private static func drawPhones(
     in context: inout GraphicsContext,
-    size: CGSize,
     time: Double,
     live: Bool,
-    level: Double,
-    green: Color,
-    gain: Double
+    level: Double
   ) {
-    let barWidth: CGFloat = 6
-    let gap: CGFloat = 8
-    let total = CGFloat(barCount) * barWidth + CGFloat(barCount - 1) * gap
-    var x = (size.width - total) / 2
-    let baseline = size.height * 0.64
-    let maxHeight: CGFloat = live ? 92 : 52
-    let alpha = gain * 0.9
-    for index in 0..<barCount {
-      let scale = barScale(time: time, index: index, live: live, level: level)
-      let height = max(2, maxHeight * CGFloat(scale))
-      let rect = CGRect(x: x, y: baseline - height, width: barWidth, height: height)
-      context.fill(
-        Path(roundedRect: rect, cornerRadius: 2),
-        with: .color(green.opacity(alpha))
-      )
-      x += barWidth + gap
+    for (phoneIndex, origin) in phoneOrigins.enumerated() {
+      let body = CGRect(origin: origin, size: phoneSize)
+      let shape = Path(roundedRect: body, cornerRadius: 18)
+      context.fill(shape, with: .color(HeroPalette.navy))
+      context.stroke(shape, with: .color(HeroPalette.pink), lineWidth: 2.5)
+      let inset = body.insetBy(dx: 16, dy: 18)
+      let barWidth: CGFloat = 8
+      let gap: CGFloat = 6
+      let total = CGFloat(barsPerPhone) * barWidth + CGFloat(barsPerPhone - 1) * gap
+      var x = inset.midX - total / 2
+      let baseline = inset.maxY
+      let maxHeight: CGFloat = live ? 52 : 30
+      for bar in 0..<barsPerPhone {
+        let scale = barScale(
+          time: time, index: phoneIndex * barsPerPhone + bar, live: live, level: level)
+        let height = max(3, maxHeight * CGFloat(scale))
+        let rect = CGRect(x: x, y: baseline - height, width: barWidth, height: height)
+        context.fill(
+          Path(roundedRect: rect, cornerRadius: 2),
+          with: .color(HeroPalette.teal)
+        )
+        x += barWidth + gap
+      }
     }
   }
 }
