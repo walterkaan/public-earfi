@@ -109,7 +109,7 @@ brew install pkg-config   # if you do not already have it
 open "dist/RoomCast.app"
 ```
 
-The helper script checks SHA-256 sums, builds libopus and FFmpeg with `--disable-gpl --disable-nonfree --enable-libopus`, and lipos arm64 with x86_64. Apple silicon is the priority. CI runs `swift test` and uploads an ad-hoc signed universal `.dmg`.
+The helper script checks SHA-256 sums, builds libopus and FFmpeg with `--disable-gpl --disable-nonfree --enable-libopus`, and lipos arm64 with x86_64. Apple silicon is the priority. CI runs on the macOS 26 runner, so the disk image is built with the macOS 26 SDK. Liquid Glass is in that build and shows when the app runs on macOS 26. On macOS 13–15 the same build keeps the solid green buttons and opaque cards. `scripts/notarize-release.sh` does the same when Xcode 26 is selected.
 
 Release tags (`v*`) sign with the `RELEASE_SIGNING_P12` and `RELEASE_SIGNING_PASSWORD` secrets when those secrets exist, and fall back to ad-hoc signing when they do not. Notarization stays off until a Developer ID account exists.
 

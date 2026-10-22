@@ -4,6 +4,7 @@
 
 First MVP build of RoomCast.
 
+- Copy link, Open PDF QR Poster, and Copy diagnostics use the same green button as Start. A build made with Xcode 26 draws Liquid Glass on macOS 26, and keeps the solid buttons and cards on macOS 13–15.
 - The first window says Welcome to RoomCast, shows the app icon, and Get started opens Settings.
 - The app name is RoomCast. The bundle id is `channel.roomcast.app`, the program is `RoomCast.app`, and logs and settings use new RoomCast folders. An older `Public EarFi.app` helper is still recognised. Ko-fi, Patreon, and Buy Me a Coffee are green buttons in a section under Health. The listener page copy is in `ListenerPage.en.json`, and the Mac UI strings are in `Localizable.xcstrings`.
 - Settings keeps Advanced open in its own card, the same shape as This Mac, with the controls on the left. Section headings on the main window, Settings, and the log use the Start Broadcasting green. The whole Start Broadcasting button accepts a click.

@@ -1,7 +1,8 @@
 #!/bin/bash
 # Assemble a universal RoomCast.app and ad-hoc sign it unless SIGN_IDENTITY is set.
 # The deployment target stays macOS 13. When this Mac's Xcode is 26, swift
-# uses the macOS 26 SDK so standard controls pick up Liquid Glass there.
+# uses the macOS 26 SDK. That compiles the Liquid Glass calls. They run only
+# on macOS 26. An older SDK skips those calls and keeps the solid controls.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

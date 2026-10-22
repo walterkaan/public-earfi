@@ -282,7 +282,7 @@ struct LogWindow: View {
           .textSelection(.enabled)
       }
       HStack {
-        Button("Copy diagnostics") { model.copyDiagnostics() }
+        GreenPushButton("Copy diagnostics") { model.copyDiagnostics() }
         Spacer()
       }
     }
