@@ -728,7 +728,7 @@ private struct AppCPUSampler {
         )
         let result = withUnsafeMutablePointer(to: &info) { pointer -> kern_return_t in
             pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { raw in
-                task_info(mach_task_self(), task_flavor_t(TASK_THREAD_TIMES_INFO), raw, &count)
+                task_info(mach_task_self_, task_flavor_t(TASK_THREAD_TIMES_INFO), raw, &count)
             }
         }
         guard result == KERN_SUCCESS else { return 0 }
