@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  macos:
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swift format
+        run: |
+          set -euo pipefail
+          if command -v swift-format >/dev/null 2>&1; then
+            FORMATTER=(swift-format)
+          else
+            FORMATTER=(xcrun swift-format)
+          fi
+          "${FORMATTER[@]}" lint --recursive --strict Sources Tests
+
+      - name: Unit tests
+        run: swift test
+
+      - name: Listener page patch
+        run: python3 scripts/patch-mediamtx-listener.py --self-test
+
+      - name: Address sanitizer
+        run: swift test --sanitize=address --filter PublicEarFiCoreTests
+
+      - name: Thread sanitizer
+        run: swift test --sanitize=thread --filter PublicEarFiCoreTests
+
+      - name: Restore bundled helpers
+        uses: actions/cache/restore@v4
+        with:
+          path: build/helpers
+          key: helpers-v1-${{ hashFiles('scripts/versions.env', 'scripts/ffmpeg-configure-flags.txt', 'scripts/build-helpers.sh') }}
+
+      - name: Build MediaMTX and LGPL ffmpeg
+        run: ./scripts/build-helpers.sh
+
+      - name: Save bundled helpers
+        uses: actions/cache/save@v4
+        with:
+          path: build/helpers
+          key: helpers-v1-${{ hashFiles('scripts/versions.env', 'scripts/ffmpeg-configure-flags.txt', 'scripts/build-helpers.sh') }}
+
+      - name: Check MediaMTX accepts the generated config
+        run: MEDIAMTX_BIN="$PWD/build/helpers/mediamtx" swift test --filter MediaMTXConfigTests/testRealMediaMTXAcceptsGeneratedConfig
+
+      - name: Build and ad-hoc sign the app
+        run: ./scripts/build-app.sh
+
+      - name: Serve the listener page from the app bundle
+        run: ./scripts/check-listener-page.sh dist/RoomCast.app
+
+      - name: Check credits, architectures, and the signature
+        run: |
+          set -euo pipefail
+          ./scripts/check-credits.sh "dist/RoomCast.app"
+          codesign --verify --deep --strict --verbose=2 "dist/RoomCast.app"
+          lipo -info "dist/RoomCast.app/Contents/MacOS/RoomCast" | grep arm64
+          lipo -info "dist/RoomCast.app/Contents/MacOS/RoomCast" | grep x86_64
+          lipo -info "dist/RoomCast.app/Contents/Helpers/ffmpeg" | grep arm64
+          lipo -info "dist/RoomCast.app/Contents/Helpers/ffmpeg" | grep x86_64
+          lipo -info "dist/RoomCast.app/Contents/Helpers/mediamtx" | grep arm64
+          lipo -info "dist/RoomCast.app/Contents/Helpers/mediamtx" | grep x86_64
+          "dist/RoomCast.app/Contents/Helpers/ffmpeg" -version | grep -- '--enable-libopus'
+          "dist/RoomCast.app/Contents/Helpers/ffmpeg" -hide_banner -buildconf | grep -q -- '--disable-gpl'
+
+      - name: Smoke test pcm_f32le publish to MediaMTX
+        run: ./scripts/smoke-rtsp.sh "dist/RoomCast.app"
+
+      - name: Package a DMG
+        run: ./scripts/package-dmg.sh
+
+      - name: Zip the app
+        run: ditto -c -k --keepParent "dist/RoomCast.app" "dist/RoomCast-app.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RoomCast-macos
+          if-no-files-found: error
+          path: |
+            dist/*.dmg
+            dist/RoomCast-app.zip
+            dist/SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hero-backdrop
+          if-no-files-found: warn
+          path: build/hero-backdrop.png

@@ -1,0 +1,122 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;background:#d9dce1;font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;font-size:13px;color:#222}
+.wrap{display:flex;flex-wrap:wrap;gap:22px;padding:26px;justify-content:center;width:1520px}
+.cap{text-align:center;font-weight:600;color:#555;margin-bottom:8px}
+.win{width:440px;background:#f6f6f7;border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.25);overflow:hidden}
+.title{height:32px;background:#e9e9ec;display:flex;align-items:center;padding:0 12px}
+.dot{width:12px;height:12px;border-radius:50%;margin-right:8px}
+.title span{flex:1;text-align:center;font-weight:600;color:#444;margin-right:60px}
+.tabs{display:flex;justify-content:center;background:#e9e9ec;border-bottom:1px solid #ccc;padding-bottom:8px}
+.tabs div{padding:3px 18px;border:1px solid #bbb;background:#fff}
+.tabs div:first-child{border-radius:6px 0 0 6px}.tabs div+div{border-left:0}.tabs div:last-child{border-radius:0 6px 6px 0}
+.tabs .on{background:#2f6fe4;color:#fff;border-color:#2f6fe4}
+.body{padding:14px;display:flex;flex-direction:column;gap:11px;height:560px}
+.card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:11px}
+h3{margin:0 0 7px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#777}
+.row{display:flex;align-items:center;gap:8px;margin:7px 0}
+.row label{width:96px;color:#555;flex:none}
+.sel{flex:1;border:1px solid #bbb;border-radius:5px;padding:4px 8px;background:#fafafa}
+.meter{height:12px;flex:1;background:#eee;border-radius:3px;overflow:hidden;position:relative}
+.meter i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#3c3 0 70%,#ec3 70% 88%,#e33 88%)}
+.seg{display:flex;border:1px solid #bbb;border-radius:5px;overflow:hidden}
+.seg div{padding:3px 8px;white-space:nowrap}.seg .on{background:#2f6fe4;color:#fff}
+.rec{background:#fff!important;color:#c62828!important;border:2px solid #c62828;font-size:16px!important;padding:13px!important;display:flex;align-items:center;justify-content:center}
+.recline{display:flex;align-items:center;gap:6px;margin-top:8px;color:#c62828;font-weight:600;font-size:12px}
+.rdot{width:10px;height:10px;border-radius:50%;background:#e53935;flex:none}
+.big{background:#d6402f;color:#fff;font-size:20px;font-weight:700;text-align:center;padding:15px;border-radius:10px}
+.status{display:flex;align-items:center;gap:8px;font-weight:600;color:#1a7f37}
+.status b{width:10px;height:10px;border-radius:50%;background:#2c2}
+.url{font-family:Menlo,monospace;font-size:12.5px;background:#f1f4fb;padding:6px 8px;border-radius:5px}
+.qr{width:104px;height:104px;flex:none;background:repeating-conic-gradient(#000 0 25%,#fff 0 50%) 0 0/16px 16px;border:6px solid #fff;outline:1px solid #ccc}
+.cnt{font-size:30px;font-weight:700;line-height:1}
+.tog{display:inline-block;width:30px;height:17px;border-radius:9px;background:#2c2;position:relative;flex:none}
+.tog:after{content:"";position:absolute;right:2px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff}
+.tog.off{background:#bbb}.tog.off:after{left:2px;right:auto}
+.logline{font-family:Menlo,monospace;font-size:11px;color:#8a6d00;background:#fff8e0;padding:5px 8px;border-radius:5px}
+.btn{border:1px solid #bbb;border-radius:5px;padding:3px 10px;background:#fff}
+.inp{border:1px solid #bbb;border-radius:5px;padding:4px 8px;background:#fff;width:90px}
+.hint{color:#888;font-size:11px;margin-left:104px;margin-top:-4px}
+.ta{border:1px solid #bbb;border-radius:5px;padding:5px 8px;background:#fff;min-height:34px;font-size:12px}
+.lbl{font-size:11px;color:#666;margin:8px 0 3px}
+.page{width:250px;height:354px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.25);margin:0 auto;padding:18px 16px;box-sizing:border-box;text-align:center;font-size:9px;color:#111}
+.page h1{font-size:17px;margin:2px 0 4px}.page .d{color:#444;margin-bottom:8px}
+.pqr{width:140px;height:140px;margin:6px auto;background:repeating-conic-gradient(#000 0 25%,#fff 0 50%) 0 0/14px 14px;border:8px solid #fff;outline:1px solid #ddd}
+.purl{font-family:Menlo,monospace;font-size:11px;font-weight:700;margin:6px 0 8px}
+.page ol{text-align:left;margin:0 0 0 14px;padding:0;line-height:1.5}
+.pf{color:#999;font-size:7px;margin-top:8px}
+.warn{background:#fff4d6;border:1px solid #f0c95a;color:#7a5600;border-radius:6px;padding:6px 8px;font-size:11px}
+.crow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #eee;font-size:12px}
+.crow b{width:110px}.lic{background:#eef2fb;color:#2f4f9e;border-radius:4px;padding:1px 6px;font-size:11px;white-space:nowrap}
+.crow .meta{flex:1;color:#666;font-size:11px}.lnk{color:#2f6fe4;text-decoration:underline;font-size:11px;white-space:nowrap}
+</style></head><body><div class="wrap">
+<div><div class="cap">Running window</div><div class="win">
+<div class="title"><div class="dot" style="background:#ff5f57"></div><div class="dot" style="background:#febc2e"></div><div class="dot" style="background:#28c840"></div><span>RoomCast</span></div>
+<div class="body">
+ <div class="big">■ Stop Broadcasting</div>
+ <div class="card"><div class="status"><b></b> Live · 01:12:45 · Focusrite Scarlett 2i2 USB</div>
+  <div class="row"><label>Input level</label><div class="meter"><i style="width:62%"></i></div><span style="color:#777">-14 dB</span></div></div>
+ <div class="card" style="display:flex;gap:14px">
+  <div class="qr"></div>
+  <div style="flex:1;min-width:0"><h3>Listeners open</h3><div class="url">http://192.168.1.42:8889/</div>
+   <div class="row"><span class="btn">Copy link</span></div>
+   <h3 style="margin-top:8px">Listening now</h3><div class="cnt">7</div></div>
+ </div>
+ <div class="card"><h3>Health</h3><div class="logline">11:47:20 audio healthy</div>
+  <div class="row" style="margin-bottom:0"><span class="btn">Copy diagnostics</span></div></div>
+</div></div></div>
+<div><div class="cap">Settings (RoomCast → Settings…, Cmd-,)</div><div class="win">
+<div class="title"><div class="dot" style="background:#ff5f57"></div><div class="dot" style="background:#febc2e"></div><div class="dot" style="background:#28c840"></div><span>Settings</span></div>
+<div class="body">
+ <div class="card"><h3>Audio input</h3>
+  <div class="row"><label>Device</label><div class="sel">Focusrite Scarlett 2i2 USB ▾</div></div>
+  <div class="row"><label>Channels</label><div class="seg"><div class="on">Mono</div><div>Stereo</div></div><div class="sel" style="flex:0 0 auto">Input 1 ▾</div></div>
+  <div class="row"><label>Quality</label><div class="seg"><div class="on">Speech 32k</div><div>Standard 64k</div><div>Music 96k</div></div></div>
+  <div class="hint">30 listeners ≈ 0.96 Mbps</div>
+  <div class="hint">Speech is mono, 32 kbps. The stream is always 48 kHz.</div>
+ </div>
+ <div class="card"><h3>Stream</h3>
+  <div class="row"><label>Stream name</label><div class="inp">live</div><label style="width:auto">Port</label><div class="inp" style="width:50px">8889</div></div>
+  <div class="row"><label>Broadcast title</label><div class="inp">RoomCast Broadcast</div></div>
+  <div class="row"><label>Network mode</label><div class="seg"><div class="on">Auto (UDP+TCP)</div><div>UDP only</div><div>TCP only</div></div></div>
+  <div class="hint">TCP only = Wi-Fi-friendly; try it if listeners hear dropouts</div>
+ </div>
+ <div class="card"><h3>This Mac</h3>
+  <div class="row"><span class="tog"></span> Keep Mac awake while broadcasting</div>
+  <div class="row"><span class="tog off"></span> Launch at login</div>
+ </div>
+ <div style="display:flex;align-items:center;gap:10px"><span class="btn" style="white-space:nowrap">Reset to defaults…</span><a style="color:#2f6fe4;white-space:nowrap;text-decoration:underline">Credits…</a><span style="color:#888;font-size:11px">Changes apply on next Start (app offers to restart if live).</span></div>
+</div></div></div>
+<div><div class="cap">Poster (File → Print Poster…, Cmd-P)</div><div class="win" style="width:560px">
+<div class="title"><div class="dot" style="background:#ff5f57"></div><div class="dot" style="background:#febc2e"></div><div class="dot" style="background:#28c840"></div><span>Poster</span></div>
+<div class="body" style="flex-direction:row;gap:14px">
+ <div style="width:250px;display:flex;flex-direction:column">
+  <div class="lbl">Header</div><div class="ta" style="min-height:0">Listen live on your phone</div>
+  <div class="lbl">Description</div><div class="ta" style="min-height:44px">Today's talk, live from the main hall.<br>Bring headphones.</div>
+  <div class="row" style="margin-top:10px"><span class="tog"></span> Show instructions</div><div class="ta" style="font-size:10.5px;line-height:1.4">Join the Wi-Fi network {network}<br>Scan the QR code or type the address below.<br>Tap ▶ to start, and keep your screen on…<br>No sound? Tap the speaker/mute icon…</div>
+  <div class="lbl">Wi-Fi network name (optional)</div><div class="ta" style="min-height:0">Hall-Guest</div>
+  <div class="row"><label style="width:70px">Paper</label><div class="seg"><div class="on">A4</div><div>Letter</div></div></div>
+  <div class="row"><label style="width:70px">Address</label><div class="seg"><div class="on">IP</div><div>.local</div></div></div>
+  <div class="warn">⚠ Address changed since last print (was 192.168.1.40). Reprint, or set a fixed IP. <u>Why?</u></div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><span class="btn">Export PDF…</span><span class="btn">Print…</span><span class="btn">Copy QR image</span></div>
+ </div>
+ <div style="flex:1;background:#e4e5e8;border-radius:8px;padding:14px 0;display:flex;flex-direction:column;justify-content:center">
+  <div class="page"><h1>Listen live on your phone</h1><div class="d">Today's talk, live from the main hall.<br>Bring headphones.</div>
+   <div class="pqr"></div><div class="purl">http://192.168.1.42:8889/</div>
+   <ol><li>Join the Wi-Fi network <b>Hall-Guest</b></li><li>Scan the QR code or type the address</li><li>Tap ▶ to start, and keep your screen on</li><li><b>No sound?</b> Tap the speaker/mute icon on the player or in your browser tab, and turn up your phone volume.</li></ol>
+   <div class="pf">RoomCast: free and open source</div></div>
+  <div style="text-align:center;color:#777;font-size:11px;margin-top:8px">Preview/PDF/Print Poster</div>
+ </div>
+</div></div></div>
+<div style="width:100%;display:flex;justify-content:center"><div><div class="cap">Credits sheet (from Settings → Credits…, also About RoomCast)</div>
+<div class="win" style="width:760px"><div class="title"><div class="dot" style="background:#ff5f57"></div><div class="dot" style="background:#febc2e"></div><div class="dot" style="background:#28c840"></div><span>Credits</span></div>
+<div style="padding:16px">
+ <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><div style="width:44px;height:44px;border-radius:10px;background:#2f6fe4;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center">EF</div>
+ <div><div style="font-weight:700;font-size:15px">RoomCast 1.0.0 <span style="color:#888;font-weight:400;font-size:12px">(42, a1b2c3d)</span></div>
+ <div style="color:#555;font-size:12px">Copyright © 2026 Walter Kaan · MIT License · <span class="lnk">github.com/walterkaan/public-earfi</span></div></div></div>
+ <div class="crow"><b>MediaMTX 1.x</b><span class="lic">MIT</span><span class="meta">© upstream authors · github.com/bluenviron/mediamtx · unmodified binary</span><span class="lnk">View licence</span></div>
+ <div class="crow"><b>FFmpeg 7.x</b><span class="lic">LGPL-2.1+</span><span class="meta">The FFmpeg developers · ffmpeg.org · LGPL build, no GPL/non-free parts. Source &amp; build script: GitHub release v1.0.0 assets</span><span class="lnk">View licence</span></div>
+ <div class="crow"><b>libopus 1.x</b><span class="lic">BSD-3-Clause</span><span class="meta">Xiph.Org Foundation &amp; contributors · opus-codec.org</span><span class="lnk">View licence</span></div>
+ <div class="crow" style="border-bottom:0"><b>QR codes</b><span class="lic">Apple</span><span class="meta">CoreImage CIQRCodeGenerator (system framework)</span><span></span></div>
+ <div style="display:flex;gap:8px;margin-top:10px"><span class="btn">Copy all notices</span><span class="btn">Open THIRD_PARTY_NOTICES on GitHub</span><span class="btn" style="margin-left:auto">Done</span></div>
+</div></div></div></div>
+</div></body></html>

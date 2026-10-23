@@ -1,0 +1,144 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 180
+    permissions:
+      contents: write
+    env:
+      RELEASE_SIGNING_P12: ${{ secrets.RELEASE_SIGNING_P12 }}
+      RELEASE_SIGNING_PASSWORD: ${{ secrets.RELEASE_SIGNING_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      DEVELOPER_ID_P12: ${{ secrets.DEVELOPER_ID_P12 }}
+      ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Import the release signing certificate when it exists
+        id: identity
+        run: |
+          set -euo pipefail
+          if [[ -z "${RELEASE_SIGNING_P12:-}" || -z "${RELEASE_SIGNING_PASSWORD:-}" ]]; then
+            echo "RELEASE_SIGNING_P12 or RELEASE_SIGNING_PASSWORD is absent. Signing ad-hoc."
+            echo "identity=-" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          KEYCHAIN="$RUNNER_TEMP/public-earfi.keychain-db"
+          security create-keychain -p "" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "" "$KEYCHAIN"
+          echo "$RELEASE_SIGNING_P12" | base64 --decode > "$RUNNER_TEMP/release.p12"
+          security import "$RUNNER_TEMP/release.p12" -k "$KEYCHAIN" -P "$RELEASE_SIGNING_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$KEYCHAIN"
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" | sed -n 's/.*"\(.*\)".*/\1/p' | head -n 1)"
+          if [[ -z "$IDENTITY" ]]; then
+            echo "The certificate imported, but no codesigning identity was found. Signing ad-hoc."
+            IDENTITY="-"
+          else
+            echo "Using release identity: $IDENTITY"
+          fi
+          {
+            echo "identity<<EOF"
+            echo "$IDENTITY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          rm -f "$RUNNER_TEMP/release.p12"
+
+      - name: Unit tests
+        run: swift test
+
+      - name: Cache bundled helpers
+        uses: actions/cache@v4
+        with:
+          path: build/helpers
+          key: helpers-v1-${{ hashFiles('scripts/versions.env', 'scripts/ffmpeg-configure-flags.txt', 'scripts/build-helpers.sh') }}
+
+      - name: Build helpers and the app
+        env:
+          SIGN_IDENTITY: ${{ steps.identity.outputs.identity }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          export PUBLIC_EARFI_VERSION="$VERSION"
+          export PUBLIC_EARFI_COMMIT="$(git rev-parse --short HEAD)"
+          ./scripts/build-helpers.sh
+          ./scripts/build-app.sh
+          ./scripts/check-credits.sh "dist/RoomCast.app"
+          codesign --verify --deep --strict --verbose=2 "dist/RoomCast.app"
+          # spctl rejects ad-hoc and self-signed apps. That is expected without notarization.
+          if spctl --assess --type execute "dist/RoomCast.app"; then
+            echo "spctl accepted the app"
+          else
+            echo "spctl rejected the app, which is expected until it is notarized."
+          fi
+          ./scripts/package-dmg.sh
+
+      - name: Collect the LGPL source archive
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source scripts/versions.env
+          mkdir -p dist/source
+          curl -fL --retry 3 -o "dist/source/ffmpeg-${FFMPEG_VERSION}-source.tar.xz" \
+            "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+          echo "${FFMPEG_SHA256}  dist/source/ffmpeg-${FFMPEG_VERSION}-source.tar.xz" | shasum -a 256 -c -
+          cp scripts/build-helpers.sh scripts/versions.env scripts/ffmpeg-configure-flags.txt dist/source/
+          {
+            echo "RoomCast FFmpeg ${FFMPEG_VERSION}"
+            echo "Built without --enable-gpl and without --enable-nonfree."
+            echo "Configure flags:"
+            cat scripts/ffmpeg-configure-flags.txt
+          } > dist/source/FFMPEG-BUILD.txt
+          (
+            cd dist
+            shasum -a 256 "RoomCast-${GITHUB_REF_NAME#v}.dmg" source/* > SHA256SUMS
+          )
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          # shellcheck disable=SC1091
+          source scripts/versions.env
+          SIGNING="ad-hoc (RELEASE_SIGNING_P12 was not configured)"
+          if [[ "${{ steps.identity.outputs.identity }}" != "-" ]]; then
+            SIGNING="self-signed release certificate"
+          fi
+          cat > release-notes.md << EOF
+          ## RoomCast ${VERSION}
+
+          This build is signed ${SIGNING}. It is not notarized.
+
+          ### First open
+          1. Open the DMG and drag RoomCast to Applications. Do not run it from the DMG or from Downloads.
+          2. Double-click RoomCast in Applications.
+          3. macOS 15 and later: click Done, then System Settings → Privacy & Security → Open Anyway.
+          4. macOS 13–14: Control-click the app → Open → Open.
+          5. Allow the microphone. If the firewall asks, allow incoming connections for mediamtx.
+
+          FFmpeg ${FFMPEG_VERSION} source is attached as \`ffmpeg-${FFMPEG_VERSION}-source.tar.xz\` together with \`build-helpers.sh\`.
+          EOF
+          sed -i 's/^          //' release-notes.md
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/RoomCast-${VERSION}.dmg" \
+            "dist/SHA256SUMS" \
+            dist/source/* \
+            --title "RoomCast ${VERSION}" \
+            --notes-file release-notes.md
+
+      - name: Notarize when a Developer ID is configured
+        if: env.APPLE_TEAM_ID != '' && env.DEVELOPER_ID_P12 != '' && env.ASC_API_KEY != ''
+        run: |
+          echo "Developer ID secrets are present."
+          echo "Notarization is intentionally dormant until Walter has verified the self-signed flow."
+          echo "A later change can re-sign with Developer ID, run notarytool submit --wait, and stapler staple."
+          exit 0
