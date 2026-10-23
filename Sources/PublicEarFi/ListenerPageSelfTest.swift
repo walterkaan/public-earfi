@@ -17,6 +17,9 @@ enum ListenerPageSelfTest {
     if !html.contains("The listener page could not load.") {
       return fail("listener page strings did not load")
     }
+    if !html.contains("Powered by RoomCast") || !html.contains("https://roomcast.channel") {
+      return fail("listener page is missing the footer")
+    }
     let server = ListenerHTTPServer(
       port: 0,
       upstreamPort: 9,
@@ -38,6 +41,9 @@ enum ListenerPageSelfTest {
     }
     if !response.contains("data:image/png;base64,") {
       return fail("served listener page is missing the favicon")
+    }
+    if !response.contains("Powered by RoomCast") {
+      return fail("served listener page is missing the footer")
     }
     fputs("listener page ok\n", stdout)
     return 0

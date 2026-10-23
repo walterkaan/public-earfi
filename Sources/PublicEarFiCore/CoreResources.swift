@@ -18,7 +18,10 @@ enum CoreResources {
   }
 
   static func pageStrings(searching root: URL? = nil) -> [String: String] {
-    let fallback = ["loadError": "The listener page could not load."]
+    let fallback = [
+      "loadError": "The listener page could not load.",
+      "poweredBy": "Powered by RoomCast",
+    ]
     guard let url = file(name: "ListenerPage.en", extension: "json", searching: root),
       let data = try? Data(contentsOf: url),
       let object = try? JSONSerialization.jsonObject(with: data) as? [String: String]

@@ -67,5 +67,7 @@ for path in sys.argv[1:]:
     text = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
     if text.get("loadError") != "The listener page could not load.":
         raise SystemExit(f"{path} is missing loadError")
+    if text.get("poweredBy") != "Powered by RoomCast":
+        raise SystemExit(f"{path} is missing poweredBy")
 print("App resources are present")
 PY

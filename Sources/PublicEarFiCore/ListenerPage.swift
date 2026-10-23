@@ -85,6 +85,7 @@ public enum ListenerPage {
       faviconHref.isEmpty
       ? ""
       : "<link rel=\"icon\" type=\"image/png\" href=\"\(faviconHref)\">"
+    let credit = creditMarkup(iconHref: faviconHref)
     return """
       <!doctype html>
       <html>
@@ -95,8 +96,11 @@ public enum ListenerPage {
       \(icon)
       <style>
       html,body{margin:0;padding:0;height:100%;background:#161a42;font-family:Arial,sans-serif;color:#fff}
-      #video{position:absolute;top:0;left:0;width:100%;height:100%;background:#161a42}
-      #message{position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;text-align:center;justify-content:center;font-size:16px;font-weight:bold;color:#fff;pointer-events:none;padding:20px;box-sizing:border-box;text-shadow:0 0 5px #000}
+      #video{position:absolute;top:0;left:0;width:100%;height:calc(100% - 44px);background:#161a42}
+      #message{position:absolute;left:0;top:0;right:0;bottom:44px;display:flex;align-items:center;text-align:center;justify-content:center;font-size:16px;font-weight:bold;color:#fff;pointer-events:none;padding:20px;box-sizing:border-box;text-shadow:0 0 5px #000}
+      #credit{position:absolute;left:0;right:0;bottom:0;height:44px;display:flex;align-items:center;justify-content:center;gap:8px;background:#161a42;border-top:1px solid rgba(47,208,189,0.35);z-index:2;font-size:13px}
+      #credit img{width:28px;height:28px;border-radius:7px;display:block}
+      #credit a{color:rgba(255,255,255,0.58);text-decoration:none}
       </style>
       <script defer src="\(readerPath)"></script>
       </head>
@@ -162,9 +166,22 @@ public enum ListenerPage {
       video.addEventListener("play",()=>applyTitle(document.title));
       window.addEventListener("beforeunload",()=>{if(reader!==null)reader.close();});
       </script>
+      \(credit)
       </body>
       </html>
       """
+  }
+
+  /// Quiet line under the player. The icon is the favicon PNG. No icon when
+  /// that file is missing. The link needs a network; the page does not.
+  static func creditMarkup(iconHref: String) -> String {
+    let label = htmlEscape(CoreResources.pageStrings()["poweredBy"] ?? "Powered by RoomCast")
+    let logo =
+      iconHref.isEmpty
+      ? ""
+      : "<img alt=\"\" width=\"28\" height=\"28\" src=\"\(iconHref)\">"
+    return
+      "<footer id=\"credit\">\(logo)<a href=\"https://roomcast.channel\" target=\"_blank\" rel=\"noopener\">\(label)</a></footer>"
   }
 
   private static func htmlEscape(_ text: String) -> String {
