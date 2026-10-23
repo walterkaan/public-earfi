@@ -28,6 +28,11 @@ struct BroadcastView: View {
                     Text("Plug in for long events.")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.85))
+                    if let reviewURL = AppStoreListing.writeReviewURL {
+                        Link("Rate RoomCast", destination: reviewURL)
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(Color.roomTeal)
+                    }
                     hint
                 }
                 .padding(.horizontal, 24)
@@ -238,6 +243,18 @@ private struct ShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+enum AppStoreListing {
+    /// Placeholder until RoomCast Go has an App Store id. Replace `APP_ID`
+    /// with the numeric id from App Store Connect. The Rate link stays
+    /// hidden while this is still the placeholder.
+    static let appID = "APP_ID"
+
+    static var writeReviewURL: URL? {
+        guard appID != "APP_ID", !appID.isEmpty, appID.allSatisfy(\.isNumber) else { return nil }
+        return URL(string: "https://apps.apple.com/app/id\(appID)?action=write-review")
+    }
 }
 
 extension Color {

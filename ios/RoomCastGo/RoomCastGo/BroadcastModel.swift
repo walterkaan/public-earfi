@@ -3,6 +3,7 @@ import AVFoundation
 import Foundation
 import MediaPlayer
 import Network
+import StoreKit
 import UIKit
 
 @MainActor
@@ -42,6 +43,7 @@ final class BroadcastModel: ObservableObject {
     private var rebindRunning = false
     private var rebindAgain = false
     private var remoteInstalled = false
+    private var startedAt: Date?
 
     init() {
         BroadcastBus.start { [weak self] command in
@@ -83,7 +85,11 @@ final class BroadcastModel: ObservableObject {
 
     func toggle() {
         if running {
+            let duration = startedAt.map { Date().timeIntervalSince($0) }
             stopBroadcast(nextStatus: "Ready")
+            if let duration {
+                requestReviewIfEarned(duration: duration)
+            }
         } else {
             beginStart(note: nil)
         }
@@ -176,6 +182,7 @@ final class BroadcastModel: ObservableObject {
             return
         }
         boundIP = ip
+        startedAt = Date()
         running = true
         busy = false
         failed = false
@@ -219,6 +226,7 @@ final class BroadcastModel: ObservableObject {
         rebindGeneration += 1
         rebindAgain = false
         rebindRunning = false
+        startedAt = nil
         poll?.invalidate()
         poll = nil
         capture.stop()
@@ -234,6 +242,19 @@ final class BroadcastModel: ObservableObject {
         status = nextStatus
         activity.end()
         clearRemote()
+    }
+
+    /// Only the Stop button reaches this, and only after `running` is false.
+    /// A network rebind does not.
+    private func requestReviewIfEarned(duration: TimeInterval) {
+        guard !running, ReviewPrompt.noteFinished(duration: duration) else { return }
+        guard let scene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive })
+            ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
+        else { return }
+        ReviewPrompt.markAsked()
+        AppStore.requestReview(in: scene)
     }
 
     private func startPolling() {
@@ -470,5 +491,33 @@ final class BroadcastActivityController {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
         }
+    }
+}
+
+/// Counts Stop presses after a broadcast of at least two minutes, and allows
+/// one review request per marketing version.
+private enum ReviewPrompt {
+    private static let countKey = "review.longBroadcasts"
+    private static let askedKey = "review.askedVersion"
+    private static let minimum: TimeInterval = 120
+
+    static func noteFinished(duration: TimeInterval) -> Bool {
+        guard duration >= minimum else { return false }
+        let defaults = UserDefaults.standard
+        let count = defaults.integer(forKey: countKey) + 1
+        defaults.set(count, forKey: countKey)
+        guard count >= 2 else { return false }
+        let version = currentVersion
+        return !version.isEmpty && defaults.string(forKey: askedKey) != version
+    }
+
+    static func markAsked() {
+        let version = currentVersion
+        guard !version.isEmpty else { return }
+        UserDefaults.standard.set(version, forKey: askedKey)
+    }
+
+    private static var currentVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
     }
 }
