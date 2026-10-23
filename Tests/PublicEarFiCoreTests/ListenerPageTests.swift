@@ -118,6 +118,26 @@ final class ListenerPageTests: XCTestCase {
     XCTAssertEqual(fromBundle, "data:image/png;base64," + nested.base64EncodedString())
   }
 
+  func testMacOSBundleLayoutKeepsResourcesUnderContents() throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let inside =
+      root
+      .appendingPathComponent("Contents/Resources")
+      .appendingPathComponent("\(CoreResources.packageBundleName).bundle")
+      .appendingPathComponent("Contents/Resources")
+    try FileManager.default.createDirectory(at: inside, withIntermediateDirectories: true)
+    let png = Data([0x89, 0x50, 0x4E, 0x47, 0x03])
+    try png.write(to: inside.appendingPathComponent("favicon.png"))
+    try Data("{\"loadError\":\"from the mac bundle\"}".utf8).write(
+      to: inside.appendingPathComponent("ListenerPage.en.json"))
+    XCTAssertEqual(
+      CoreResources.faviconDataURI(searching: root),
+      "data:image/png;base64," + png.base64EncodedString())
+    XCTAssertEqual(
+      CoreResources.pageStrings(searching: root)["loadError"], "from the mac bundle")
+  }
+
   func testDevelopmentBundleStillProvidesTheFaviconAndStrings() {
     XCTAssertTrue(CoreResources.faviconDataURI().hasPrefix("data:image/png;base64,"))
     XCTAssertEqual(

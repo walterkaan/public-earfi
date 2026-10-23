@@ -57,16 +57,15 @@ enum CoreResources {
   }
 
   private static func bundledFile(_ filename: String) -> URL? {
-    let nested = "\(packageBundleName).bundle/\(filename)"
     var urls: [URL] = []
     func add(_ root: URL) {
-      urls.append(root.appendingPathComponent("Contents/Resources/\(nested)"))
-      urls.append(root.appendingPathComponent("Resources/\(nested)"))
-      urls.append(root.appendingPathComponent(nested))
+      for suffix in bundleSuffixes(filename) {
+        urls.append(root.appendingPathComponent(suffix))
+      }
     }
     add(Bundle.main.bundleURL)
     if let resources = Bundle.main.resourceURL {
-      urls.append(resources.appendingPathComponent(nested))
+      add(resources)
     }
     if let executable = Bundle.main.executableURL?.deletingLastPathComponent() {
       var cursor = executable
@@ -83,16 +82,29 @@ enum CoreResources {
     return urls.first(where: isFile)
   }
 
-  private static func firstFile(_ filename: String, in roots: [URL]) -> URL? {
-    let nested = "\(packageBundleName).bundle/\(filename)"
-    let suffixes = [
-      filename,
-      "Contents/Resources/\(filename)",
-      "Resources/\(filename)",
-      "Contents/Resources/\(nested)",
-      "Resources/\(nested)",
-      nested,
+  /// macOS keeps bundle files in Contents/Resources. A flat bundle keeps them
+  /// at its root. Loose app files stay ahead of either layout.
+  private static func bundleSuffixes(_ filename: String) -> [String] {
+    let bundle = "\(packageBundleName).bundle"
+    let inside = "\(bundle)/Contents/Resources/\(filename)"
+    let flat = "\(bundle)/\(filename)"
+    return [
+      "Contents/Resources/\(inside)",
+      "Contents/Resources/\(flat)",
+      "Resources/\(inside)",
+      "Resources/\(flat)",
+      inside,
+      flat,
     ]
+  }
+
+  private static func firstFile(_ filename: String, in roots: [URL]) -> URL? {
+    let suffixes =
+      [
+        filename,
+        "Contents/Resources/\(filename)",
+        "Resources/\(filename)",
+      ] + bundleSuffixes(filename)
     for root in roots {
       for suffix in suffixes {
         let url = root.appendingPathComponent(suffix)
