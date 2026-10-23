@@ -19,8 +19,11 @@ final class AudioCapture {
         if session.category != .playAndRecord {
             try? session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
         }
-        if session.currentRoute.inputs.contains(where: { $0.portType == .usbAudio }) { return true }
-        return session.availableInputs?.contains(where: { $0.portType == .usbAudio }) ?? false
+        func isUSB(_ port: AVAudioSessionPortDescription) -> Bool {
+            port.portType == .usbAudio || port.portName.localizedCaseInsensitiveContains("usb")
+        }
+        if session.currentRoute.inputs.contains(where: isUSB) { return true }
+        return session.availableInputs?.contains(where: isUSB) ?? false
     }
 
     private let log = Logger(subsystem: "channel.roomcast.go", category: "audio")
@@ -200,6 +203,8 @@ final class AudioCapture {
         let input = engine.inputNode
         let session = AVAudioSession.sharedInstance()
         detachSilence()
+        // Decide the profile now the session is active and the route is real.
+        musicActive = musicPreferred && Self.routeIsUSB
         let builtIn = !musicActive && session.currentRoute.inputs.contains { $0.portType == .builtInMic }
         // Voice processing helps the built-in mic and fights a headset or a desk mic.
         // USB and Music leave the voice-processing unit off, which is the path
