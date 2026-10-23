@@ -14,7 +14,12 @@ final class AudioCapture {
     var onCaptureFailure: ((String) -> Void)?
 
     static var routeIsUSB: Bool {
-        AVAudioSession.sharedInstance().currentRoute.inputs.contains { $0.portType == .usbAudio }
+        let session = AVAudioSession.sharedInstance()
+        if session.category != .playAndRecord {
+            try? session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
+        }
+        if session.currentRoute.inputs.contains(where: { $0.portType == .usbAudio }) { return true }
+        return session.availableInputs?.contains(where: { $0.portType == .usbAudio }) ?? false
     }
 
     private let log = Logger(subsystem: "channel.roomcast.go", category: "audio")
