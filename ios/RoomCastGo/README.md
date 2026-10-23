@@ -1,8 +1,11 @@
 # RoomCast Go
 
 iPhone-only proof that a phone can host a **voice-only** RoomCast broadcast.
-One screen: Start / Stop, a QR code, the listener URL, a listener count, and
-a microphone meter. Opus mono at 32 kbps. No settings.
+One screen: Start / Stop, Mute, mic gain, a QR code, Share, the listener
+URL, a listener count, and a live microphone meter. Opus mono at 32 kbps.
+No input picker: iOS switches the mic on its own. While a broadcast is
+running, a Live Activity on the lock screen and in the Dynamic Island shows
+the listener count, a coarse meter, and Mute / Unmute and gain buttons.
 
 Listeners open the same browser page as the Mac app, including the
 “Powered by RoomCast” footer, and play over WebRTC. The iPhone runs the
@@ -38,7 +41,9 @@ by hand.
 1. Open `ios/RoomCastGo/RoomCastGo.xcodeproj`.
 2. Select the RoomCastGo target → Signing & Capabilities.
 3. Leave “Automatically manage signing” on.
-4. Set Team to your team. Leave the bundle id as `channel.roomcast.go`.
+4. The project’s team is `6G2V545X95`. Leave the bundle id as
+   `channel.roomcast.go`. The widget extension is
+   `channel.roomcast.go.widget` on the same team.
 5. Plug in the iPhone, select it as the run destination, and press Run.
    Xcode creates the App ID, the Apple Development certificate, and the
    development provisioning profile, and registers the phone’s UDID.
@@ -56,9 +61,19 @@ If automatic signing fails, create these in
 | Device | Devices → add the iPhone. The UDID is in Xcode → Window → Devices and Simulators. |
 | Certificate | Certificates → Apple Development. Creating it from Xcode (the automatic path above) is enough. A certificate signing request is only needed if you make the certificate on the website. |
 | Profile | Profiles → iOS App Development. App ID `channel.roomcast.go`, that development certificate, that iPhone. Name it `RoomCast Go Development`. Download it and double-click it. Then switch the target to manual signing and pick that profile. |
+| App Group | Identifiers → App Groups → `group.channel.roomcast.go`. Then on both App IDs below, enable App Groups and select that group. |
+| Widget App ID | Identifiers → App IDs → App. Description `RoomCast Go Widget`. Explicit bundle ID `channel.roomcast.go.widget`. Enable only App Groups, and select `group.channel.roomcast.go`. |
 
-Nothing else. No APNs key, no Sign in with Apple key, no App Store Connect
-app record until you want TestFlight.
+Nothing else. No APNs key, no push certificate, no Sign in with Apple key,
+no App Store Connect app record until you want TestFlight. The lock screen
+card is a local Live Activity, not a remote push.
+
+Press Run once before creating those by hand. Automatic signing often
+registers the widget App ID and the App Group. Create them in the portal
+only if Xcode reports a signing error for the widget or the App Group.
+
+On the iPhone, Settings → RoomCast Go → Live Activities should be on if you
+want the lock screen card. The broadcast still runs if that switch is off.
 
 ## Build and run
 
@@ -89,11 +104,21 @@ On the phone, allow Microphone and Local Network. If you deny one of them:
 - Settings → Privacy & Security → Local Network → RoomCast Go
 
 Press Start. The orange microphone dot means the phone is capturing. Another
-phone on the same Wi-Fi scans the QR code, opens the page, and taps the
-speaker icon. The page starts muted, the same way the Mac listener page
-does, so the browser will allow autoplay. The host’s lock screen should keep
-the broadcast running. A phone call pauses the microphone and the broadcast
-resumes when the call ends.
+phone on the same Wi-Fi scans the QR code, or you tap Share and send the
+URL by Messages or AirDrop. The page starts muted, the same way the Mac
+listener page does, so the browser will allow autoplay. Tap the speaker
+icon. The host’s lock screen keeps the broadcast running. Mute sends
+silence and leaves the listeners connected. Gain is software volume on the
+way into Opus, from 0.5× to 3×. A phone call pauses the microphone and the
+broadcast resumes when the call ends.
+
+Plug the phone in for a long event. The meter on the main screen is the
+live mic level. The lock screen meter updates about once a second.
+
+If the iPhone changes networks, the app rebinds the server and refreshes
+the QR code. Listeners who still have the same address reconnect on their
+own. If the address changed, they need the new code or the new shared link.
+Control Center’s pause and play buttons mute and unmute.
 
 ## Personal Hotspot
 
@@ -122,8 +147,14 @@ that 16 listeners will sound fine.
 
 - **Xcode says the project is not a valid property list**: from
   `ios/RoomCastGo`, run `brew install xcodegen && xcodegen`.
-- **“Roomcast.xcframework is missing”** in Xcode: run
-  `./scripts/build-server-framework.sh` from `ios/RoomCastGo`, then build again.
+- **“Roomcast.xcframework is missing”**, or you just pulled a change to
+  the listener page: run `./scripts/build-server-framework.sh` from
+  `ios/RoomCastGo`, then build again. The page is compiled into the
+  framework.
+- **Widget or App Group signing error**: create `group.channel.roomcast.go`
+  and the App ID `channel.roomcast.go.widget` as in the table above, enable
+  the group on both `channel.roomcast.go` and `channel.roomcast.go.widget`,
+  then build again.
 - **Go is too old, not Apple silicon, or macOS kills `go` with exit 137**:
   `which go` is probably an old Intel build at `/usr/local/go/bin/go`.
   Run `brew install go`, open a new Terminal, and confirm `which go` is
@@ -146,11 +177,16 @@ that 16 listeners will sound fine.
 
 ## What is already proven
 
+On Walter’s iPhone 15: the broadcast kept going with the screen locked,
+two listeners worked including over Personal Hotspot, and the delay was
+about 500 ms. Opus stays at 32 kbps. iOS picked the input (AirPods, the
+built-in mic, a USB sound card) without a picker.
+
 On a Linux machine, without an iPhone: the WHEP server accepts the same
 offer shape as the listener page, two listeners receive the same packets,
-and the vendored Opus encoder round-trips a sine wave. A real iPhone is
-still required for the microphone, the lock screen, phone-call
-interruptions, AirPods, Personal Hotspot, latency, battery, and heat.
+and the vendored Opus encoder round-trips a sine wave. The network
+restart, mute, gain, Share, and Live Activity in this pass were not run
+on a phone here. Battery and heat are still unmeasured.
 [FINDINGS.md](FINDINGS.md) lists each of those.
 
 Licences: [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

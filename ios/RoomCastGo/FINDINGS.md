@@ -1,9 +1,10 @@
 # Findings: can an iPhone host voice-only RoomCast?
 
 **Yes, for a handful of listeners on the same Wi-Fi or on this iPhone’s
-Personal Hotspot.** This proof is not a stand-in for the Mac app at a
-30-person venue. Latency, battery, and heat were not measured on a phone.
-The numbers below are design bounds, not device results.
+Personal Hotspot.** Walter ran it on an iPhone 15: the stream kept going
+with the screen locked, two listeners worked including over the phone’s
+hotspot, and the delay was about 500 ms. This proof is not a stand-in for
+the Mac app at a 30-person venue. Battery and heat were not measured.
 
 ## Server choice
 
@@ -18,10 +19,10 @@ need a second encoder process.
 | Pure Swift ICE and DTLS | Not a practical proof. The security and congestion code is the whole problem. |
 | **In-process Pion WHEP server** | **Chosen.** Pion is the WebRTC library MediaMTX already uses. One Go package, bound with gomobile to `Roomcast.xcframework`, speaks the same WHEP and `reader.js` contract as the Mac listener page. Opus is compiled by Xcode from the vendored 1.6.1 float sources. `AVAudioEngine` captures the mic. One Opus encode is fanned out to every peer. |
 
-The listener HTML is a copy of the Mac page at the RoomCast beta commit
-`780ddc8`, including the waiting state, the retry, and the
-“Powered by RoomCast” footer. `reader.js` is the MediaMTX v1.21.2 file,
-byte for byte.
+The listener HTML is the Mac page at the RoomCast beta commit `780ddc8`,
+including the waiting state and the “Powered by RoomCast” footer, plus a
+reconnect when the audio track ends so a restart on the same address comes
+back. `reader.js` is the MediaMTX v1.21.2 file, byte for byte.
 
 ## Licence, size, battery, App Store
 
@@ -35,24 +36,42 @@ byte for byte.
 
 ## Latency
 
-Not measured. The path is a 20 ms capture period, Opus in VoIP mode
-(algorithmic delay on top of that frame), a browser jitter buffer that is
-often about 40–100 ms, and well under 10 ms on a quiet LAN. Expect roughly
-100–200 ms mouth-to-ear, possibly a little under the Mac app because there
-is no ffmpeg-to-RTSP hop. A phone-to-phone recording is the measurement a
-real version needs.
+About 500 ms on Walter’s iPhone 15, by ear, with the 32 kbps voice preset.
+That is the number to plan around. The design path is a 20 ms capture
+period, Opus in VoIP mode, a browser jitter buffer, and a short LAN hop,
+which on paper is closer to 100–200 ms. The extra delay is likely the
+browser buffer, and it can be higher again on Personal Hotspot or with
+AirPods in call mode. It is one phone’s observation, not a lab recording.
+
+## What Walter confirmed on an iPhone 15
+
+- Background audio while the screen is locked. The orange microphone
+  indicator is the lock-screen signal.
+- Two listeners, on Wi-Fi and on this iPhone’s Personal Hotspot.
+- About 500 ms of delay. Audio quality was good at Opus 32 kbps mono, so
+  that bitrate stays.
+- iOS switches the input on its own: AirPods, the built-in mic, a USB sound
+  card. There is no input picker.
+- A network change did not rebind the server. That is what the auto-restart
+  below is for. It has not been tried on a phone yet.
 
 ## Behaviour that is designed and not device-tested
 
-- Background audio while the screen is locked or the app is not in front.
-  The orange microphone indicator is the lock-screen signal.
+- When the network changes, `NWPathMonitor` stops and starts the Go server
+  on the new address, and the QR code updates. The microphone stays up.
+  Listeners whose page is still on that same address retry WHEP. A new IP
+  means they need the new QR code or the Share link.
+- Mute encodes silence and leaves the WebRTC sessions up. The on-screen
+  meter keeps showing the mic. Gain is a software multiply before Opus,
+  from 0.5× to 3×. The same Mute and gain buttons are on the Live Activity
+  (lock screen and Dynamic Island). Control Center pause and play mute and
+  unmute. If Live Activities are switched off, Start still broadcasts.
 - A phone call stops the microphone and does not tear down listener
   sessions. When the interruption ends, capture starts again. If iOS
   suspends the process anyway, the listener page retries WHEP on its own.
-- The system picks the input: built-in mic, AirPods, a wired headset, or a
-  USB-C mic. Voice processing runs only for the built-in mic, so a headset
-  is not run through speakerphone echo control. AirPods use the hands-free
-  profile and will sound like a call.
+- Voice processing runs only for the built-in mic, so a headset is not run
+  through speakerphone echo control. AirPods use the hands-free profile
+  and will sound like a call.
 - The server binds the chosen private IPv4 only, on port 8889 for the page
   and WHEP and port 8189 for ICE over both UDP and TCP. It does not listen
   on the cellular address. A one-packet UDP poke to a neighbour on the same
@@ -84,7 +103,9 @@ Linux, no iPhone, no Xcode, no Safari:
 - `scripts/test-opus.sh`: the vendored encoder round-trips a 220 Hz sine
   (best correlation 0.99949 after the codec delay).
 
-Not verified, because there is no iPhone and no macOS SDK here: the
-gomobile framework link, the SwiftUI compile, the microphone, background
-audio, call interruptions, AirPods, Personal Hotspot, latency, battery,
-and heat.
+Not verified in this environment, because there is no iPhone and no macOS
+SDK here: the SwiftUI compile, linking this revision’s framework, and the
+new network restart, mute, gain, Share button, and Live Activity. Walter’s
+iPhone 15 already showed lock-screen audio, two listeners, Personal
+Hotspot, and about 500 ms of delay on the previous build. Battery and heat
+are still unmeasured.

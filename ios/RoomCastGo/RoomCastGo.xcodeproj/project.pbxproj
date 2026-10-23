@@ -37,6 +37,7 @@
 		3654696B6F75228F1E3AB63B /* k2a_FLP.c in Sources */ = {isa = PBXBuildFile; fileRef = E60CADEA1883977D5822C357 /* k2a_FLP.c */; };
 		36C4301D9FA6FFC63C3750F8 /* LTP_analysis_filter_FLP.c in Sources */ = {isa = PBXBuildFile; fileRef = 718A4A7C6F8772241B2F9C50 /* LTP_analysis_filter_FLP.c */; };
 		374E3C88C6501C19A6EAAB83 /* LP_variable_cutoff.c in Sources */ = {isa = PBXBuildFile; fileRef = 819BCAF0AEC608A228EFC877 /* LP_variable_cutoff.c */; };
+		37A9F16113A4224501869723 /* BroadcastShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 290CDBE69B711F93538FCD35 /* BroadcastShared.swift */; };
 		39AE93DE61D21BB105A03BA0 /* quant_bands.c in Sources */ = {isa = PBXBuildFile; fileRef = EFAE29F7FEA2E6105F37AD99 /* quant_bands.c */; };
 		3A17328FD67C2C2789070E75 /* OpusEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E03E76405E540CB5800DB8B /* OpusEncoder.swift */; };
 		3B8480F64EAA7E5E5E0E1849 /* resampler_private_IIR_FIR.c in Sources */ = {isa = PBXBuildFile; fileRef = 2FAF2B1EE32F9073F32F7FF0 /* resampler_private_IIR_FIR.c */; };
@@ -47,6 +48,7 @@
 		3FE39168283C344514D9716B /* LPC_inv_pred_gain_FLP.c in Sources */ = {isa = PBXBuildFile; fileRef = D6961575884E875FD3D9B378 /* LPC_inv_pred_gain_FLP.c */; };
 		45406B9B05CEFDE2C28ABF85 /* decode_indices.c in Sources */ = {isa = PBXBuildFile; fileRef = 857C349EF224E7B1B9F5AAA8 /* decode_indices.c */; };
 		4588722DCCC59E9D630A3084 /* encode_indices.c in Sources */ = {isa = PBXBuildFile; fileRef = 2046C313CCFA4D47D902E9CA /* encode_indices.c */; };
+		4606CE7E4379061D617E1E60 /* BroadcastShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 290CDBE69B711F93538FCD35 /* BroadcastShared.swift */; };
 		4875299C48139BD6AA7EF3E9 /* opus_decoder.c in Sources */ = {isa = PBXBuildFile; fileRef = 814AE86111EDFEED1241FB90 /* opus_decoder.c */; };
 		4919580F9E4E6EAB32F173A3 /* resampler_private_down_FIR.c in Sources */ = {isa = PBXBuildFile; fileRef = 06E7578A31E57BD6CFE720E8 /* resampler_private_down_FIR.c */; };
 		49CCEACFF37A18730A490874 /* celt.c in Sources */ = {isa = PBXBuildFile; fileRef = 8BE4D4043F33A0B2DCFAA55D /* celt.c */; };
@@ -93,11 +95,13 @@
 		96E95C4840E9A893D5ACA9B8 /* dec_API.c in Sources */ = {isa = PBXBuildFile; fileRef = 999199AE4550C80C30B8F43A /* dec_API.c */; };
 		9819D2F15102B0BFBB56F44E /* Roomcast.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8536D0B245C4F680590007E6 /* Roomcast.xcframework */; };
 		9E0A2EF1C6D0C42560650AF3 /* NLSF2A.c in Sources */ = {isa = PBXBuildFile; fileRef = A5ACE56DD2B257BDC3836FF6 /* NLSF2A.c */; };
+		9F36233DC2CE031927D44ECE /* RoomCastGoWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BA67D1B4DAF24A47DFBB4A10 /* RoomCastGoWidget.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		9FB2592CD746CDB6ADEAD7FF /* RoomCastGoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E7E09AABDFCD07BB66C44ED /* RoomCastGoApp.swift */; };
 		A293F3EC3E42F4186AD4D048 /* find_pitch_lags_FLP.c in Sources */ = {isa = PBXBuildFile; fileRef = 763E6FB4FD588C07FD3B9B48 /* find_pitch_lags_FLP.c */; };
 		A2C829D557A163AF9C170991 /* celt_encoder.c in Sources */ = {isa = PBXBuildFile; fileRef = C6641F8A6416D45AA988AB01 /* celt_encoder.c */; };
 		A380974F2F4F3C311823E17F /* debug.c in Sources */ = {isa = PBXBuildFile; fileRef = 3B30F9AC0615C1EB62BCA1CD /* debug.c */; };
 		A4A08216A82A461D01DA9805 /* apply_sine_window_FLP.c in Sources */ = {isa = PBXBuildFile; fileRef = AED0B4F46DDA3490BF0036D5 /* apply_sine_window_FLP.c */; };
+		A6798C54E25953917CAC0A55 /* BroadcastLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F564C105A8EC6D3FCBCAFE1 /* BroadcastLiveActivity.swift */; };
 		A8E44A67130A8139B653EA73 /* decode_pulses.c in Sources */ = {isa = PBXBuildFile; fileRef = ADEE7FD952641D367EE78892 /* decode_pulses.c */; };
 		ACC081429FF7666EECD97B9A /* code_signs.c in Sources */ = {isa = PBXBuildFile; fileRef = 7EEC01CC47658733ADCD7E2B /* code_signs.c */; };
 		ACE171A0FFB0790E76DE84D8 /* PLC.c in Sources */ = {isa = PBXBuildFile; fileRef = 40C7A2840AAF8E41349E1A2A /* PLC.c */; };
@@ -161,7 +165,28 @@
 		FDAE83CDB9BDDD534D87524F /* control_SNR.c in Sources */ = {isa = PBXBuildFile; fileRef = 469DC53E72379FC72ADC8E00 /* control_SNR.c */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		D537591CEB00D5909771891D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 34A6DA4DF818FE6ED0DFA677 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D1D7AE2F7CD9097430957268;
+			remoteInfo = RoomCastGoWidget;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXCopyFilesBuildPhase section */
+		A4341F5FEA7C7D18C79244D1 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				9F36233DC2CE031927D44ECE /* RoomCastGoWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D6A40BB12DFC74FFFA6A1FCD /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -196,12 +221,14 @@
 		22090585D59C71BB1F22DC84 /* repacketizer.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = repacketizer.c; sourceTree = "<group>"; };
 		22557BFA5A8CCD8FD1C7D843 /* find_LTP_FLP.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = find_LTP_FLP.c; sourceTree = "<group>"; };
 		26028CC487BF41690C4C7B5F /* energy_FLP.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = energy_FLP.c; sourceTree = "<group>"; };
+		290CDBE69B711F93538FCD35 /* BroadcastShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastShared.swift; sourceTree = "<group>"; };
 		2A000133D94E6F09F80D20A4 /* residual_energy_FLP.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = residual_energy_FLP.c; sourceTree = "<group>"; };
 		2B3A62DC6BA6857616A88239 /* bwexpander_FLP.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = bwexpander_FLP.c; sourceTree = "<group>"; };
 		2C77042371A3362E71934DB4 /* warped_autocorrelation_FLP.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = warped_autocorrelation_FLP.c; sourceTree = "<group>"; };
 		2CEE0071C008F27B6022DB4B /* opus_projection_encoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = opus_projection_encoder.c; sourceTree = "<group>"; };
 		2DF1110E6BC03116F7FE699D /* encode_frame_FLP.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = encode_frame_FLP.c; sourceTree = "<group>"; };
 		2E03E76405E540CB5800DB8B /* OpusEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpusEncoder.swift; sourceTree = "<group>"; };
+		2F564C105A8EC6D3FCBCAFE1 /* BroadcastLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastLiveActivity.swift; sourceTree = "<group>"; };
 		2FAF2B1EE32F9073F32F7FF0 /* resampler_private_IIR_FIR.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = resampler_private_IIR_FIR.c; sourceTree = "<group>"; };
 		34129E1407002F7796D2B9ED /* process_gains_FLP.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = process_gains_FLP.c; sourceTree = "<group>"; };
 		3958DFD6F4AC13FA4F9D0D55 /* biquad_alt.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = biquad_alt.c; sourceTree = "<group>"; };
@@ -282,6 +309,7 @@
 		B49D983F136FA734B9DDA138 /* tables_LTP.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = tables_LTP.c; sourceTree = "<group>"; };
 		B631D12C8ADF0232D8CDE7E3 /* scale_vector_FLP.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = scale_vector_FLP.c; sourceTree = "<group>"; };
 		B702F1A469C2A67DBAE28AB2 /* stereo_quant_pred.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = stereo_quant_pred.c; sourceTree = "<group>"; };
+		BA67D1B4DAF24A47DFBB4A10 /* RoomCastGoWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = RoomCastGoWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BBE58F6D26E6248D34EE5445 /* rate.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = rate.c; sourceTree = "<group>"; };
 		BC2AF4EABE9DB530A56995AD /* AudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCapture.swift; sourceTree = "<group>"; };
 		BE6323F64DA3F78934998D75 /* tables_NLSF_CB_WB.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = tables_NLSF_CB_WB.c; sourceTree = "<group>"; };
@@ -347,6 +375,8 @@
 			isa = PBXGroup;
 			children = (
 				E503DDCC3F30260B6C8D5BA3 /* RoomCastGo */,
+				5E662B5315B9FB174B367664 /* RoomCastGoWidget */,
+				EF354E92AAF73F66719279C5 /* Shared */,
 				85821252374DCEDAB5986EB4 /* Vendor */,
 				8656261693214BAF9688A394 /* Frameworks */,
 				7E40D0430AB99FA6F8AAE0EB /* Products */,
@@ -438,6 +468,14 @@
 			path = silk;
 			sourceTree = "<group>";
 		};
+		5E662B5315B9FB174B367664 /* RoomCastGoWidget */ = {
+			isa = PBXGroup;
+			children = (
+				2F564C105A8EC6D3FCBCAFE1 /* BroadcastLiveActivity.swift */,
+			);
+			path = RoomCastGoWidget;
+			sourceTree = "<group>";
+		};
 		62C3A33686B8E9F4571859A0 /* opus */ = {
 			isa = PBXGroup;
 			children = (
@@ -460,6 +498,7 @@
 			isa = PBXGroup;
 			children = (
 				7B14D717959BA927FF26CC49 /* RoomCastGo.app */,
+				BA67D1B4DAF24A47DFBB4A10 /* RoomCastGoWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -582,6 +621,14 @@
 			path = RoomCastGo;
 			sourceTree = "<group>";
 		};
+		EF354E92AAF73F66719279C5 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				290CDBE69B711F93538FCD35 /* BroadcastShared.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -593,11 +640,13 @@
 				C7BC805EE0B2BB05DFA1B2CD /* Sources */,
 				F4850119A9DC738111781A08 /* Resources */,
 				BD8EE5E7A58A44E56EB31EFA /* Frameworks */,
+				A4341F5FEA7C7D18C79244D1 /* Embed Foundation Extensions */,
 				D6A40BB12DFC74FFFA6A1FCD /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				0E3BC21453727EA49A6A1FB9 /* PBXTargetDependency */,
 			);
 			name = RoomCastGo;
 			packageProductDependencies = (
@@ -605,6 +654,23 @@
 			productName = RoomCastGo;
 			productReference = 7B14D717959BA927FF26CC49 /* RoomCastGo.app */;
 			productType = "com.apple.product-type.application";
+		};
+		D1D7AE2F7CD9097430957268 /* RoomCastGoWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 35E8C83A5B440BEF78FF5F59 /* Build configuration list for PBXNativeTarget "RoomCastGoWidget" */;
+			buildPhases = (
+				9D174981F1757A679026AC4E /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RoomCastGoWidget;
+			packageProductDependencies = (
+			);
+			productName = RoomCastGoWidget;
+			productReference = BA67D1B4DAF24A47DFBB4A10 /* RoomCastGoWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -616,6 +682,11 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					684969E6EDCCA8D1B6FBA90B = {
+						DevelopmentTeam = 6G2V545X95;
+						ProvisioningStyle = Automatic;
+					};
+					D1D7AE2F7CD9097430957268 = {
+						DevelopmentTeam = 6G2V545X95;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -635,6 +706,7 @@
 			projectRoot = "";
 			targets = (
 				684969E6EDCCA8D1B6FBA90B /* RoomCastGo */,
+				D1D7AE2F7CD9097430957268 /* RoomCastGoWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -674,6 +746,15 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		9D174981F1757A679026AC4E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A6798C54E25953917CAC0A55 /* BroadcastLiveActivity.swift in Sources */,
+				4606CE7E4379061D617E1E60 /* BroadcastShared.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C7BC805EE0B2BB05DFA1B2CD /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -682,6 +763,7 @@
 				5B33DB09E59AAD1BD726312C /* AudioCapture.swift in Sources */,
 				C20F6539BD91A9934B26522D /* BroadcastModel.swift in Sources */,
 				C65579918674C9A46150199A /* BroadcastPorts.swift in Sources */,
+				37A9F16113A4224501869723 /* BroadcastShared.swift in Sources */,
 				6465180DC61FF8DC912803F2 /* BroadcastView.swift in Sources */,
 				6DBE74842023FE019EE3CF6C /* CNG.c in Sources */,
 				4DEADF9EE2DAE8A0AE71EF86 /* HP_variable_cutoff.c in Sources */,
@@ -831,6 +913,14 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		0E3BC21453727EA49A6A1FB9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D1D7AE2F7CD9097430957268 /* RoomCastGoWidget */;
+			targetProxy = D537591CEB00D5909771891D /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		0585CD166F4690A4DA37CDA8 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -844,6 +934,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 6G2V545X95;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -889,6 +980,41 @@
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
+		};
+		44EF8B25CA96BFE2BAEB0962 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = RoomCastGoWidget/RoomCastGoWidget.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 6G2V545X95;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RoomCastGoWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = channel.roomcast.go.widget;
+				PRODUCT_NAME = RoomCastGoWidget;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
 		};
 		572125F1976352A8083A0E03 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -946,6 +1072,40 @@
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
+		};
+		5B4345791C2DF9BCA94C934A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = RoomCastGoWidget/RoomCastGoWidget.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 6G2V545X95;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RoomCastGoWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = channel.roomcast.go.widget;
+				PRODUCT_NAME = RoomCastGoWidget;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
 		};
 		97D6C5CA825CE1B249C887CD /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -1023,6 +1183,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 6G2V545X95;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(SRCROOT)/build",
@@ -1075,6 +1236,15 @@
 			buildConfigurations = (
 				97D6C5CA825CE1B249C887CD /* Debug */,
 				572125F1976352A8083A0E03 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		35E8C83A5B440BEF78FF5F59 /* Build configuration list for PBXNativeTarget "RoomCastGoWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5B4345791C2DF9BCA94C934A /* Debug */,
+				44EF8B25CA96BFE2BAEB0962 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

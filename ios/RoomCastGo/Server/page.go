@@ -16,7 +16,8 @@ var faviconPNG []byte
 
 // listenerHTML is the Mac app's listener page (ListenerPage.swift at
 // commit 780ddc8) served from this phone. reader.js is MediaMTX v1.21.2,
-// unchanged. Phones still open /, load reader.js, and play /whep.
+// unchanged. After the first connection the page keeps retrying WHEP, so a
+// restart on the same address reconnects. A new IP still needs the new URL.
 func listenerHTML(title string) string {
 	safeTitle := html.EscapeString(title)
 	scriptTitle := scriptJSON(title)
@@ -91,14 +92,15 @@ let retryTimer=null;
 let connected=false;
 let generation=0;
 const connect=()=>{
-if(connected)return;
 if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
 const ticket=++generation;
+connected=false;
 if(reader!==null){try{reader.close();}catch(err){}reader=null;}
 reader=new MediaMTXWebRTCReader({
 url:new URL("/whep",window.location.href).toString(),
-onError:(err)=>{
-if(ticket!==generation||connected)return;
+onError:()=>{
+if(ticket!==generation)return;
+connected=false;
 setMessage(waitingText);
 if(retryTimer!==null)clearTimeout(retryTimer);
 retryTimer=setTimeout(connect,1500);
@@ -109,6 +111,15 @@ connected=true;
 if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
 setMessage("");
 video.srcObject=evt.streams[0];
+const stream=evt.streams[0];
+(stream?stream.getTracks():[]).forEach((track)=>{
+track.addEventListener("ended",()=>{
+if(ticket!==generation||!connected)return;
+connected=false;
+setMessage(waitingText);
+connect();
+});
+});
 applyTitle(document.title);
 },
 onDataChannel:(evt)=>{
@@ -117,6 +128,16 @@ evt.channel.onmessage=(evt)=>{console.log("data channel message",evt.data);};
 },
 });
 };
+setInterval(()=>{
+if(!connected)return;
+const stream=video.srcObject;
+const tracks=stream&&stream.getTracks?stream.getTracks():[];
+if(tracks.length>0&&tracks.every((track)=>track.readyState==="ended")){
+connected=false;
+setMessage(waitingText);
+connect();
+}
+},2000);
 window.addEventListener("load",()=>{
 if(typeof MediaMTXWebRTCReader!=="function"){
 setMessage("` + jsString("The listener page could not load.") + `");

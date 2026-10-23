@@ -16,6 +16,7 @@ func TestListenerPageMatchesMacContract(t *testing.T) {
 		"Waiting for the host to start",
 		"The listener page could not load.",
 		"MediaMTXWebRTCReader",
+		`readyState==="ended"`,
 		"Room &lt;Cast&gt; &amp; &#34;live&#34;",
 	} {
 		if !strings.Contains(html, needle) {

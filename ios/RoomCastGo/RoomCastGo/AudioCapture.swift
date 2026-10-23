@@ -21,6 +21,18 @@ final class AudioCapture {
     private var lastLevelAt = Date.distantPast
     private var running = false
     private var observers: [NSObjectProtocol] = []
+    private let mixLock = NSLock()
+    private var gain: Float = 1
+    private var sendSilence = false
+
+    /// Gain is applied before the meter and the encoder. Mute still measures
+    /// the mic, then encodes silence so the WebRTC session stays up.
+    func setMix(gain: Float, muted: Bool) {
+        mixLock.lock()
+        self.gain = gain
+        self.sendSilence = muted
+        mixLock.unlock()
+    }
 
     func start() throws {
         if running { return }
@@ -135,9 +147,16 @@ final class AudioCapture {
     }
 
     private func publishFrame() {
+        mixLock.lock()
+        let gain = self.gain
+        let sendSilence = self.sendSilence
+        mixLock.unlock()
+
         var sum: Float = 0
-        for sample in frame {
-            sum += sample * sample
+        for index in frame.indices {
+            let heard = min(1, max(-1, frame[index] * gain))
+            sum += heard * heard
+            frame[index] = sendSilence ? 0 : heard
         }
         let rms = sqrt(sum / Float(frame.count))
         let db = 20 * log10(max(rms, 1e-8))

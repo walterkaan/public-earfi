@@ -1,5 +1,7 @@
+import ActivityKit
 import AVFoundation
 import Foundation
+import MediaPlayer
 import Network
 import UIKit
 
@@ -15,6 +17,8 @@ final class BroadcastModel: ObservableObject {
     @Published var level: Float = 0
     @Published var inputName = ""
     @Published var qrImage: UIImage?
+    @Published var muted = false
+    @Published var gain = 1.0
 
     var listenerLabel: String {
         switch listeners {
@@ -26,23 +30,41 @@ final class BroadcastModel: ObservableObject {
 
     private let capture = AudioCapture()
     private let probe = LocalNetworkProbe()
+    private let activity = BroadcastActivityController()
     private var monitor: NWPathMonitor?
     private var poll: Timer?
     private var ip = ""
     private var iface = ""
     private var boundIP: String?
-    private var restarting = false
+    private var lastPathKey = ""
+    private var sawPath = false
+    private var rebindGeneration = 0
+    private var rebindRunning = false
+    private var rebindAgain = false
+    private var remoteInstalled = false
+
+    init() {
+        BroadcastBus.start { [weak self] command in
+            Task { @MainActor in
+                self?.handle(command)
+            }
+        }
+    }
 
     func appear() {
-        refreshAddress()
+        updateAddress()
         if !ip.isEmpty {
             probe.poke(ip: ip)
         }
+        if !running {
+            activity.endOrphans()
+        }
         guard monitor == nil else { return }
         let monitor = NWPathMonitor()
-        monitor.pathUpdateHandler = { [weak self] _ in
+        monitor.pathUpdateHandler = { [weak self] path in
+            let key = Self.pathKey(path)
             Task { @MainActor in
-                self?.refreshAddress()
+                self?.handlePath(key)
             }
         }
         monitor.start(queue: .global(qos: .utility))
@@ -50,10 +72,13 @@ final class BroadcastModel: ObservableObject {
     }
 
     func sceneBecameActive() {
-        refreshAddress()
-        if running {
-            listeners = BroadcastServer.listenerCount()
+        updateAddress()
+        guard running else { return }
+        listeners = BroadcastServer.listenerCount()
+        if !ip.isEmpty, ip != boundIP {
+            scheduleRebind()
         }
+        pushActivity(force: true)
     }
 
     func toggle() {
@@ -61,6 +86,39 @@ final class BroadcastModel: ObservableObject {
             stopBroadcast(nextStatus: "Ready")
         } else {
             beginStart(note: nil)
+        }
+    }
+
+    func setMuted(_ value: Bool) {
+        muted = value
+        capture.setMix(gain: Float(gain), muted: muted)
+        updateNowPlaying()
+        if running {
+            if status == "Live" || status == "Muted. Listeners hear silence." {
+                status = muted ? "Muted. Listeners hear silence." : "Live"
+            }
+            pushActivity(force: true)
+        }
+    }
+
+    func adjustGain(up: Bool) {
+        gain = BroadcastGain.adjusted(gain, up: up)
+        capture.setMix(gain: Float(gain), muted: muted)
+        if running {
+            pushActivity(force: true)
+        }
+    }
+
+    private func handle(_ command: BroadcastCommand) {
+        switch command {
+        case .mute:
+            setMuted(true)
+        case .unmute:
+            setMuted(false)
+        case .gainUp:
+            adjustGain(up: true)
+        case .gainDown:
+            adjustGain(up: false)
         }
     }
 
@@ -96,7 +154,7 @@ final class BroadcastModel: ObservableObject {
     }
 
     private func startGranted(note: String?) {
-        refreshAddress()
+        updateAddress()
         guard !ip.isEmpty else {
             busy = false
             failed = true
@@ -105,6 +163,7 @@ final class BroadcastModel: ObservableObject {
         }
         probe.poke(ip: ip)
         wireCapture()
+        capture.setMix(gain: Float(gain), muted: muted)
         do {
             try BroadcastServer.start(ip: ip, iface: iface)
             try capture.start()
@@ -121,7 +180,10 @@ final class BroadcastModel: ObservableObject {
         busy = false
         failed = false
         level = 0
-        status = note ?? "Live"
+        listeners = 0
+        status = note ?? (muted ? "Muted. Listeners hear silence." : "Live")
+        installRemote()
+        activity.start(activityState())
         startPolling()
     }
 
@@ -147,13 +209,16 @@ final class BroadcastModel: ObservableObject {
                     self.failed = false
                     self.status = "Interrupted. It resumes when the call ends."
                 } else {
-                    self.status = "Live"
+                    self.status = self.muted ? "Muted. Listeners hear silence." : "Live"
                 }
             }
         }
     }
 
     private func stopBroadcast(nextStatus: String) {
+        rebindGeneration += 1
+        rebindAgain = false
+        rebindRunning = false
         poll?.invalidate()
         poll = nil
         capture.stop()
@@ -165,7 +230,10 @@ final class BroadcastModel: ObservableObject {
         inputName = ""
         boundIP = nil
         failed = false
+        muted = false
         status = nextStatus
+        activity.end()
+        clearRemote()
     }
 
     private func startPolling() {
@@ -174,14 +242,106 @@ final class BroadcastModel: ObservableObject {
             Task { @MainActor in
                 guard let self, self.running else { return }
                 self.listeners = BroadcastServer.listenerCount()
-                self.refreshAddress()
+                self.updateAddress()
+                if !self.ip.isEmpty, self.ip != self.boundIP {
+                    self.scheduleRebind()
+                }
+                self.pushActivity(force: false)
             }
         }
         RunLoop.main.add(timer, forMode: .common)
         poll = timer
     }
 
-    private func refreshAddress() {
+    private func handlePath(_ key: String) {
+        let changed = sawPath && key != lastPathKey
+        sawPath = true
+        lastPathKey = key
+        updateAddress()
+        guard running, changed else { return }
+        scheduleRebind()
+    }
+
+    private func scheduleRebind() {
+        guard running else { return }
+        if rebindRunning {
+            rebindAgain = true
+            return
+        }
+        rebindRunning = true
+        rebindGeneration += 1
+        let generation = rebindGeneration
+        Task { @MainActor in
+            defer {
+                guard generation == self.rebindGeneration else { return }
+                self.rebindRunning = false
+                let followUp = self.rebindAgain && self.running
+                self.rebindAgain = false
+                if followUp {
+                    self.scheduleRebind()
+                }
+            }
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard !Task.isCancelled, generation == self.rebindGeneration, self.running else { return }
+            await self.rebind(generation: generation)
+        }
+    }
+
+    private func rebind(generation: Int) async {
+        let previous = boundIP
+        for _ in 0..<20 {
+            guard generation == rebindGeneration, running else { return }
+            updateAddress()
+            if ip.isEmpty {
+                failed = false
+                status = "Waiting for Wi-Fi or Personal Hotspot…"
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                continue
+            }
+            let target = ip
+            failed = false
+            status = "Reconnecting…"
+            BroadcastServer.stop()
+            guard generation == rebindGeneration, running else { return }
+            do {
+                try BroadcastServer.start(ip: ip, iface: iface)
+                guard generation == rebindGeneration, running else {
+                    BroadcastServer.stop()
+                    return
+                }
+                boundIP = ip
+                probe.poke(ip: ip)
+                failed = false
+                if let previous, previous != ip {
+                    status = "Live on a new address. Listeners need the new code."
+                } else if muted {
+                    status = "Muted. Listeners hear silence."
+                } else {
+                    status = "Live"
+                }
+                pushActivity(force: true)
+                if rebindAgain {
+                    rebindAgain = false
+                    try? await Task.sleep(nanoseconds: 400_000_000)
+                    continue
+                }
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                updateAddress()
+                if ip == target { return }
+            } catch {
+                failed = true
+                status = error.localizedDescription
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
+        }
+        guard generation == rebindGeneration, running else { return }
+        if ip.isEmpty {
+            failed = true
+            status = "Wi-Fi or Personal Hotspot dropped."
+        }
+    }
+
+    private func updateAddress() {
         let chosen = BroadcastServer.selectHost(HostAddress.table())
         let parts = chosen.split(separator: " ", maxSplits: 1).map(String.init)
         if parts.count == 2 {
@@ -200,30 +360,115 @@ final class BroadcastModel: ObservableObject {
         } else {
             iface = ""
             ip = ""
-            if !url.isEmpty {
-                url = ""
-                qrImage = nil
+            if !running {
+                if !url.isEmpty {
+                    url = ""
+                    qrImage = nil
+                }
+                networkNote = "Join a Wi-Fi network, or turn on Personal Hotspot."
             }
-            networkNote = "Join a Wi-Fi network, or turn on Personal Hotspot."
         }
+    }
 
-        guard running, !restarting else { return }
-        if ip.isEmpty {
-            failed = true
-            status = "Wi-Fi or Personal Hotspot dropped. The broadcast may have stopped."
-            return
-        }
-        guard let boundIP else { return }
-        if ip == boundIP {
-            if failed {
-                failed = false
-                status = "Live"
+    private func activityState() -> BroadcastAttributes.ContentState {
+        let coarse = (Double(level) * 5).rounded() / 5
+        return BroadcastAttributes.ContentState(
+            listeners: listeners,
+            level: min(1, max(0, coarse)),
+            muted: muted,
+            gain: gain
+        )
+    }
+
+    private func pushActivity(force: Bool) {
+        activity.update(activityState(), force: force)
+    }
+
+    private func installRemote() {
+        let center = MPRemoteCommandCenter.shared()
+        if !remoteInstalled {
+            center.pauseCommand.addTarget { [weak self] _ in
+                Task { @MainActor in self?.setMuted(true) }
+                return .success
             }
+            center.playCommand.addTarget { [weak self] _ in
+                Task { @MainActor in self?.setMuted(false) }
+                return .success
+            }
+            remoteInstalled = true
+        }
+        center.pauseCommand.isEnabled = true
+        center.playCommand.isEnabled = true
+        updateNowPlaying()
+    }
+
+    private func updateNowPlaying() {
+        guard remoteInstalled else { return }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
+            MPMediaItemPropertyTitle: "RoomCast Go",
+            MPNowPlayingInfoPropertyIsLiveStream: true,
+            MPNowPlayingInfoPropertyPlaybackRate: muted ? 0 : 1,
+        ]
+    }
+
+    private func clearRemote() {
+        guard remoteInstalled else { return }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        let center = MPRemoteCommandCenter.shared()
+        center.pauseCommand.isEnabled = false
+        center.playCommand.isEnabled = false
+    }
+
+    private static func pathKey(_ path: NWPath) -> String {
+        let names = path.availableInterfaces.map { "\($0.type.rawValue):\($0.name)" }.sorted()
+        return "\(path.status)|\(names.joined(separator: ","))"
+    }
+}
+
+/// Local Live Activity. If the phone has Live Activities turned off, start
+/// fails quietly and the broadcast still runs.
+final class BroadcastActivityController {
+    private var current: Activity<BroadcastAttributes>?
+    private var last: BroadcastAttributes.ContentState?
+
+    func start(_ state: BroadcastAttributes.ContentState) {
+        last = state
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            current = nil
             return
         }
-        restarting = true
-        stopBroadcast(nextStatus: "The network changed. Starting at the new address.")
-        beginStart(note: "The network changed. Listeners need the new code.")
-        restarting = false
+        do {
+            current = try Activity.request(
+                attributes: BroadcastAttributes(name: "RoomCast Go"),
+                content: ActivityContent(state: state, staleDate: nil),
+                pushType: nil
+            )
+        } catch {
+            current = nil
+        }
+    }
+
+    func update(_ state: BroadcastAttributes.ContentState, force: Bool) {
+        guard let current else { return }
+        if !force, state == last { return }
+        last = state
+        Task { await current.update(ActivityContent(state: state, staleDate: nil)) }
+    }
+
+    func end() {
+        let ending = current
+        current = nil
+        last = nil
+        guard let ending else { return }
+        Task { await ending.end(nil, dismissalPolicy: .immediate) }
+    }
+
+    func endOrphans() {
+        guard current == nil else { return }
+        Task {
+            for activity in Activity<BroadcastAttributes>.activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+        }
     }
 }

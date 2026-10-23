@@ -27,12 +27,16 @@ targets:
         includes:
           - "**/*.c"
       - path: Vendor/opus-bridge/opus_bridge.c
+      - path: Shared
     dependencies:
       - framework: build/Roomcast.xcframework
         embed: true
         link: true
         codeSign: true
         removeHeaders: true
+      - target: RoomCastGoWidget
+        embed: true
+        codeSign: true
     preBuildScripts:
       - name: Check Roomcast.xcframework
         basedOnDependencyAnalysis: false
@@ -50,6 +54,7 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: RoomCastGo/Info.plist
         CODE_SIGN_ENTITLEMENTS: RoomCastGo/RoomCastGo.entitlements
+        DEVELOPMENT_TEAM: 6G2V545X95
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: Apple Development
         SWIFT_OBJC_BRIDGING_HEADER: RoomCastGo/RoomCastGo-Bridging-Header.h
@@ -98,3 +103,44 @@ targets:
           VALIDATE_PRODUCT: YES
           DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
     scheme: {}
+  RoomCastGoWidget:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: RoomCastGoWidget
+        excludes:
+          - Info.plist
+          - "*.entitlements"
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: channel.roomcast.go.widget
+        PRODUCT_NAME: RoomCastGoWidget
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        DEVELOPMENT_TEAM: 6G2V545X95
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: RoomCastGoWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: RoomCastGoWidget/RoomCastGoWidget.entitlements
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: Apple Development
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SWIFT_VERSION: "5.0"
+        ARCHS: arm64
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: iphoneos
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+        TARGETED_DEVICE_FAMILY: "1"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+      configs:
+        Debug:
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+          DEBUG_INFORMATION_FORMAT: dwarf
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+          SWIFT_COMPILATION_MODE: wholemodule
+          DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
