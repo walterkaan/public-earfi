@@ -282,7 +282,7 @@ struct LogWindow: View {
           .textSelection(.enabled)
       }
       HStack {
-        GreenPushButton("Copy diagnostics") { model.copyDiagnostics() }
+        TintedPushButton("Copy diagnostics") { model.copyDiagnostics() }
         Spacer()
       }
     }
@@ -295,61 +295,72 @@ struct LogWindow: View {
 
 struct FirstRunSheet: View {
   @EnvironmentObject private var model: AppModel
+  @Environment(\.dismiss) private var dismiss
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
-      Image(nsImage: NSApp.applicationIconImage)
-        .resizable()
-        .interpolation(.high)
-        .frame(width: 80, height: 80)
-        .frame(maxWidth: .infinity)
-      Text("Welcome to RoomCast")
-        .font(.title2.bold())
-        .foregroundStyle(AppChrome.heading)
-        .frame(maxWidth: .infinity)
+      HStack(spacing: 12) {
+        Image(nsImage: NSApp.applicationIconImage)
+          .resizable()
+          .interpolation(.high)
+          .frame(width: 48, height: 48)
+          .accessibilityLabel("RoomCast")
+        Text("Welcome to RoomCast")
+          .font(.title2.bold())
+          .foregroundStyle(AppChrome.heading)
+      }
       Text(
-        "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, WiFi needs No Internet."
+        "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no account, and the Wi-Fi doesn't need internet."
       )
-      .fixedSize(horizontal: false, vertical: true)
+      .helperText()
+      .foregroundStyle(.white)
       Text(
-        "Sound comes from your Mac's microphone, an application, headset or earbuds or a mixing desk for larger events."
+        "Sound can come from the Mac's microphone, an application, a headset or earbuds, or a mixing desk for larger events."
       )
-      .fixedSize(horizontal: false, vertical: true)
-      sheetHeading("Getting started")
-      VStack(alignment: .leading, spacing: 8) {
-        Text(
-          "1. Choose your sound source in Settings, which opens when you click the button below."
-        )
-        Text("2. Optionally, add your Wi-Fi details so listeners get an easy join code.")
-        Text("3. Click Start Broadcasting.")
-        Text(
-          "4. Print the QR poster or show it on a screen. Listeners scan to join the Wi-Fi, scan again to listen, and use earphones. The audio QR code is always on the main window."
+      .helperText()
+      VStack(alignment: .leading, spacing: 10) {
+        welcomeStep(
+          "1", symbol: "mic.fill", title: "Pick your sound source",
+          detail: nil)
+        welcomeStep(
+          "2", symbol: "dot.radiowaves.left.and.right", title: "Start broadcasting",
+          detail: nil)
+        welcomeStep(
+          "3", symbol: "qrcode", title: "Share the QR",
+          detail:
+            "Print the poster or show it. Guests scan to join the Wi-Fi, then scan to listen with earphones."
         )
       }
-      .fixedSize(horizontal: false, vertical: true)
-      sheetHeading("Two macOS prompts to allow")
-      VStack(alignment: .leading, spacing: 8) {
-        Text("• Microphone access, so RoomCast can hear your sound source.")
-        Text("• Incoming connections, if your firewall is on, so phones can reach this Mac.")
-      }
-      .fixedSize(horizontal: false, vertical: true)
-      sheetHeading("You're set to go!")
       HStack {
         Spacer()
+        TintedPushButton("Not now") { dismiss() }
         GreenPushButton("Choose Sound Source") { model.finishFirstRun() }
           .keyboardShortcut(.defaultAction)
-        Spacer()
       }
     }
-    .padding(24)
+    .padding(22)
     .frame(width: 560)
     .background(AppChrome.window)
   }
 
-  private func sheetHeading(_ text: LocalizedStringKey) -> some View {
-    Text(text)
-      .font(.headline)
-      .foregroundStyle(AppChrome.heading)
+  private func welcomeStep(
+    _ number: String, symbol: String, title: LocalizedStringKey, detail: String?
+  ) -> some View {
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: symbol)
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundStyle(AppChrome.heading)
+        .frame(width: 28, height: 28)
+        .background(Circle().fill(AppChrome.heading.opacity(0.16)))
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 2) {
+        (Text(verbatim: "\(number). ") + Text(title))
+          .font(.system(size: 15, weight: .semibold))
+        if let detail {
+          Text(detail).helperText()
+        }
+      }
+    }
   }
 }
 

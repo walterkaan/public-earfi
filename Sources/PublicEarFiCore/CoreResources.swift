@@ -21,6 +21,7 @@ enum CoreResources {
     let fallback = [
       "loadError": "The listener page could not load.",
       "poweredBy": "Powered by RoomCast",
+      "waiting": "Waiting for the host to start…",
     ]
     guard let url = file(name: "ListenerPage.en", extension: "json", searching: root),
       let data = try? Data(contentsOf: url),

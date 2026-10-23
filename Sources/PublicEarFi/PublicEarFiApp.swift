@@ -31,6 +31,7 @@ struct PublicEarFiApp: App {
     Settings {
       SettingsTab()
         .environmentObject(model)
+        .frame(width: 700, height: 600)
         .preferredColorScheme(.dark)
     }
 
@@ -91,6 +92,12 @@ struct AppMenus: Commands {
         openWindow(id: "log")
       }
       .keyboardShortcut("l", modifiers: [.command])
+    }
+    CommandMenu("Broadcast") {
+      Button(model.isBroadcasting ? "Stop Broadcasting" : "Start Broadcasting") {
+        model.toggleBroadcast()
+      }
+      .keyboardShortcut("b", modifiers: [.command])
     }
     CommandGroup(replacing: .help) {
       Button("Getting Started") {

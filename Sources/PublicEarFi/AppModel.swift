@@ -16,8 +16,8 @@ final class AppModel: ObservableObject {
   @Published var levelFraction = 0.0
   @Published var noSignal = false
   @Published var logLines: [String] = []
-  @Published var showCredits = false
   @Published var showFirstRun = false
+  @Published var showMicrophoneExplain = false
   @Published var showFirewall = false
   @Published var showWhy = false
   @Published var showQR = false
@@ -45,6 +45,10 @@ final class AppModel: ObservableObject {
   private let sleepAssertion = SleepAssertion()
   private var runningSignature: BroadcastSignature?
   private var didAutoStart = false
+  private var lastAnnouncedLevel = Int.min
+  private var peakFraction = 0.0
+  private var peakHoldUntil = Date.distantPast
+  var meterPeakFraction: Double { peakFraction }
   private var lastAnnouncedIP: String?
   private var lastDeviceName = "audio interface"
   private var feedingDeviceName = ""
@@ -76,7 +80,14 @@ final class AppModel: ObservableObject {
       Task { @MainActor in self?.health = line }
     }
     controller.onListeners = { [weak self] count in
-      Task { @MainActor in self?.listeners = count }
+      Task { @MainActor in
+        guard let self else { return }
+        let previous = self.listeners
+        self.listeners = count
+        if previous != count {
+          self.announce("\(count) listening")
+        }
+      }
     }
     controller.onLog = { [weak self] line in
       Task { @MainActor in self?.appendLog(line) }
@@ -211,7 +222,7 @@ final class AppModel: ObservableObject {
     switch phase {
     case .stopped:
       let name = selectedDevice?.name ?? String(localized: "No device")
-      return String(format: String(localized: "Stopped - %@ is sound source"), name)
+      return String(format: String(localized: "Stopped · Sound from: %@"), name)
     case .starting:
       return "Starting…"
     case .waitingForDevice(let name):
@@ -257,16 +268,25 @@ final class AppModel: ObservableObject {
   func finishFirstRun() {
     UserDefaults.standard.set(true, forKey: Self.firstRunKey)
     showFirstRun = false
+    showMicrophoneExplain = true
+  }
+
+  /// The system microphone prompt follows this explainer. Settings opens
+  /// after macOS has asked, so the prompt is not hidden behind that window.
+  func confirmMicrophoneAndContinue() {
+    showMicrophoneExplain = false
     AVCaptureDevice.requestAccess(for: .audio) { _ in
       Task { @MainActor in
         self.refreshDevices()
         self.restartMeter()
+        self.openSettings()
       }
     }
-    // After the sheet closes, so Settings is not hidden behind it.
-    DispatchQueue.main.async {
-      self.openSettings()
-    }
+  }
+
+  func skipMicrophoneAndOpenSettings() {
+    showMicrophoneExplain = false
+    openSettings()
   }
 
   func openSettings() {
@@ -281,6 +301,10 @@ final class AppModel: ObservableObject {
 
   func toggleBroadcast() {
     if isBroadcasting {
+      if listeners > 0 {
+        confirmStopWhileListenersRemain()
+        return
+      }
       controller.stop()
       return
     }
@@ -289,6 +313,34 @@ final class AppModel: ObservableObject {
       return
     }
     beginBroadcast()
+  }
+
+  /// Cancel is the first button, so Return and Escape leave the stream up.
+  private func confirmStopWhileListenersRemain() {
+    let count = listeners
+    let alert = NSAlert()
+    if count == 1 {
+      alert.messageText = String(localized: "Stop broadcasting? 1 person is listening.")
+    } else {
+      alert.messageText = String(
+        format: String(localized: "Stop broadcasting? %d people are listening."), count)
+    }
+    alert.alertStyle = .warning
+    alert.addButton(withTitle: String(localized: "Cancel"))
+    let stop = alert.addButton(withTitle: String(localized: "Stop Broadcasting"))
+    stop.hasDestructiveAction = true
+    if alert.runModal() == .alertSecondButtonReturn {
+      controller.stop()
+    }
+  }
+
+  private func announce(_ message: String) {
+    let info: [NSAccessibility.NotificationUserInfoKey: Any] = [
+      .announcement: message,
+      .priority: NSNumber(value: NSAccessibilityPriorityLevel.medium.rawValue),
+    ]
+    NSAccessibility.post(
+      element: NSApp, notification: .announcementRequested, userInfo: info)
   }
 
   func confirmFirewallAndStart() {
@@ -647,11 +699,41 @@ final class AppModel: ObservableObject {
       let decibels = controller.recentCaptureDecibels()
       levelDB = decibels
       levelFraction = min(1, max(0, (decibels + 60) / 60))
+    } else {
+      let reading = meter.latest()
+      levelDB = reading.decibels
+      levelFraction = reading.fraction
+    }
+    notePeak()
+    noteLevelAnnouncement()
+  }
+
+  private func notePeak() {
+    let level = min(1, max(0, levelFraction))
+    let moment = Date()
+    if level >= peakFraction {
+      peakFraction = level
+      peakHoldUntil = moment.addingTimeInterval(0.9)
+    } else if moment > peakHoldUntil {
+      peakFraction = max(level, peakFraction - 0.02)
+    }
+  }
+
+  /// VoiceOver hears a move of about 6 dB. The meter also exposes the exact
+  /// value while it is focused, so every frame is not spoken.
+  private func noteLevelAnnouncement() {
+    let shown = levelDB <= -100 ? -100 : Int(levelDB.rounded())
+    if lastAnnouncedLevel == Int.min {
+      lastAnnouncedLevel = shown
       return
     }
-    let reading = meter.latest()
-    levelDB = reading.decibels
-    levelFraction = reading.fraction
+    if abs(shown - lastAnnouncedLevel) < 6 { return }
+    lastAnnouncedLevel = shown
+    if shown <= -100 {
+      announce("Input level, silent")
+    } else {
+      announce("Input level \(shown) dB")
+    }
   }
 
   private func tick() {

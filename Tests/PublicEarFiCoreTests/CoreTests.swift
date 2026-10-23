@@ -34,7 +34,8 @@ final class SettingsTests: XCTestCase {
     XCTAssertNil(settings.posterPaperSize)
     XCTAssertTrue(settings.posterUseFooter)
     XCTAssertEqual(AppSettings.listenerTarget, 30)
-    XCTAssertEqual(settings.bandwidthHint, "30 listeners ≈ 0.96 Mbps")
+    XCTAssertEqual(
+      settings.bandwidthHint, "Speech · 32 kbps · about 30 phones ≈ 0.96 Mbps")
     XCTAssertTrue(validate(settings).isEmpty)
   }
 
@@ -45,14 +46,19 @@ final class SettingsTests: XCTestCase {
     XCTAssertEqual(settings.resolvedBitrateKbps, 32)
     XCTAssertEqual(settings.opusApplication, "voip")
     XCTAssertEqual(AppSettings.listenerTarget, 30)
-    XCTAssertEqual(settings.bandwidthHint, "30 listeners ≈ 0.96 Mbps")
+    XCTAssertEqual(
+      settings.bandwidthHint, "Speech · 32 kbps · about 30 phones ≈ 0.96 Mbps")
     XCTAssertTrue(validate(settings).isEmpty)
 
     settings.quality = .music
     settings.channelMode = .mono
     XCTAssertEqual(settings.resolvedBitrateKbps, 96)
+    XCTAssertEqual(
+      settings.bandwidthHint, "Music · 96 kbps · about 30 phones ≈ 2.88 Mbps")
     settings.channelMode = .stereo
     XCTAssertEqual(settings.resolvedBitrateKbps, 128)
+    XCTAssertEqual(
+      settings.bandwidthHint, "Music · 128 kbps · about 30 phones ≈ 3.84 Mbps")
     XCTAssertEqual(formatMbps(settings.estimatedMegabits(listeners: 10)), "1.28")
 
     settings.quality = .custom

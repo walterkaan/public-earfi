@@ -287,17 +287,6 @@
         }
       }
     },
-    "Credits…": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Credits…"
-          }
-        }
-      }
-    },
     "Custom bitrate": {
       "extractionState": "manual",
       "localizations": {
@@ -404,17 +393,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hidden network"
-          }
-        }
-      }
-    },
-    "If the macOS firewall is on, it will ask to allow incoming connections for mediamtx. That is the listener server. Choose Allow. If phones cannot connect later, check System Settings → Network → Firewall.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "If the macOS firewall is on, it will ask to allow incoming connections for mediamtx. That is the listener server. Choose Allow. If phones cannot connect later, check System Settings → Network → Firewall."
           }
         }
       }
@@ -837,17 +815,6 @@
         }
       }
     },
-    "Speech is mono, 32 kbps, for about 30 phones. The stream is always 48 kHz. Music is 96 kbps mono or 128 kbps stereo.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Speech is mono, 32 kbps, for about 30 phones. The stream is always 48 kHz. Music is 96 kbps mono or 128 kbps stereo."
-          }
-        }
-      }
-    },
     "Standard 64k": {
       "extractionState": "manual",
       "localizations": {
@@ -1079,39 +1046,6 @@
         }
       }
     },
-    "Getting started": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Getting started"
-          }
-        }
-      }
-    },
-    "Please Consider Supporting this Project": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Please Consider Supporting this Project"
-          }
-        }
-      }
-    },
-    "Stopped - %@ is sound source": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stopped - %@ is sound source"
-          }
-        }
-      }
-    },
     "Change Sound Source": {
       "extractionState": "manual",
       "localizations": {
@@ -1134,94 +1068,6 @@
         }
       }
     },
-    "1. Choose your sound source in Settings, which opens when you click the button below.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1. Choose your sound source in Settings, which opens when you click the button below."
-          }
-        }
-      }
-    },
-    "2. Optionally, add your Wi-Fi details so listeners get an easy join code.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "2. Optionally, add your Wi-Fi details so listeners get an easy join code."
-          }
-        }
-      }
-    },
-    "3. Click Start Broadcasting.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "3. Click Start Broadcasting."
-          }
-        }
-      }
-    },
-    "4. Print the QR poster or show it on a screen. Listeners scan to join the Wi-Fi, scan again to listen, and use earphones. The audio QR code is always on the main window.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "4. Print the QR poster or show it on a screen. Listeners scan to join the Wi-Fi, scan again to listen, and use earphones. The audio QR code is always on the main window."
-          }
-        }
-      }
-    },
-    "Two macOS prompts to allow": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Two macOS prompts to allow"
-          }
-        }
-      }
-    },
-    "• Microphone access, so RoomCast can hear your sound source.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "• Microphone access, so RoomCast can hear your sound source."
-          }
-        }
-      }
-    },
-    "• Incoming connections, if your firewall is on, so phones can reach this Mac.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "• Incoming connections, if your firewall is on, so phones can reach this Mac."
-          }
-        }
-      }
-    },
-    "You're set to go!": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "You're set to go!"
-          }
-        }
-      }
-    },
     "Choose Sound Source": {
       "extractionState": "manual",
       "localizations": {
@@ -1240,17 +1086,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Getting Started"
-          }
-        }
-      }
-    },
-    "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, WiFi needs No Internet.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no cloud, WiFi needs No Internet."
           }
         }
       }
@@ -1299,39 +1134,6 @@
         }
       }
     },
-    "Sound comes from your Mac's microphone, an application, headset or earbuds or a mixing desk for larger events.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sound comes from your Mac's microphone, an application, headset or earbuds or a mixing desk for larger events."
-          }
-        }
-      }
-    },
-    "0db leaves the volume unchanged. Increase or decrease the broadcast's volume.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "0db leaves the volume unchanged. Increase or decrease the broadcast's volume."
-          }
-        }
-      }
-    },
-    "Volume, from -12 dB to +24 dB. Changes apply immediately, including while you are live.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Volume, from -12 dB to +24 dB. Changes apply immediately, including while you are live."
-          }
-        }
-      }
-    },
     "Broadcast music from an app": {
       "extractionState": "manual",
       "localizations": {
@@ -1339,61 +1141,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Broadcast music from an app"
-          }
-        }
-      }
-    },
-    "Name, port, title, network mode": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Name, port, title, network mode"
-          }
-        }
-      }
-    },
-    "Stay awake, launch at login, start when opened": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stay awake, launch at login, start when opened"
-          }
-        }
-      }
-    },
-    "ICE port, URL style, listeners, log, bitrate": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ICE port, URL style, listeners, log, bitrate"
-          }
-        }
-      }
-    },
-    "Expanded": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expanded"
-          }
-        }
-      }
-    },
-    "Collapsed": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Collapsed"
           }
         }
       }
@@ -1416,6 +1163,424 @@
           "stringUnit": {
             "state": "translated",
             "value": "RoomCast FAQ"
+          }
+        }
+      }
+    },
+    "Stopped · Sound from: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped · Sound from: %@"
+          }
+        }
+      }
+    },
+    "Stop broadcasting? 1 person is listening.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop broadcasting? 1 person is listening."
+          }
+        }
+      }
+    },
+    "Stop broadcasting? %d people are listening.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop broadcasting? %d people are listening."
+          }
+        }
+      }
+    },
+    "Microphone": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microphone"
+          }
+        }
+      }
+    },
+    "Not now": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now"
+          }
+        }
+      }
+    },
+    "macOS will ask for the microphone so RoomCast can hear your sound source.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS will ask for the microphone so RoomCast can hear your sound source."
+          }
+        }
+      }
+    },
+    "macOS will ask to allow incoming connections so phones on the Wi-Fi can reach this Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS will ask to allow incoming connections so phones on the Wi-Fi can reach this Mac."
+          }
+        }
+      }
+    },
+    "Not live yet: press Start Broadcasting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not live yet: press Start Broadcasting"
+          }
+        }
+      }
+    },
+    "Doesn't work? Try: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Doesn't work? Try: %@"
+          }
+        }
+      }
+    },
+    "Copied": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied"
+          }
+        }
+      }
+    },
+    "Live": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live"
+          }
+        }
+      }
+    },
+    "Support RoomCast": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Support RoomCast"
+          }
+        }
+      }
+    },
+    "Changes take effect next time you start broadcasting.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes take effect next time you start broadcasting."
+          }
+        }
+      }
+    },
+    "WebRTC ICE port. Phones receive the audio on this UDP or TCP port. It is not Icecast.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WebRTC ICE port. Phones receive the audio on this UDP or TCP port. It is not Icecast."
+          }
+        }
+      }
+    },
+    "0 dB leaves the volume unchanged. Increase or decrease the broadcast's volume.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "0 dB leaves the volume unchanged. Increase or decrease the broadcast's volume."
+          }
+        }
+      }
+    },
+    "Volume, from -12 dB to +24 dB. Changes apply immediately, including while you are live. Double-click to reset to 0 dB.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volume, from -12 dB to +24 dB. Changes apply immediately, including while you are live. Double-click to reset to 0 dB."
+          }
+        }
+      }
+    },
+    "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no account, and the Wi-Fi doesn't need internet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no account, and the Wi-Fi doesn't need internet."
+          }
+        }
+      }
+    },
+    "Sound can come from the Mac's microphone, an application, a headset or earbuds, or a mixing desk for larger events.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sound can come from the Mac's microphone, an application, a headset or earbuds, or a mixing desk for larger events."
+          }
+        }
+      }
+    },
+    "Pick your sound source": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick your sound source"
+          }
+        }
+      }
+    },
+    "Start broadcasting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start broadcasting"
+          }
+        }
+      }
+    },
+    "Share the QR": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share the QR"
+          }
+        }
+      }
+    },
+    "Print the poster or show it. Guests scan to join the Wi-Fi, then scan to listen with earphones.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Print the poster or show it. Guests scan to join the Wi-Fi, then scan to listen with earphones."
+          }
+        }
+      }
+    },
+    "Stop broadcasting to change source": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop broadcasting to change source"
+          }
+        }
+      }
+    },
+    "Choose a microphone, headset, or mixing desk": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a microphone, headset, or mixing desk"
+          }
+        }
+      }
+    },
+    "Not broadcasting.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not broadcasting."
+          }
+        }
+      }
+    },
+    "Starting the broadcast.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting the broadcast."
+          }
+        }
+      }
+    },
+    "Sound is reaching listeners. Checked %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sound is reaching listeners. Checked %@."
+          }
+        }
+      }
+    },
+    "The audio interface is unplugged. Plug it back in.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The audio interface is unplugged. Plug it back in."
+          }
+        }
+      }
+    },
+    "No sound is reaching the input. Check the desk feed and the selected source.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No sound is reaching the input. Check the desk feed and the selected source."
+          }
+        }
+      }
+    },
+    "The audio stalled. RoomCast is restarting it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The audio stalled. RoomCast is restarting it."
+          }
+        }
+      }
+    },
+    "The listener server is not answering. RoomCast is retrying.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The listener server is not answering. RoomCast is retrying."
+          }
+        }
+      }
+    },
+    "The stream hit a problem and is retrying. Copy diagnostics if it continues.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The stream hit a problem and is retrying. Copy diagnostics if it continues."
+          }
+        }
+      }
+    },
+    "Something needs attention. Copy diagnostics for the details.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Something needs attention. Copy diagnostics for the details."
+          }
+        }
+      }
+    },
+    "Listen QR code, opens %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listen QR code, opens %@"
+          }
+        }
+      }
+    },
+    "Listen QR code": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listen QR code"
+          }
+        }
+      }
+    },
+    "Apply now": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply now"
+          }
+        }
+      }
+    },
+    "Brief interruption, then the new settings are live.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brief interruption, then the new settings are live."
+          }
+        }
+      }
+    },
+    "Sound": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sound"
           }
         }
       }

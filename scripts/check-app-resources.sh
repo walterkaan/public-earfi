@@ -69,5 +69,7 @@ for path in sys.argv[1:]:
         raise SystemExit(f"{path} is missing loadError")
     if text.get("poweredBy") != "Powered by RoomCast":
         raise SystemExit(f"{path} is missing poweredBy")
+    if text.get("waiting") != "Waiting for the host to start…":
+        raise SystemExit(f"{path} is missing waiting")
 print("App resources are present")
 PY

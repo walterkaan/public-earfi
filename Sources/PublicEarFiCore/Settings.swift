@@ -160,10 +160,24 @@ public struct AppSettings: Codable, Equatable {
     Double(resolvedBitrateKbps * listeners) / 1000
   }
 
+  public var qualityLabel: String {
+    switch quality {
+    case .speech:
+      return "Speech"
+    case .standard:
+      return "Standard"
+    case .music:
+      return "Music"
+    case .custom:
+      return "Custom"
+    }
+  }
+
+  /// One line for the selected quality: name, bitrate, and about 30 phones.
   public var bandwidthHint: String {
-    let listeners = Self.listenerTarget
-    let text = formatMbps(estimatedMegabits(listeners: listeners))
-    return "\(listeners) listeners ≈ \(text) Mbps"
+    let phones = Self.listenerTarget
+    let text = formatMbps(estimatedMegabits(listeners: phones))
+    return "\(qualityLabel) · \(resolvedBitrateKbps) kbps · about \(phones) phones ≈ \(text) Mbps"
   }
 
   public func resolvedPaperSize(regionCode: String?, measurementSystemIsUS: Bool) -> PaperSize {

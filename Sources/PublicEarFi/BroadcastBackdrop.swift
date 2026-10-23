@@ -9,8 +9,9 @@ import SwiftUI
 /// staggered vertically, each carry three teal bars. Buttons stay the brand
 /// green; this scene does not. Stopped is dimmer than a live broadcast.
 /// Reduce Motion holds one frame, and a hidden window pauses the timeline.
-/// The scene is stretched across the whole window so it shows in the gaps
-/// around the cards, including when Reduce Transparency makes those cards opaque.
+/// The scene is stretched across the window. The card stack is an opaque
+/// plate, so the hero stays in the margin and under the title, including
+/// when Reduce Transparency is on.
 struct BroadcastBackdrop: View {
   var live: Bool
   var level: Double

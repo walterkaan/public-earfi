@@ -20,6 +20,9 @@ enum ListenerPageSelfTest {
     if !html.contains("Powered by RoomCast") || !html.contains("https://roomcast.channel") {
       return fail("listener page is missing the footer")
     }
+    if !html.contains("Waiting for the host to start…") || html.contains("location.reload") {
+      return fail("listener page is missing the waiting state")
+    }
     let server = ListenerHTTPServer(
       port: 0,
       upstreamPort: 9,
@@ -44,6 +47,9 @@ enum ListenerPageSelfTest {
     }
     if !response.contains("Powered by RoomCast") {
       return fail("served listener page is missing the footer")
+    }
+    if !response.contains("Waiting for the host to start…") {
+      return fail("served listener page is missing the waiting state")
     }
     fputs("listener page ok\n", stdout)
     return 0

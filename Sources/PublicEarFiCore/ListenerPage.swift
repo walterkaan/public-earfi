@@ -81,6 +81,8 @@ public enum ListenerPage {
   public static func html(title: String) -> String {
     let safeTitle = htmlEscape(title)
     let scriptTitle = jsonForScript(title: title)
+    let waiting = htmlEscape(
+      CoreResources.pageStrings()["waiting"] ?? "Waiting for the host to start…")
     let icon =
       faviconHref.isEmpty
       ? ""
@@ -106,7 +108,7 @@ public enum ListenerPage {
       </head>
       <body>
       <video id="video" title="\(safeTitle)"></video>
-      <div id="message"></div>
+      <div id="message">\(waiting)</div>
       <script>
       const video=document.getElementById("video");
       const message=document.getElementById("message");
@@ -147,21 +149,45 @@ public enum ListenerPage {
       video.disablepictureinpicture=parseBoolString(params.get("disablepictureinpicture"),false);
       defaultControls=video.controls;
       };
+      const waitingText="\(Self.pageCopy("waiting"))";
+      let retryTimer=null;
+      let connected=false;
+      let generation=0;
+      const connect=()=>{
+      if(connected)return;
+      if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
+      const ticket=++generation;
+      if(reader!==null){try{reader.close();}catch(err){}reader=null;}
+      reader=new MediaMTXWebRTCReader({
+      url:new URL("\(whepPath)",window.location.href).toString(),
+      onError:(err)=>{
+      if(ticket!==generation||connected)return;
+      setMessage(waitingText);
+      if(retryTimer!==null)clearTimeout(retryTimer);
+      retryTimer=setTimeout(connect,1500);
+      },
+      onTrack:(evt)=>{
+      if(ticket!==generation)return;
+      connected=true;
+      if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
+      setMessage("");
+      video.srcObject=evt.streams[0];
+      applyTitle(document.title);
+      },
+      onDataChannel:(evt)=>{
+      evt.channel.binaryType="arraybuffer";
+      evt.channel.onmessage=(evt)=>{console.log("data channel message",evt.data);};
+      },
+      });
+      };
       window.addEventListener("load",()=>{
       if(typeof MediaMTXWebRTCReader!=="function"){
       setMessage("\(Self.pageCopy("loadError"))");
       return;
       }
       loadAttributesFromQuery();
-      reader=new MediaMTXWebRTCReader({
-      url:new URL("\(whepPath)",window.location.href).toString(),
-      onError:(err)=>{setMessage(err);},
-      onTrack:(evt)=>{setMessage("");video.srcObject=evt.streams[0];applyTitle(document.title);},
-      onDataChannel:(evt)=>{
-      evt.channel.binaryType="arraybuffer";
-      evt.channel.onmessage=(evt)=>{console.log("data channel message",evt.data);};
-      },
-      });
+      setMessage(waitingText);
+      connect();
       });
       video.addEventListener("play",()=>applyTitle(document.title));
       window.addEventListener("beforeunload",()=>{if(reader!==null)reader.close();});
