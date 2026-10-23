@@ -15,6 +15,7 @@ func TestListenerPageMatchesMacContract(t *testing.T) {
 		"/earfi.json",
 		"Waiting for the host to start",
 		"The listener page could not load.",
+		"This page needs JavaScript turned on.",
 		"MediaMTXWebRTCReader",
 		`readyState==="ended"`,
 		"Room &lt;Cast&gt; &amp; &#34;live&#34;",

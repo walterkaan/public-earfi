@@ -250,8 +250,8 @@ func dialListener(t *testing.T, base string, onTrack func(*webrtc.TrackRemote, *
 	}); err != nil {
 		t.Fatalf("set answer: %v\n%s", err, answer)
 	}
-	if !strings.Contains(string(answer), "opus") {
-		t.Fatalf("answer has no opus:\n%s", answer)
+	if !strings.Contains(string(answer), "opus") || !strings.Contains(string(answer), "stereo=1") {
+		t.Fatalf("answer opus is not stereo-capable:\n%s", answer)
 	}
 	if countCandidates(string(answer)) == 0 {
 		t.Fatalf("answer has no ICE candidates:\n%s", answer)

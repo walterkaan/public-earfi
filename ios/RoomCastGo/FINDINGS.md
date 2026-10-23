@@ -77,11 +77,13 @@ own small client limit, which is separate from this server.
 
 ## Behaviour that is designed and not device-tested
 
-- When the network changes, the app shows “Reconnecting…” immediately.
+- When the chosen host changes, the app shows “Reconnecting…”.
   `RoomcastStop` and `RoomcastStart` run on a background actor, not the
   main actor, then the QR code updates. The microphone stays up. Listeners
   whose page is still on that same address retry WHEP. A new IP means they
-  need the new QR code or the Share link.
+  need the new QR code or the Share link. A path update that still selects
+  the bound Wi-Fi or hotspot address does not stop the server. The path
+  key ignores cellular, so a cell radio flap is not a new network.
 - Mute encodes silence and leaves the WebRTC sessions up. The on-screen
   meter keeps showing the mic. The app’s gain control is a slider from
   0.5× to 3×. The lock screen keeps minus and plus, because a Live Activity
@@ -98,6 +100,21 @@ own small client limit, which is separate from this server.
   property 2107), keeps echo control, and runs a software leveler that
   aims louder as the slider rises, then soft-clips. This has not been
   heard on a phone.
+- A USB input shows Voice / Music under the mic row. The choice is
+  remembered. Music is session mode `.measurement`, with voice processing
+  off, at 48 kHz. Opus uses audio mode: 128 kbps when the USB device has
+  two channels, otherwise 96 kbps mono. The Music slider is 0× to 2×, with
+  a soft clip above 1× and no leveler, and the meter is those post-gain
+  samples. Unplugging USB falls back to Voice. Plugging it back returns to
+  Music if that was the choice. The switch restarts capture only. The
+  listener SDP advertises `stereo=1` from the start, so listeners stay
+  connected. Voice stays 32 kbps mono.
+- Built-in Voice used to flood the console with `auou/vpio/appl, render
+  err: -1` at the start of a broadcast, and listeners heard brief dropouts
+  until that flood stopped. A USB input never did this. The voice-processing
+  output bus is now fed silence (`noErr`) at the format read after the
+  session is active, the tap size follows that slice, and a format change
+  rebuilds the graph. Not confirmed on a phone here.
 - Start and Stop paint “Starting…” or “Stopping…” (amber, spinner, taps
   ignored) before the gomobile call. Stop is red once the server is up.
   The QR code, URL, Share button, listener count, and meter are on screen
@@ -144,14 +161,16 @@ Linux, no iPhone, no Xcode, no Safari:
   ignored, public addresses ignored), the listener page contract, two
   listeners receiving the same payloads, trickle ICE, and start/stop.
 - `scripts/test-opus.sh`: the vendored encoder round-trips a 220 Hz sine
-  (best correlation 0.99949 after the codec delay).
+  (best correlation above 0.95 after the codec delay) and creates the
+  music encoders (stereo 128 kbps and mono 96 kbps).
 
 Not verified in this environment, because there is no iPhone and no macOS
-SDK here: the SwiftUI compile (`xcodebuild` was not run), linking this
-revision’s framework, Starting… / Stopping…, the tighter layout, the
-off-main rebind, the gain leveler, the restyled Live Activity, Now Playing
-artwork, or the stats line. Walter’s iPhone 15 already showed lock-screen
-audio, two listeners, Personal Hotspot, and about 500 ms of delay on an
-earlier build. Battery and heat are still unmeasured. This revision’s Go
-change (no listener cap) needs `./scripts/build-server-framework.sh`
-before that device build.
+SDK here: the SwiftUI compile (`xcodebuild` was not run), the built-in
+voice-processing startup (the `render err: -1` flood and the dropouts),
+USB Music mode, the 0×–2× slider, the launch screen, the Dynamic Island
+title, the same-address rebind guard, or the new App Icon on a home screen.
+Walter’s iPhone 15 already showed lock-screen audio, two listeners,
+Personal Hotspot, and about 500 ms of delay on an earlier build. This
+revision changes the listener page and the Opus SDP, so run
+`./scripts/build-server-framework.sh` before that device build. The Opus
+bridge itself is compiled with the app, not into the xcframework.

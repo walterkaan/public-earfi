@@ -23,15 +23,16 @@ struct BroadcastLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    HStack(spacing: 8) {
-                        logo(size: 32)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("RoomCast")
-                                .font(.subheadline.weight(.semibold))
-                            Text(listenerText(context.state.listeners))
-                                .font(.caption2)
-                                .foregroundStyle(.white.opacity(0.8))
-                        }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("RoomCast")
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                        Text(listenerText(context.state.listeners))
+                            .font(.caption2)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .foregroundStyle(.white.opacity(0.8))
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {

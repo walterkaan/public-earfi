@@ -2,11 +2,14 @@
 
 #include "opus.h"
 
-enum { kRoomcastOpusBitrate = 32000 };
-
-OpusEncoder *roomcast_opus_create(int *error_code) {
+OpusEncoder *roomcast_opus_create(int channels, int bitrate, int application, int *error_code) {
     int err = OPUS_OK;
-    OpusEncoder *encoder = opus_encoder_create(48000, 1, OPUS_APPLICATION_VOIP, &err);
+    int ch = channels >= 2 ? 2 : 1;
+    int app = application == OPUS_APPLICATION_AUDIO ? OPUS_APPLICATION_AUDIO : OPUS_APPLICATION_VOIP;
+    if (bitrate < 6000) {
+        bitrate = 6000;
+    }
+    OpusEncoder *encoder = opus_encoder_create(48000, ch, app, &err);
     if (error_code != 0) {
         *error_code = err;
     }
@@ -16,9 +19,9 @@ OpusEncoder *roomcast_opus_create(int *error_code) {
         }
         return 0;
     }
-    opus_encoder_ctl(encoder, OPUS_SET_BITRATE(kRoomcastOpusBitrate));
+    opus_encoder_ctl(encoder, OPUS_SET_BITRATE(bitrate));
     opus_encoder_ctl(encoder, OPUS_SET_VBR(1));
-    opus_encoder_ctl(encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE));
+    opus_encoder_ctl(encoder, OPUS_SET_SIGNAL(app == OPUS_APPLICATION_AUDIO ? OPUS_SIGNAL_MUSIC : OPUS_SIGNAL_VOICE));
     opus_encoder_ctl(encoder, OPUS_SET_DTX(0));
     opus_encoder_ctl(encoder, OPUS_SET_LSB_DEPTH(16));
     return encoder;

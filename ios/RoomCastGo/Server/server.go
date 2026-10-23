@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -57,10 +58,12 @@ func newServer(httpPort, icePort int, ip, iface, title string) (*server, error) 
 	iface = safeIfaceName(iface)
 
 	track, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{
-		MimeType:    webrtc.MimeTypeOpus,
-		ClockRate:   48000,
-		Channels:    2,
-		SDPFmtpLine: "minptime=10;useinbandfec=1",
+		MimeType:  webrtc.MimeTypeOpus,
+		ClockRate: 48000,
+		Channels:  2,
+		// stereo=1 lets a USB music broadcast send stereo Opus on this same
+		// track. Voice stays mono packets. Listeners do not renegotiate.
+		SDPFmtpLine: "minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1",
 	}, "audio", "roomcast")
 	if err != nil {
 		return nil, fmt.Errorf("could not create the audio track: %w", err)
@@ -138,6 +141,36 @@ func newServer(httpPort, icePort int, ip, iface, title string) (*server, error) 
 	}()
 	log.Printf("broadcasting %s on %s (ice %s)", s.url(), iface, udpConn.LocalAddr())
 	return s, nil
+}
+
+// Pion copies the offer's Opus fmtp into the answer, so a voice-only offer
+// would not advertise stereo. USB music sends stereo on this same track.
+func advertiseStereo(sdp string) string {
+	lines := strings.Split(sdp, "\r\n")
+	payload := ""
+	for _, line := range lines {
+		if strings.HasPrefix(line, "a=rtpmap:") && strings.Contains(strings.ToLower(line), "opus/") {
+			rest := strings.TrimPrefix(line, "a=rtpmap:")
+			payload, _, _ = strings.Cut(rest, " ")
+			break
+		}
+	}
+	if payload == "" {
+		return sdp
+	}
+	prefix := "a=fmtp:" + payload + " "
+	for i, line := range lines {
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		if !strings.Contains(line, "stereo=") {
+			lines[i] += ";stereo=1"
+		}
+		if !strings.Contains(line, "sprop-stereo=") {
+			lines[i] += ";sprop-stereo=1"
+		}
+	}
+	return strings.Join(lines, "\r\n")
 }
 
 func (s *server) url() string {
@@ -271,7 +304,9 @@ func (s *server) acceptOffer(offerSDP string) (string, string, error) {
 		return fail(errors.New("no answer"))
 	}
 	log.Printf("listener offered, answer candidates: %d", countCandidates(local.SDP))
-	return id, local.SDP, nil
+	// Pion rejects a rewritten local description. The browser only needs the
+	// stereo parameters on the answer it receives.
+	return id, advertiseStereo(local.SDP), nil
 }
 
 func (s *server) addCandidates(id, fragment string) error {

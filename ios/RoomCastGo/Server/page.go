@@ -41,11 +41,13 @@ html,body{margin:0;padding:0;height:100%;background:#161a42;font-family:Arial,sa
 #credit{position:absolute;left:0;right:0;bottom:0;height:44px;display:flex;align-items:center;justify-content:center;gap:8px;background:#161a42;border-top:1px solid rgba(47,208,189,0.35);z-index:2;font-size:13px}
 #credit img{width:28px;height:28px;border-radius:7px;display:block}
 #credit a{color:rgba(255,255,255,0.58);text-decoration:none}
+.noscript{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:16px;font-weight:bold;padding:20px}
 </style>
 <script defer src="/reader.js"></script>
 </head>
 <body>
 <video id="video" title="` + safeTitle + `"></video>
+<noscript><p class="noscript">This page needs JavaScript turned on.</p></noscript>
 <div id="message">` + waiting + `</div>
 <script>
 const video=document.getElementById("video");

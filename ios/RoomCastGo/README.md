@@ -4,7 +4,8 @@ iPhone-only proof that a phone can host a **voice-only** RoomCast broadcast.
 One screen: Start / Stop, a mute button, a mic-gain slider, and, while
 live, a QR code, Share, the listener URL, a listener count, and a live
 microphone meter. Tap the listener count for CPU, heat, and battery.
-Opus mono at 32 kbps. No input picker: iOS switches the mic on its own.
+Voice is Opus mono at 32 kbps. A USB input can switch to Music. No input
+picker: iOS switches the mic on its own.
 While a broadcast is running, a Live Activity on the lock screen and in
 the Dynamic Island shows the listener count, a level bar, and mute and
 gain buttons.
@@ -114,9 +115,13 @@ show Starting… or Stopping… until the server answers, so a second tap does
 not undo the first. Mute sends silence and leaves the listeners connected.
 The gain slider runs from 0.5× to 3×. At 1× the built-in mic keeps its
 usual voice processing. Above 1× that automatic gain switches off so the
-boost can be heard. A phone call pauses the microphone and the broadcast
-resumes when the call ends. Tap the listener count while live for the
-listener count, app CPU, thermal state, and battery.
+boost can be heard. Plug in a USB input and Voice / Music appears under
+the mic. Music turns voice processing off, sends 48 kHz Opus (128 kbps
+stereo, or 96 kbps mono), and the slider runs from 0× to 2×. Unplugging
+returns to Voice. Listeners stay connected across that switch. A phone
+call pauses the microphone and the broadcast resumes when the call ends.
+Tap the listener count while live for the listener count, app CPU, thermal
+state, and battery.
 
 Plug the phone in for a long event. The meter on the main screen is the
 live mic level. The lock screen meter updates about once a second.
@@ -158,8 +163,9 @@ sound fine. See [FINDINGS.md](FINDINGS.md).
 - **“Roomcast.xcframework is missing”**, or you just pulled a change to
   the listener page or the Go server: run `./scripts/build-server-framework.sh`
   from `ios/RoomCastGo`, then build again. The page and the server are
-  compiled into the framework. The current branch removed the 16-listener
-  cap, so rebuild before the many-tab test.
+  compiled into the framework. Rebuild before testing this branch: the
+  listener page gained a no-JavaScript line, and the Opus SDP advertises
+  stereo so USB Music does not need a renegotiation.
 - **Widget or App Group signing error**: create `group.channel.roomcast.go`
   and the App ID `channel.roomcast.go.widget` as in the table above, enable
   the group on both `channel.roomcast.go` and `channel.roomcast.go.widget`,
@@ -188,15 +194,18 @@ sound fine. See [FINDINGS.md](FINDINGS.md).
 
 On Walter’s iPhone 15: the broadcast kept going with the screen locked,
 two listeners worked including over Personal Hotspot, and the delay was
-about 500 ms. Opus stays at 32 kbps. iOS picked the input (AirPods, the
-built-in mic, a USB sound card) without a picker.
+about 500 ms. Voice stays at 32 kbps. iOS picked the input (AirPods, the
+built-in mic, a USB sound card) without a picker. A later note from that
+phone: the `auou/vpio` render errors and the startup dropouts happen with
+the built-in mic, and a USB start does not. The silence feed for that
+voice-processing bus has not been confirmed on the phone. USB Music mode
+has not been run on a phone either.
 
 On a Linux machine, without an iPhone: the WHEP server accepts the same
 offer shape as the listener page, two listeners receive the same packets,
 seventeen sessions are accepted, and the vendored Opus encoder round-trips
-a sine wave. The network restart, mute, gain, Share, Live Activity, and
-stats line were not run on a phone here. Battery and heat are still
-unmeasured. `xcodebuild` was not run here.
+a sine wave. `xcodebuild` was not run here. Rebuild the server framework
+on a Mac before installing this branch.
 [FINDINGS.md](FINDINGS.md) lists each of those.
 
 Licences: [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

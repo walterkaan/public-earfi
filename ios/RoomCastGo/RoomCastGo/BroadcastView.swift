@@ -16,6 +16,9 @@ struct BroadcastView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 4)
                 mixRow
+                if model.usbInput {
+                    musicPicker
+                }
                 startButton
                 if let detail = detailText {
                     Text(detail)
@@ -159,7 +162,7 @@ struct BroadcastView: View {
                     get: { model.gain },
                     set: { model.setGain($0) }
                 ),
-                in: BroadcastGain.minimum...BroadcastGain.maximum
+                in: BroadcastGain.range(music: model.musicActive)
             )
             .tint(Color.roomTeal)
             .accessibilityLabel("Mic gain")
@@ -168,6 +171,20 @@ struct BroadcastView: View {
                 .foregroundStyle(.white)
                 .frame(width: 52, alignment: .trailing)
         }
+    }
+
+    private var musicPicker: some View {
+        Picker("Sound", selection: Binding(
+            get: { model.musicPreferred },
+            set: { model.setMusicPreferred($0) }
+        )) {
+            Text("Voice").tag(false)
+            Text("Music").tag(true)
+        }
+        .pickerStyle(.segmented)
+        .controlSize(.small)
+        .disabled(model.phase == .starting || model.phase == .stopping)
+        .accessibilityLabel("Voice or music")
     }
 
     private var qrCard: some View {

@@ -43,7 +43,7 @@ static float best_correlation(const float *a, const float *b, int count) {
 
 int main(void) {
     int err = 0;
-    OpusEncoder *encoder = roomcast_opus_create(&err);
+    OpusEncoder *encoder = roomcast_opus_create(1, 32000, OPUS_APPLICATION_VOIP, &err);
     if (encoder == 0) {
         fprintf(stderr, "encoder create failed: %d\n", err);
         return 1;
@@ -87,5 +87,31 @@ int main(void) {
     }
     roomcast_opus_destroy(encoder);
     opus_decoder_destroy(decoder);
+
+    /* Music mode: stereo audio at 128 kbps, and mono audio at 96 kbps. */
+    OpusEncoder *music = roomcast_opus_create(2, 128000, OPUS_APPLICATION_AUDIO, &err);
+    if (music == 0) {
+        fprintf(stderr, "music encoder create failed: %d\n", err);
+        return 1;
+    }
+    float stereo[kFrame * 2];
+    for (int i = 0; i < kFrame; i++) {
+        double t = (double)i / (double)kRate;
+        stereo[i * 2] = (float)(0.2 * sin(2.0 * 3.141592653589793 * 220.0 * t));
+        stereo[i * 2 + 1] = stereo[i * 2];
+    }
+    unsigned char music_packet[1500];
+    int music_bytes = roomcast_opus_encode(music, stereo, kFrame, music_packet, (int)sizeof music_packet);
+    if (music_bytes < 1) {
+        fprintf(stderr, "music encode failed: %d\n", music_bytes);
+        return 1;
+    }
+    roomcast_opus_destroy(music);
+    OpusEncoder *music_mono = roomcast_opus_create(1, 96000, OPUS_APPLICATION_AUDIO, &err);
+    if (music_mono == 0) {
+        fprintf(stderr, "mono music encoder create failed: %d\n", err);
+        return 1;
+    }
+    roomcast_opus_destroy(music_mono);
     return 0;
 }

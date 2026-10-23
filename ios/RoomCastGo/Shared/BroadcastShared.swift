@@ -16,10 +16,18 @@ struct BroadcastAttributes: ActivityAttributes {
 enum BroadcastGain {
     static let minimum = 0.5
     static let maximum = 3.0
+    static let musicMinimum = 0.0
+    static let musicMaximum = 2.0
     static let steps: [Double] = [0.5, 0.75, 1, 1.5, 2, 3]
+    static let musicSteps: [Double] = [0, 0.5, 1, 1.5, 2]
 
-    static func adjusted(_ gain: Double, up: Bool) -> Double {
-        let index = steps.enumerated().min { abs($0.element - gain) < abs($1.element - gain) }?.offset ?? 2
+    static func range(music: Bool) -> ClosedRange<Double> {
+        music ? musicMinimum...musicMaximum : minimum...maximum
+    }
+
+    static func adjusted(_ gain: Double, up: Bool, music: Bool) -> Double {
+        let steps = music ? musicSteps : self.steps
+        let index = steps.enumerated().min { abs($0.element - gain) < abs($1.element - gain) }?.offset ?? 0
         let next = index + (up ? 1 : -1)
         if next < 0 || next >= steps.count { return steps[index] }
         return steps[next]

@@ -28,11 +28,15 @@ final class BroadcastModel: ObservableObject {
     @Published var qrImage: UIImage?
     @Published var muted = false
     @Published var gain = 1.0
+    /// Remembered across launches. Applied only while a USB input is connected.
+    @Published var musicPreferred = UserDefaults.standard.bool(forKey: "capture.music")
+    @Published var usbInput = false
     @Published var cpuPercent = 0.0
     @Published var thermal = ProcessInfo.processInfo.thermalState
     @Published var batteryLevel: Float = -1
 
     var isOnAir: Bool { phase == .live || phase == .reconnecting }
+    var musicActive: Bool { musicPreferred && usbInput }
 
     var listenerLabel: String {
         switch listeners {
@@ -72,6 +76,7 @@ final class BroadcastModel: ObservableObject {
     private var ip = ""
     private var iface = ""
     private var boundIP: String?
+    private var boundIface: String?
     private var lastPathKey = ""
     private var sawPath = false
     private var rebindGeneration = 0
@@ -80,6 +85,7 @@ final class BroadcastModel: ObservableObject {
     private var remoteInstalled = false
     private var startedAt: Date?
     private var cpuSampler = AppCPUSampler()
+    private var usbObserver: NSObjectProtocol?
     private var nowPlayingKey = ""
     private lazy var nowPlayingArtwork: MPMediaItemArtwork? = {
         guard let image = UIImage(named: "Logo") else { return nil }
@@ -99,7 +105,9 @@ final class BroadcastModel: ObservableObject {
         Task { await self.prepareAddress() }
         if phase == .idle {
             activity.endOrphans()
+            refreshUSB()
         }
+        observeUSBWhileIdle()
         guard monitor == nil else { return }
         let monitor = NWPathMonitor()
         monitor.pathUpdateHandler = { [weak self] path in
@@ -139,11 +147,24 @@ final class BroadcastModel: ObservableObject {
     }
 
     func setGain(_ value: Double) {
-        applyGain(min(BroadcastGain.maximum, max(BroadcastGain.minimum, value)))
+        let range = BroadcastGain.range(music: musicActive)
+        applyGain(min(range.upperBound, max(range.lowerBound, value)))
     }
 
     func adjustGain(up: Bool) {
-        applyGain(BroadcastGain.adjusted(gain, up: up))
+        applyGain(BroadcastGain.adjusted(gain, up: up, music: musicActive))
+    }
+
+    /// Music is USB-only. The choice is kept when the device is unplugged,
+    /// and capture restarts without dropping the listener sessions.
+    func setMusicPreferred(_ preferred: Bool) {
+        guard musicPreferred != preferred else { return }
+        musicPreferred = preferred
+        UserDefaults.standard.set(preferred, forKey: "capture.music")
+        let range = BroadcastGain.range(music: preferred && usbInput)
+        gain = min(range.upperBound, max(range.lowerBound, gain))
+        capture.setMusicPreferred(preferred)
+        capture.setMix(gain: Float(gain), muted: muted)
     }
 
     private func applyGain(_ value: Double) {
@@ -211,6 +232,10 @@ final class BroadcastModel: ObservableObject {
         }
         probe.poke(ip: ip)
         wireCapture()
+        refreshUSB()
+        capture.setMusicPreferred(musicPreferred)
+        let range = BroadcastGain.range(music: musicActive)
+        gain = min(range.upperBound, max(range.lowerBound, gain))
         capture.setMix(gain: Float(gain), muted: muted)
         let address = ip
         let interfaceName = iface
@@ -244,6 +269,7 @@ final class BroadcastModel: ObservableObject {
             return
         }
         boundIP = address
+        boundIface = interfaceName
         startedAt = Date()
         phase = .live
         failed = false
@@ -283,6 +309,58 @@ final class BroadcastModel: ObservableObject {
                 }
             }
         }
+        capture.onUSB = { [weak self] usb in
+            Task { @MainActor in
+                self?.noteUSB(usb)
+            }
+        }
+        capture.onCaptureFailure = { [weak self] message in
+            Task { @MainActor in
+                guard let self, self.isOnAir else { return }
+                self.failed = true
+                self.status = message
+            }
+        }
+    }
+
+    private func observeUSBWhileIdle() {
+        guard usbObserver == nil else { return }
+        usbObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.phase == .idle else { return }
+                self.refreshUSB()
+            }
+        }
+    }
+
+    private func refreshUSB() {
+        let usb = AudioCapture.routeIsUSB
+        if usbInput != usb {
+            usbInput = usb
+        }
+        clampGainToMode()
+    }
+
+    /// Capture already restarted when this arrives during a broadcast.
+    /// Do not call `setMusicPreferred` again.
+    private func noteUSB(_ usb: Bool) {
+        if usbInput != usb {
+            usbInput = usb
+        }
+        clampGainToMode()
+        capture.setMix(gain: Float(gain), muted: muted)
+    }
+
+    private func clampGainToMode() {
+        let range = BroadcastGain.range(music: musicActive)
+        let clamped = min(range.upperBound, max(range.lowerBound, gain))
+        if clamped != gain {
+            gain = clamped
+        }
     }
 
     private func beginStop() {
@@ -308,6 +386,7 @@ final class BroadcastModel: ObservableObject {
         cpuPercent = 0
         inputName = ""
         boundIP = nil
+        boundIface = nil
         failed = false
         muted = false
         cpuSampler.reset()
@@ -365,6 +444,9 @@ final class BroadcastModel: ObservableObject {
     }
 
     private func refreshAfterActive() async {
+        if phase == .idle {
+            refreshUSB()
+        }
         await updateAddress()
         guard isOnAir else { return }
         listeners = await gate.listenerCount()
@@ -381,9 +463,6 @@ final class BroadcastModel: ObservableObject {
         sawPath = true
         lastPathKey = key
         if changed, isOnAir {
-            phase = .reconnecting
-            failed = false
-            status = "Reconnecting…"
             scheduleRebind()
         }
         Task { await self.updateAddress() }
@@ -398,9 +477,6 @@ final class BroadcastModel: ObservableObject {
         rebindRunning = true
         rebindGeneration += 1
         let generation = rebindGeneration
-        phase = .reconnecting
-        failed = false
-        status = "Reconnecting…"
         Task { @MainActor in
             defer {
                 if generation == self.rebindGeneration {
@@ -414,11 +490,36 @@ final class BroadcastModel: ObservableObject {
             }
             try? await Task.sleep(nanoseconds: 700_000_000)
             guard !Task.isCancelled, generation == self.rebindGeneration, self.isOnAir else { return }
+            if await self.hostUnchanged() { return }
+            self.phase = .reconnecting
+            self.failed = false
+            self.status = "Reconnecting…"
             await self.rebind(generation: generation)
         }
     }
 
+    /// Cellular flaps and other path updates must not restart the server.
+    /// Stay live when the bound Wi-Fi or hotspot address is still up and is
+    /// still the address `selectHost` would pick.
+    private func hostUnchanged() async -> Bool {
+        guard let boundIP, let boundIface, !boundIP.isEmpty, !boundIface.isEmpty else { return false }
+        let present = HostAddress.interfaces().contains { $0.name == boundIface && $0.address == boundIP }
+        guard present else { return false }
+        let chosen = await gate.selectHost(HostAddress.table())
+        let parts = chosen.split(separator: " ", maxSplits: 1).map(String.init)
+        return parts.count == 2 && parts[0] == boundIface && parts[1] == boundIP
+    }
+
     private func rebind(generation: Int) async {
+        if await hostUnchanged() {
+            guard generation == rebindGeneration, isOnAir else { return }
+            if phase == .reconnecting {
+                failed = false
+                phase = .live
+                status = muted ? "Muted. Listeners hear silence." : "Live"
+            }
+            return
+        }
         let previous = boundIP
         for _ in 0..<20 {
             guard generation == rebindGeneration, phase == .reconnecting else { return }
@@ -449,6 +550,7 @@ final class BroadcastModel: ObservableObject {
                 return
             }
             boundIP = target
+            boundIface = interfaceName
             probe.poke(ip: target)
             failed = false
             phase = .live
@@ -576,8 +678,19 @@ final class BroadcastModel: ObservableObject {
         center.playCommand.isEnabled = false
     }
 
+    /// Wi-Fi, wired Ethernet, and a Personal Hotspot bridge. Cellular is left
+    /// out so a cell radio flapping does not look like a new network.
     nonisolated private static func pathKey(_ path: NWPath) -> String {
-        let names = path.availableInterfaces.map { "\($0.type):\($0.name)" }.sorted()
+        let names = path.availableInterfaces.filter { interface in
+            switch interface.type {
+            case .wifi, .wiredEthernet:
+                return true
+            case .other:
+                return interface.name.hasPrefix("bridge")
+            default:
+                return false
+            }
+        }.map { "\($0.type):\($0.name)" }.sorted()
         return "\(path.status)|\(names.joined(separator: ","))"
     }
 }
