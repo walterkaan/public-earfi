@@ -68,6 +68,13 @@ cd ios/RoomCastGo
 open RoomCastGo.xcodeproj
 ```
 
+The Xcode project is generated from `project.yml`. If Xcode says it is not a
+valid property list, regenerate it from `ios/RoomCastGo`:
+
+```bash
+brew install xcodegen && xcodegen
+```
+
 The script needs a network connection the first time. It installs a pinned
 `gomobile` and writes `build/Roomcast.xcframework` (gitignored). The first
 build takes a few minutes.
@@ -113,6 +120,8 @@ that 16 listeners will sound fine.
 
 ## If the build or the broadcast fails
 
+- **Xcode says the project is not a valid property list**: from
+  `ios/RoomCastGo`, run `brew install xcodegen && xcodegen`.
 - **“Roomcast.xcframework is missing”** in Xcode: run
   `./scripts/build-server-framework.sh` from `ios/RoomCastGo`, then build again.
 - **Go is too old, not Apple silicon, or macOS kills `go` with exit 137**:

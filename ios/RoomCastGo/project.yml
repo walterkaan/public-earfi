@@ -1,0 +1,100 @@
+name: RoomCastGo
+options:
+  bundleIdPrefix: channel.roomcast
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: none
+  developmentLanguage: en
+settings:
+  base:
+    SDKROOT: iphoneos
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    SWIFT_VERSION: "5.0"
+    GCC_C_LANGUAGE_STANDARD: c99
+targets:
+  RoomCastGo:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: RoomCastGo
+        excludes:
+          - Info.plist
+          - "*.entitlements"
+      - path: Vendor/opus
+        includes:
+          - "**/*.c"
+      - path: Vendor/opus-bridge/opus_bridge.c
+    dependencies:
+      - framework: build/Roomcast.xcframework
+        embed: true
+        link: true
+        codeSign: true
+        removeHeaders: true
+    preBuildScripts:
+      - name: Check Roomcast.xcframework
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ ! -d "$SRCROOT/build/Roomcast.xcframework" ]; then
+            echo "error: build/Roomcast.xcframework is missing. In Terminal, cd into ios/RoomCastGo and run ./scripts/build-server-framework.sh" >&2
+            exit 1
+          fi
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: channel.roomcast.go
+        PRODUCT_NAME: RoomCastGo
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: RoomCastGo/Info.plist
+        CODE_SIGN_ENTITLEMENTS: RoomCastGo/RoomCastGo.entitlements
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: Apple Development
+        SWIFT_OBJC_BRIDGING_HEADER: RoomCastGo/RoomCastGo-Bridging-Header.h
+        SWIFT_VERSION: "5.0"
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        ARCHS: arm64
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: iphoneos
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+        TARGETED_DEVICE_FAMILY: "1"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        GCC_C_LANGUAGE_STANDARD: c99
+        GCC_WARN_INHIBIT_ALL_WARNINGS: YES
+        CLANG_ENABLE_MODULES: YES
+        CLANG_ENABLE_OBJC_ARC: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        FRAMEWORK_SEARCH_PATHS:
+          - $(SRCROOT)/build
+        HEADER_SEARCH_PATHS:
+          - $(SRCROOT)/Vendor/opus
+          - $(SRCROOT)/Vendor/opus/include
+          - $(SRCROOT)/Vendor/opus/celt
+          - $(SRCROOT)/Vendor/opus/silk
+          - $(SRCROOT)/Vendor/opus/silk/float
+          - $(SRCROOT)/Vendor/opus/src
+          - $(SRCROOT)/Vendor/opus-bridge
+        OTHER_CFLAGS:
+          - -DHAVE_CONFIG_H
+          - -w
+        LD_RUNPATH_SEARCH_PATHS:
+          - $(inherited)
+          - "@executable_path/Frameworks"
+      configs:
+        Debug:
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+          ENABLE_TESTABILITY: YES
+          GCC_OPTIMIZATION_LEVEL: "0"
+          ONLY_ACTIVE_ARCH: YES
+          DEBUG_INFORMATION_FORMAT: dwarf
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+          SWIFT_COMPILATION_MODE: wholemodule
+          VALIDATE_PRODUCT: YES
+          DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+    scheme: {}
