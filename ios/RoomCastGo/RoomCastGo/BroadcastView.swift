@@ -254,7 +254,7 @@ struct BroadcastView: View {
     private var meter: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(model.muted ? "Sound Source · not sent" : (model.profileText.isEmpty || model.phase == .idle ? "Sound Source" : "Sound Source · \(model.profileText)"))
+                Text(model.muted ? "Sound Source · not sent" : (model.profileText.isEmpty || model.phase == .idle ? "Sound Source" : "Sound · \(model.profileText)"))
                 Spacer()
                 if model.clipping && !model.muted {
                     Text("Too loud, turn the source down")
