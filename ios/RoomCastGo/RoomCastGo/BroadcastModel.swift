@@ -278,7 +278,8 @@ final class BroadcastModel: ObservableObject {
         cpuSampler.reset()
         sampleStats()
         status = muted ? "Muted. Listeners hear silence." : "Live"
-        installRemote()
+        // Now Playing card dropped: the Live Activity has mute, gain and the meter.
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         activity.start(activityState())
         startPolling()
     }
