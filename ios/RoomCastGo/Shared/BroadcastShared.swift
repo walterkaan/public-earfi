@@ -14,6 +14,8 @@ struct BroadcastAttributes: ActivityAttributes {
 }
 
 enum BroadcastGain {
+    static let minimum = 0.5
+    static let maximum = 3.0
     static let steps: [Double] = [0.5, 0.75, 1, 1.5, 2, 3]
 
     static func adjusted(_ gain: Double, up: Bool) -> Double {

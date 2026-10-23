@@ -100,6 +100,20 @@ func TestTwoListenersHearTheSameVoice(t *testing.T) {
 	t.Fatalf("listeners did not both receive the voice (left %d, right %d)", len(leftGot), len(rightGot))
 }
 
+func TestSeventeenListenersAreAccepted(t *testing.T) {
+	s := testServer(t)
+	const n = 17
+	for range n {
+		dialListener(t, s.url(), nil)
+	}
+	s.mu.Lock()
+	got := len(s.sessions)
+	s.mu.Unlock()
+	if got != n {
+		t.Fatalf("sessions = %d, want %d", got, n)
+	}
+}
+
 func TestDeleteDropsTheListener(t *testing.T) {
 	s := testServer(t)
 	listener := dialListener(t, s.url(), nil)

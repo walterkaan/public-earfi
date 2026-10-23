@@ -102,6 +102,7 @@
 		A380974F2F4F3C311823E17F /* debug.c in Sources */ = {isa = PBXBuildFile; fileRef = 3B30F9AC0615C1EB62BCA1CD /* debug.c */; };
 		A4A08216A82A461D01DA9805 /* apply_sine_window_FLP.c in Sources */ = {isa = PBXBuildFile; fileRef = AED0B4F46DDA3490BF0036D5 /* apply_sine_window_FLP.c */; };
 		A6798C54E25953917CAC0A55 /* BroadcastLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F564C105A8EC6D3FCBCAFE1 /* BroadcastLiveActivity.swift */; };
+		D2E74B19A8C3560F4B7E1A93 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F8A31C06B4D2479E1A6C5D20 /* Assets.xcassets */; };
 		A8E44A67130A8139B653EA73 /* decode_pulses.c in Sources */ = {isa = PBXBuildFile; fileRef = ADEE7FD952641D367EE78892 /* decode_pulses.c */; };
 		ACC081429FF7666EECD97B9A /* code_signs.c in Sources */ = {isa = PBXBuildFile; fileRef = 7EEC01CC47658733ADCD7E2B /* code_signs.c */; };
 		ACE171A0FFB0790E76DE84D8 /* PLC.c in Sources */ = {isa = PBXBuildFile; fileRef = 40C7A2840AAF8E41349E1A2A /* PLC.c */; };
@@ -229,6 +230,7 @@
 		2DF1110E6BC03116F7FE699D /* encode_frame_FLP.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = encode_frame_FLP.c; sourceTree = "<group>"; };
 		2E03E76405E540CB5800DB8B /* OpusEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpusEncoder.swift; sourceTree = "<group>"; };
 		2F564C105A8EC6D3FCBCAFE1 /* BroadcastLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastLiveActivity.swift; sourceTree = "<group>"; };
+		F8A31C06B4D2479E1A6C5D20 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2FAF2B1EE32F9073F32F7FF0 /* resampler_private_IIR_FIR.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = resampler_private_IIR_FIR.c; sourceTree = "<group>"; };
 		34129E1407002F7796D2B9ED /* process_gains_FLP.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = process_gains_FLP.c; sourceTree = "<group>"; };
 		3958DFD6F4AC13FA4F9D0D55 /* biquad_alt.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = biquad_alt.c; sourceTree = "<group>"; };
@@ -471,6 +473,7 @@
 		5E662B5315B9FB174B367664 /* RoomCastGoWidget */ = {
 			isa = PBXGroup;
 			children = (
+				F8A31C06B4D2479E1A6C5D20 /* Assets.xcassets */,
 				2F564C105A8EC6D3FCBCAFE1 /* BroadcastLiveActivity.swift */,
 			);
 			path = RoomCastGoWidget;
@@ -660,6 +663,7 @@
 			buildConfigurationList = 35E8C83A5B440BEF78FF5F59 /* Build configuration list for PBXNativeTarget "RoomCastGoWidget" */;
 			buildPhases = (
 				9D174981F1757A679026AC4E /* Sources */,
+				91C6E0A5D3F84B27C6A1E508 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -712,6 +716,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		91C6E0A5D3F84B27C6A1E508 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D2E74B19A8C3560F4B7E1A93 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F4850119A9DC738111781A08 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;

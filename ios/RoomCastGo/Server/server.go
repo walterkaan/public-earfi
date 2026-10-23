@@ -17,17 +17,10 @@ import (
 	"github.com/pion/webrtc/v4/pkg/media"
 )
 
-const (
-	// Phone proof cap. Personal Hotspot cannot carry a room of 30 phones,
-	// and each listener is its own WebRTC session.
-	maxListeners = 16
-
-	opusFrame = 20 * time.Millisecond
-)
+const opusFrame = 20 * time.Millisecond
 
 var (
 	errStopped   = errors.New("the broadcast has stopped")
-	errFull      = errors.New("too many listeners for this phone")
 	errNoSession = errors.New("that listener is gone")
 )
 
@@ -166,6 +159,7 @@ func (s *server) publish(packet []byte) {
 	}
 	buf := make([]byte, len(packet))
 	copy(buf, packet)
+	// Packetized once. Each bound peer then encrypts its own SRTP copy.
 	_ = s.track.WriteSample(media.Sample{Data: buf, Duration: opusFrame})
 }
 
@@ -219,10 +213,6 @@ func (s *server) acceptOffer(offerSDP string) (string, string, error) {
 		s.mu.Unlock()
 		return "", "", errStopped
 	}
-	if len(s.sessions) >= maxListeners {
-		s.mu.Unlock()
-		return "", "", errFull
-	}
 	s.mu.Unlock()
 
 	pc, err := s.api.NewPeerConnection(webrtc.Configuration{})
@@ -240,13 +230,10 @@ func (s *server) acceptOffer(offerSDP string) (string, string, error) {
 	id := newID()
 	sess := &session{pc: pc}
 	s.mu.Lock()
-	if s.closed || len(s.sessions) >= maxListeners {
+	if s.closed {
 		s.mu.Unlock()
 		_ = pc.Close()
-		if s.closed {
-			return "", "", errStopped
-		}
-		return "", "", errFull
+		return "", "", errStopped
 	}
 	s.sessions[id] = sess
 	s.mu.Unlock()

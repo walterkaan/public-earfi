@@ -1,4 +1,5 @@
 import AVFoundation
+import AudioToolbox
 import Foundation
 import os
 
@@ -24,13 +25,38 @@ final class AudioCapture {
     private let mixLock = NSLock()
     private var gain: Float = 1
     private var sendSilence = false
+    private var useLeveler = false
+    /// Main thread only. True after voice-processing AGC was turned off.
+    private var hardwareLeveler = false
+    /// Main thread only. Voice processing is on for the built-in mic.
+    private var voiceProcessing = false
+    /// Audio thread only. Smoothed makeup while AGC is off.
+    private var levelerGain: Float = 1
+    private var levelerWasOn = false
 
     /// Gain is applied before the meter and the encoder. Mute still measures
     /// the mic, then encodes silence so the WebRTC session stays up.
+    ///
+    /// At 1× and below, the built-in mic keeps Apple's voice-processing AGC
+    /// (the sensitive, clean sound). Above 1× that AGC is switched off,
+    /// because it already holds speech near full scale and a later multiply
+    /// only hard-clips. A leveler then aims louder as the slider rises.
+    /// Call this on the main thread.
     func setMix(gain: Float, muted: Bool) {
+        let clamped = min(3, max(0.5, gain))
+        let wantLeveler = voiceProcessing && clamped > 1.001
+        if wantLeveler != hardwareLeveler {
+            if wantLeveler {
+                hardwareLeveler = setHardwareAGC(false)
+            } else {
+                _ = setHardwareAGC(true)
+                hardwareLeveler = false
+            }
+        }
         mixLock.lock()
-        self.gain = gain
+        self.gain = clamped
         self.sendSilence = muted
+        self.useLeveler = hardwareLeveler && wantLeveler
         mixLock.unlock()
     }
 
@@ -38,6 +64,11 @@ final class AudioCapture {
         if running { return }
         do {
             let session = AVAudioSession.sharedInstance()
+            // `.default` plus voice processing on the built-in mic is the
+            // sensitive sound. `.voiceChat` would add a second session AGC.
+            // `.measurement` would strip that processing. `inputGain` only
+            // goes from 0 to 1 and is usually not settable on this mic, so
+            // it cannot be the boost.
             try session.setCategory(
                 .playAndRecord,
                 mode: .default,
@@ -46,10 +77,14 @@ final class AudioCapture {
             try session.setPreferredSampleRate(48_000)
             try session.setPreferredIOBufferDuration(0.02)
             try session.setActive(true)
+            if session.isInputGainSettable {
+                try? session.setInputGain(1)
+            }
             encoder = try OpusEncoderBox()
             try installTap()
             engine.prepare()
             try engine.start()
+            reapplyBoost()
             running = true
             observeSession()
             reportInput()
@@ -88,7 +123,19 @@ final class AudioCapture {
             $0.portType == .builtInMic
         }
         // Voice processing helps the built-in mic and fights a headset or a desk mic.
-        try? input.setVoiceProcessingEnabled(builtIn)
+        if builtIn {
+            do {
+                try input.setVoiceProcessingEnabled(true)
+                voiceProcessing = true
+            } catch {
+                voiceProcessing = false
+                log.error("voice processing stayed off: \(error.localizedDescription, privacy: .public)")
+            }
+        } else {
+            try? input.setVoiceProcessingEnabled(false)
+            voiceProcessing = false
+            hardwareLeveler = false
+        }
 
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else {
@@ -150,11 +197,41 @@ final class AudioCapture {
         mixLock.lock()
         let gain = self.gain
         let sendSilence = self.sendSilence
+        let leveler = self.useLeveler
         mixLock.unlock()
+
+        if leveler {
+            var energy: Float = 0
+            for sample in frame {
+                energy += sample * sample
+            }
+            let rms = sqrt(energy / Float(frame.count))
+            // 1.5× aims a little hotter than a normal voice-processed
+            // level. 3× aims clearly louder. The cap stops a quiet room
+            // from being amplified without limit.
+            let target = min(0.34, 0.11 * gain)
+            let wanted = min(28, target / max(rms, 0.004))
+            if levelerWasOn {
+                levelerGain += (wanted - levelerGain) * 0.35
+            } else {
+                levelerGain = wanted
+            }
+            levelerWasOn = true
+        } else {
+            levelerWasOn = false
+            levelerGain = 1
+        }
 
         var sum: Float = 0
         for index in frame.indices {
-            let heard = min(1, max(-1, frame[index] * gain))
+            let heard: Float
+            if leveler {
+                heard = softClip(frame[index] * levelerGain)
+            } else if gain > 1 {
+                heard = softClip(frame[index] * gain)
+            } else {
+                heard = min(1, max(-1, frame[index] * gain))
+            }
             sum += heard * heard
             frame[index] = sendSilence ? 0 : heard
         }
@@ -225,6 +302,7 @@ final class AudioCapture {
             if !engine.isRunning {
                 try installTap()
                 try engine.start()
+                reapplyBoost()
             }
             reportInput()
             onInterrupted?(false)
@@ -255,10 +333,45 @@ final class AudioCapture {
             try AVAudioSession.sharedInstance().setActive(true)
             try installTap()
             try engine.start()
+            reapplyBoost()
             reportInput()
         } catch {
             log.error("route restart failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// `kAUVoiceIOProperty_VoiceProcessingEnableAGC` is 2107. Turning it off
+    /// leaves echo control on. Returns whether the property took.
+    private func setHardwareAGC(_ enabled: Bool) -> Bool {
+        guard voiceProcessing, let unit = engine.inputNode.audioUnit else { return false }
+        var value: UInt32 = enabled ? 1 : 0
+        let status = AudioUnitSetProperty(
+            unit,
+            AudioUnitPropertyID(2107),
+            kAudioUnitScope_Global,
+            0,
+            &value,
+            UInt32(MemoryLayout<UInt32>.size)
+        )
+        if status != noErr {
+            log.error("could not set voice-processing AGC (\(status))")
+            return false
+        }
+        return true
+    }
+
+    private func reapplyBoost() {
+        mixLock.lock()
+        let gain = self.gain
+        let muted = self.sendSilence
+        mixLock.unlock()
+        hardwareLeveler = false
+        setMix(gain: gain, muted: muted)
+    }
+
+    private func softClip(_ sample: Float) -> Float {
+        let drive: Float = 1.2
+        return tanhf(sample * drive) / tanhf(drive)
     }
 
     private func reportInput() {

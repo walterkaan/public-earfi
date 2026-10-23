@@ -4,40 +4,51 @@ struct BroadcastView: View {
     @ObservedObject var model: BroadcastModel
     @Environment(\.scenePhase) private var scenePhase
     @State private var shareURL: String?
+    @State private var showStats = false
 
     var body: some View {
         ZStack {
             Color.roomNavy.ignoresSafeArea()
-            ScrollView {
-                VStack(spacing: 22) {
-                    header
-                    startButton
-                    muteButton
-                    if model.muted {
-                        Text("Muted. Listeners hear silence.")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color.roomPink)
-                            .frame(maxWidth: .infinity)
-                    }
-                    gainRow
-                    statusLine
-                    qrCard
-                    shareButton
-                    listenerLine
-                    meter
-                    Text("Plug in for long events.")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.85))
-                    if let reviewURL = AppStoreListing.writeReviewURL {
-                        Link("Rate RoomCast", destination: reviewURL)
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(Color.roomTeal)
-                    }
-                    hint
+            VStack(spacing: 10) {
+                Text("RoomCast Go")
+                    .font(.title.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 4)
+                mixRow
+                startButton
+                if let detail = detailText {
+                    Text(detail)
+                        .font(.footnote.weight(.medium))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(model.failed ? Color.roomPink : Color.white.opacity(0.72))
+                        .frame(maxWidth: .infinity)
+                        .lineLimit(4)
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 28)
+                if model.isOnAir {
+                    qrCard
+                    Text(model.url)
+                        .font(.system(.caption2, design: .monospaced))
+                        .textSelection(.enabled)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                    shareButton
+                    listenerBlock
+                    meter
+                }
+                Spacer(minLength: 8)
+                Text("Plug in for long events.")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+                if let reviewURL = AppStoreListing.writeReviewURL {
+                    Link("Rate RoomCast", destination: reviewURL)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Color.roomTeal)
+                }
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
         }
         .preferredColorScheme(.dark)
         .onAppear { model.appear() }
@@ -58,124 +69,120 @@ struct BroadcastView: View {
         )
     }
 
-    private var header: some View {
-        VStack(spacing: 6) {
-            Text("RoomCast Go")
-                .font(.largeTitle.weight(.bold))
-                .foregroundStyle(.white)
-            Text("Voice only · Opus 32 kbps · mono")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.7))
+    private var detailText: String? {
+        switch model.phase {
+        case .starting, .stopping:
+            return nil
+        case .reconnecting:
+            return model.status
+        case .live:
+            return model.status == "Live" ? nil : model.status
+        case .idle:
+            return model.failed ? model.status : model.networkNote
         }
-        .frame(maxWidth: .infinity)
     }
 
     private var startButton: some View {
         Button(action: model.toggle) {
-            Text(model.running ? "Stop" : "Start")
-                .font(.title2.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .frame(height: 60)
-                .background(model.running ? Color.roomPink : Color.roomTeal)
-                .foregroundStyle(Color.roomNavy)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .disabled(model.busy || (!model.running && model.url.isEmpty))
-        .opacity(model.busy ? 0.6 : 1)
-    }
-
-    private var muteButton: some View {
-        Button {
-            model.setMuted(!model.muted)
-        } label: {
-            Text(model.muted ? "Unmute" : "Mute")
-                .font(.title3.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(model.muted ? Color.roomPink : Color.white.opacity(0.12))
-                .foregroundStyle(model.muted ? Color.roomNavy : .white)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var gainRow: some View {
-        HStack(spacing: 16) {
-            stepButton("−", enabled: model.gain > (BroadcastGain.steps.first ?? 0)) {
-                model.adjustGain(up: false)
+            HStack(spacing: 10) {
+                if model.phase == .starting || model.phase == .stopping {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(Color.roomNavy)
+                        .controlSize(.regular)
+                }
+                Text(buttonTitle)
+                    .font(.title3.weight(.semibold))
             }
-            VStack(spacing: 2) {
-                Text(BroadcastGain.label(model.gain))
-                    .font(.title3.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.white)
-                Text("Mic gain")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.65))
-            }
-            .frame(minWidth: 72)
-            stepButton("+", enabled: model.gain < (BroadcastGain.steps.last ?? 1)) {
-                model.adjustGain(up: true)
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func stepButton(_ title: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.title2.weight(.semibold))
-                .frame(width: 52, height: 44)
-                .background(Color.white.opacity(0.12))
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.35)
-    }
-
-    private var statusLine: some View {
-        Text(model.status)
-            .font(.subheadline.weight(.medium))
-            .multilineTextAlignment(.center)
-            .foregroundStyle(model.failed ? Color.roomPink : Color.white.opacity(0.78))
             .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(buttonColor)
+            .foregroundStyle(buttonInk)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(SteadyButtonStyle())
+        .disabled(buttonLocked)
+        .accessibilityLabel(buttonTitle)
+    }
+
+    private var buttonTitle: String {
+        switch model.phase {
+        case .idle: return "Start"
+        case .starting: return "Starting…"
+        case .live, .reconnecting: return "Stop"
+        case .stopping: return "Stopping…"
+        }
+    }
+
+    private var buttonColor: Color {
+        switch model.phase {
+        case .idle: return .roomTeal
+        case .starting, .stopping: return .roomAmber
+        case .live, .reconnecting: return .roomRed
+        }
+    }
+
+    private var buttonInk: Color {
+        switch model.phase {
+        case .live, .reconnecting: return .white
+        case .idle, .starting, .stopping: return .roomNavy
+        }
+    }
+
+    private var buttonLocked: Bool {
+        switch model.phase {
+        case .starting, .stopping:
+            return true
+        case .idle:
+            return model.url.isEmpty
+        case .live, .reconnecting:
+            return false
+        }
+    }
+
+    private var mixRow: some View {
+        HStack(spacing: 10) {
+            Button {
+                model.setMuted(!model.muted)
+            } label: {
+                Image(systemName: model.muted ? "mic.slash.fill" : "mic.fill")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 44, height: 44)
+                    .background(model.muted ? Color.roomPink : Color.white.opacity(0.12))
+                    .foregroundStyle(model.muted ? Color.roomNavy : .white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(model.muted ? "Unmute" : "Mute")
+            Slider(
+                value: Binding(
+                    get: { model.gain },
+                    set: { model.setGain($0) }
+                ),
+                in: BroadcastGain.minimum...BroadcastGain.maximum
+            )
+            .tint(Color.roomTeal)
+            .accessibilityLabel("Mic gain")
+            Text(BroadcastGain.label(model.gain))
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.white)
+                .frame(width: 52, alignment: .trailing)
+        }
     }
 
     private var qrCard: some View {
-        VStack(spacing: 14) {
+        Group {
             if let image = model.qrImage {
                 Image(uiImage: image)
                     .interpolation(.none)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxWidth: 280)
-                    .padding(12)
+                    .padding(8)
                     .background(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .containerRelativeFrame(.horizontal) { width, _ in width * 0.60 }
                     .accessibilityLabel("QR code for the listener page")
-            } else {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.white.opacity(0.08))
-                    .frame(height: 220)
-                    .overlay {
-                        Text(model.networkNote)
-                            .font(.body)
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(.white.opacity(0.8))
-                            .padding(24)
-                    }
             }
-            Text(model.url.isEmpty ? "No listener address yet" : model.url)
-                .font(.system(.footnote, design: .monospaced))
-                .textSelection(.enabled)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.white)
-            Text(model.networkNote)
-                .font(.footnote)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.white.opacity(0.65))
         }
     }
 
@@ -184,35 +191,49 @@ struct BroadcastView: View {
             shareURL = model.url
         } label: {
             Text("Share")
-                .font(.body.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
-                .frame(height: 48)
+                .frame(height: 40)
                 .background(Color.white.opacity(0.12))
                 .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(model.url.isEmpty)
-        .opacity(model.url.isEmpty ? 0.4 : 1)
     }
 
-    private var listenerLine: some View {
-        Text(model.running ? model.listenerLabel : "Not broadcasting")
-            .font(.title3.weight(.semibold))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
+    private var listenerBlock: some View {
+        VStack(spacing: 2) {
+            Button {
+                showStats.toggle()
+            } label: {
+                Text(model.listenerLabel)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(showStats ? "Hides CPU, heat, and battery" : "Shows CPU, heat, and battery")
+            if showStats {
+                Text(model.statsText)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.62))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
+        }
     }
 
     private var meter: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(model.muted ? "Microphone · not sent" : "Microphone")
                 Spacer()
                 Text(model.inputName.isEmpty ? " " : model.inputName)
                     .lineLimit(1)
             }
-            .font(.footnote.weight(.medium))
-            .foregroundStyle(.white.opacity(0.75))
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(.white.opacity(0.7))
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.12))
@@ -221,17 +242,18 @@ struct BroadcastView: View {
                         .frame(width: max(0, geo.size.width * CGFloat(model.level)))
                 }
             }
-            .frame(height: 18)
+            .frame(height: 10)
             .accessibilityLabel("Microphone level")
             .accessibilityValue("\(Int(model.level * 100)) percent")
         }
     }
+}
 
-    private var hint: some View {
-        Text("Listeners open the page in a browser and tap the speaker icon to unmute. Locking this iPhone keeps the broadcast going. If the network changes, this phone restarts and refreshes the code. A phone call pauses the mic, then it comes back.")
-            .font(.footnote)
-            .multilineTextAlignment(.center)
-            .foregroundStyle(.white.opacity(0.55))
+/// Keeps Starting… and Stopping… at full color. The plain style fades a disabled button.
+private struct SteadyButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.86 : 1)
     }
 }
 
@@ -261,4 +283,6 @@ extension Color {
     static let roomNavy = Color(red: 22 / 255, green: 26 / 255, blue: 66 / 255)
     static let roomTeal = Color(red: 47 / 255, green: 208 / 255, blue: 189 / 255)
     static let roomPink = Color(red: 255 / 255, green: 93 / 255, blue: 143 / 255)
+    static let roomAmber = Color(red: 1, green: 0.76, blue: 0.18)
+    static let roomRed = Color(red: 0.92, green: 0.22, blue: 0.27)
 }

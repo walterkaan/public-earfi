@@ -1,15 +1,23 @@
 import ActivityKit
 import AVFoundation
+import Darwin
 import Foundation
 import MediaPlayer
 import Network
 import StoreKit
 import UIKit
 
+enum BroadcastPhase: Equatable {
+    case idle
+    case starting
+    case live
+    case stopping
+    case reconnecting
+}
+
 @MainActor
 final class BroadcastModel: ObservableObject {
-    @Published var running = false
-    @Published var busy = false
+    @Published var phase: BroadcastPhase = .idle
     @Published var failed = false
     @Published var status = "Ready"
     @Published var url = ""
@@ -20,6 +28,11 @@ final class BroadcastModel: ObservableObject {
     @Published var qrImage: UIImage?
     @Published var muted = false
     @Published var gain = 1.0
+    @Published var cpuPercent = 0.0
+    @Published var thermal = ProcessInfo.processInfo.thermalState
+    @Published var batteryLevel: Float = -1
+
+    var isOnAir: Bool { phase == .live || phase == .reconnecting }
 
     var listenerLabel: String {
         switch listeners {
@@ -29,9 +42,31 @@ final class BroadcastModel: ObservableObject {
         }
     }
 
+    var statsText: String {
+        let cpu = String(format: "CPU %.0f%%", cpuPercent)
+        let battery: String
+        if batteryLevel < 0 {
+            battery = "battery —"
+        } else {
+            battery = "battery \(Int((batteryLevel * 100).rounded()))%"
+        }
+        return "\(listenerLabel) · \(cpu) · \(thermalLabel) · \(battery)"
+    }
+
+    private var thermalLabel: String {
+        switch thermal {
+        case .nominal: return "nominal"
+        case .fair: return "fair"
+        case .serious: return "serious"
+        case .critical: return "critical"
+        @unknown default: return "unknown"
+        }
+    }
+
     private let capture = AudioCapture()
     private let probe = LocalNetworkProbe()
     private let activity = BroadcastActivityController()
+    private let gate = BroadcastServerGate()
     private var monitor: NWPathMonitor?
     private var poll: Timer?
     private var ip = ""
@@ -44,6 +79,12 @@ final class BroadcastModel: ObservableObject {
     private var rebindAgain = false
     private var remoteInstalled = false
     private var startedAt: Date?
+    private var cpuSampler = AppCPUSampler()
+    private var nowPlayingKey = ""
+    private lazy var nowPlayingArtwork: MPMediaItemArtwork? = {
+        guard let image = UIImage(named: "Logo") else { return nil }
+        return MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+    }()
 
     init() {
         BroadcastBus.start { [weak self] command in
@@ -54,11 +95,9 @@ final class BroadcastModel: ObservableObject {
     }
 
     func appear() {
-        updateAddress()
-        if !ip.isEmpty {
-            probe.poke(ip: ip)
-        }
-        if !running {
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        Task { await self.prepareAddress() }
+        if phase == .idle {
             activity.endOrphans()
         }
         guard monitor == nil else { return }
@@ -74,24 +113,17 @@ final class BroadcastModel: ObservableObject {
     }
 
     func sceneBecameActive() {
-        updateAddress()
-        guard running else { return }
-        listeners = BroadcastServer.listenerCount()
-        if !ip.isEmpty, ip != boundIP {
-            scheduleRebind()
-        }
-        pushActivity(force: true)
+        Task { await self.refreshAfterActive() }
     }
 
     func toggle() {
-        if running {
-            let duration = startedAt.map { Date().timeIntervalSince($0) }
-            stopBroadcast(nextStatus: "Ready")
-            if let duration {
-                requestReviewIfEarned(duration: duration)
-            }
-        } else {
-            beginStart(note: nil)
+        switch phase {
+        case .starting, .stopping:
+            return
+        case .live, .reconnecting:
+            beginStop()
+        case .idle:
+            beginStart()
         }
     }
 
@@ -99,19 +131,26 @@ final class BroadcastModel: ObservableObject {
         muted = value
         capture.setMix(gain: Float(gain), muted: muted)
         updateNowPlaying()
-        if running {
-            if status == "Live" || status == "Muted. Listeners hear silence." {
-                status = muted ? "Muted. Listeners hear silence." : "Live"
-            }
-            pushActivity(force: true)
+        guard isOnAir else { return }
+        if status == "Live" || status == "Muted. Listeners hear silence." {
+            status = muted ? "Muted. Listeners hear silence." : "Live"
         }
+        pushActivity(force: true)
+    }
+
+    func setGain(_ value: Double) {
+        applyGain(min(BroadcastGain.maximum, max(BroadcastGain.minimum, value)))
     }
 
     func adjustGain(up: Bool) {
-        gain = BroadcastGain.adjusted(gain, up: up)
+        applyGain(BroadcastGain.adjusted(gain, up: up))
+    }
+
+    private func applyGain(_ value: Double) {
+        gain = value
         capture.setMix(gain: Float(gain), muted: muted)
-        if running {
-            pushActivity(force: true)
+        if isOnAir {
+            pushActivity(force: false)
         }
     }
 
@@ -128,67 +167,91 @@ final class BroadcastModel: ObservableObject {
         }
     }
 
-    private func beginStart(note: String?) {
-        guard !busy else { return }
-        busy = true
+    private func beginStart() {
+        guard phase == .idle else { return }
+        phase = .starting
         failed = false
+        status = "Starting…"
         switch AVAudioSession.sharedInstance().recordPermission {
         case .granted:
-            startGranted(note: note)
+            Task { await self.startGranted() }
         case .denied:
-            busy = false
-            failed = true
-            status = "Microphone access is off. Turn it on in Settings → Privacy & Security → Microphone."
+            failStart("Microphone access is off. Turn it on in Settings → Privacy & Security → Microphone.")
         case .undetermined:
             AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
                 Task { @MainActor in
-                    guard let self else { return }
+                    guard let self, self.phase == .starting else { return }
                     if granted {
-                        self.startGranted(note: note)
+                        await self.startGranted()
                     } else {
-                        self.busy = false
-                        self.failed = true
-                        self.status = "Microphone access is off. The broadcast needs the microphone."
+                        self.failStart("Microphone access is off. The broadcast needs the microphone.")
                     }
                 }
             }
         @unknown default:
-            busy = false
-            failed = true
-            status = "Microphone access is unavailable."
+            failStart("Microphone access is unavailable.")
         }
     }
 
-    private func startGranted(note: String?) {
-        updateAddress()
+    private func failStart(_ message: String) {
+        phase = .idle
+        failed = true
+        status = message
+    }
+
+    private func startGranted() async {
+        guard phase == .starting else { return }
+        await updateAddress()
+        guard phase == .starting else { return }
         guard !ip.isEmpty else {
-            busy = false
             failed = true
+            phase = .idle
             status = networkNote
             return
         }
         probe.poke(ip: ip)
         wireCapture()
         capture.setMix(gain: Float(gain), muted: muted)
+        let address = ip
+        let interfaceName = iface
+        if let failure = await gate.start(ip: address, iface: interfaceName) {
+            capture.stop()
+            await gate.stop()
+            guard phase == .starting else { return }
+            failed = true
+            phase = .idle
+            status = failure
+            return
+        }
+        guard phase == .starting else {
+            await gate.stop()
+            return
+        }
         do {
-            try BroadcastServer.start(ip: ip, iface: iface)
             try capture.start()
         } catch {
             capture.stop()
-            BroadcastServer.stop()
-            busy = false
+            await gate.stop()
+            guard phase == .starting else { return }
             failed = true
+            phase = .idle
             status = error.localizedDescription
             return
         }
-        boundIP = ip
+        guard phase == .starting else {
+            capture.stop()
+            await gate.stop()
+            return
+        }
+        boundIP = address
         startedAt = Date()
-        running = true
-        busy = false
+        phase = .live
         failed = false
         level = 0
         listeners = 0
-        status = note ?? (muted ? "Muted. Listeners hear silence." : "Live")
+        cpuSampler.reset()
+        sampleStats()
+        status = muted ? "Muted. Listeners hear silence." : "Live"
         installRemote()
         activity.start(activityState())
         startPolling()
@@ -210,7 +273,7 @@ final class BroadcastModel: ObservableObject {
         }
         capture.onInterrupted = { [weak self] interrupted in
             Task { @MainActor in
-                guard let self, self.running else { return }
+                guard let self, self.isOnAir else { return }
                 if interrupted {
                     self.level = 0
                     self.failed = false
@@ -222,32 +285,44 @@ final class BroadcastModel: ObservableObject {
         }
     }
 
-    private func stopBroadcast(nextStatus: String) {
+    private func beginStop() {
+        let duration = startedAt.map { Date().timeIntervalSince($0) }
+        phase = .stopping
+        status = "Stopping…"
         rebindGeneration += 1
         rebindAgain = false
         rebindRunning = false
+        Task { await self.finishStop(duration: duration) }
+    }
+
+    private func finishStop(duration: TimeInterval?) async {
         startedAt = nil
         poll?.invalidate()
         poll = nil
         capture.stop()
-        BroadcastServer.stop()
-        running = false
-        busy = false
+        await gate.stop()
+        guard phase == .stopping else { return }
+        phase = .idle
         level = 0
         listeners = 0
+        cpuPercent = 0
         inputName = ""
         boundIP = nil
         failed = false
         muted = false
-        status = nextStatus
+        cpuSampler.reset()
+        status = "Ready"
         activity.end()
         clearRemote()
+        if let duration {
+            requestReviewIfEarned(duration: duration)
+        }
     }
 
-    /// Only the Stop button reaches this, and only after `running` is false.
+    /// Only the Stop button reaches this, and only after the broadcast is down.
     /// A network rebind does not.
     private func requestReviewIfEarned(duration: TimeInterval) {
-        guard !running, ReviewPrompt.noteFinished(duration: duration) else { return }
+        guard phase == .idle, ReviewPrompt.noteFinished(duration: duration) else { return }
         guard let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .first(where: { $0.activationState == .foregroundActive })
@@ -261,30 +336,61 @@ final class BroadcastModel: ObservableObject {
         poll?.invalidate()
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                guard let self, self.running else { return }
-                self.listeners = BroadcastServer.listenerCount()
-                self.updateAddress()
-                if !self.ip.isEmpty, self.ip != self.boundIP {
-                    self.scheduleRebind()
-                }
-                self.pushActivity(force: false)
+                await self?.pollTick()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
         poll = timer
     }
 
+    private func pollTick() async {
+        guard isOnAir else { return }
+        listeners = await gate.listenerCount()
+        guard isOnAir else { return }
+        sampleStats()
+        await updateAddress()
+        guard isOnAir else { return }
+        if !ip.isEmpty, ip != boundIP {
+            scheduleRebind()
+        }
+        updateNowPlaying()
+        pushActivity(force: false)
+    }
+
+    private func prepareAddress() async {
+        await updateAddress()
+        if !ip.isEmpty {
+            probe.poke(ip: ip)
+        }
+    }
+
+    private func refreshAfterActive() async {
+        await updateAddress()
+        guard isOnAir else { return }
+        listeners = await gate.listenerCount()
+        sampleStats()
+        if !ip.isEmpty, ip != boundIP {
+            scheduleRebind()
+        }
+        updateNowPlaying()
+        pushActivity(force: true)
+    }
+
     private func handlePath(_ key: String) {
         let changed = sawPath && key != lastPathKey
         sawPath = true
         lastPathKey = key
-        updateAddress()
-        guard running, changed else { return }
-        scheduleRebind()
+        if changed, isOnAir {
+            phase = .reconnecting
+            failed = false
+            status = "Reconnecting…"
+            scheduleRebind()
+        }
+        Task { await self.updateAddress() }
     }
 
     private func scheduleRebind() {
-        guard running else { return }
+        guard isOnAir else { return }
         if rebindRunning {
             rebindAgain = true
             return
@@ -292,11 +398,14 @@ final class BroadcastModel: ObservableObject {
         rebindRunning = true
         rebindGeneration += 1
         let generation = rebindGeneration
+        phase = .reconnecting
+        failed = false
+        status = "Reconnecting…"
         Task { @MainActor in
             defer {
                 if generation == self.rebindGeneration {
                     self.rebindRunning = false
-                    let followUp = self.rebindAgain && self.running
+                    let followUp = self.rebindAgain && self.isOnAir
                     self.rebindAgain = false
                     if followUp {
                         self.scheduleRebind()
@@ -304,7 +413,7 @@ final class BroadcastModel: ObservableObject {
                 }
             }
             try? await Task.sleep(nanoseconds: 700_000_000)
-            guard !Task.isCancelled, generation == self.rebindGeneration, self.running else { return }
+            guard !Task.isCancelled, generation == self.rebindGeneration, self.isOnAir else { return }
             await self.rebind(generation: generation)
         }
     }
@@ -312,8 +421,9 @@ final class BroadcastModel: ObservableObject {
     private func rebind(generation: Int) async {
         let previous = boundIP
         for _ in 0..<20 {
-            guard generation == rebindGeneration, running else { return }
-            updateAddress()
+            guard generation == rebindGeneration, phase == .reconnecting else { return }
+            await updateAddress()
+            guard generation == rebindGeneration, phase == .reconnecting else { return }
             if ip.isEmpty {
                 failed = false
                 status = "Waiting for Wi-Fi or Personal Hotspot…"
@@ -321,50 +431,60 @@ final class BroadcastModel: ObservableObject {
                 continue
             }
             let target = ip
+            let interfaceName = iface
             failed = false
             status = "Reconnecting…"
-            BroadcastServer.stop()
-            guard generation == rebindGeneration, running else { return }
-            do {
-                try BroadcastServer.start(ip: ip, iface: iface)
-                guard generation == rebindGeneration, running else {
-                    BroadcastServer.stop()
-                    return
-                }
-                boundIP = ip
-                probe.poke(ip: ip)
-                failed = false
-                if let previous, previous != ip {
-                    status = "Live on a new address. Listeners need the new code."
-                } else if muted {
-                    status = "Muted. Listeners hear silence."
-                } else {
-                    status = "Live"
-                }
-                pushActivity(force: true)
-                if rebindAgain {
-                    rebindAgain = false
-                    try? await Task.sleep(nanoseconds: 400_000_000)
-                    continue
-                }
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                updateAddress()
-                if ip == target { return }
-            } catch {
+            await gate.stop()
+            guard generation == rebindGeneration, phase == .reconnecting else { return }
+            if let failure = await gate.start(ip: target, iface: interfaceName) {
+                await gate.stop()
+                guard generation == rebindGeneration, phase == .reconnecting else { return }
                 failed = true
-                status = error.localizedDescription
+                status = failure
                 try? await Task.sleep(nanoseconds: 500_000_000)
+                continue
             }
+            guard generation == rebindGeneration, phase == .reconnecting else {
+                await gate.stop()
+                return
+            }
+            boundIP = target
+            probe.poke(ip: target)
+            failed = false
+            phase = .live
+            if let previous, previous != target {
+                status = "Live on a new address. Listeners need the new code."
+            } else if muted {
+                status = "Muted. Listeners hear silence."
+            } else {
+                status = "Live"
+            }
+            pushActivity(force: true)
+            if rebindAgain {
+                rebindAgain = false
+                phase = .reconnecting
+                status = "Reconnecting…"
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                continue
+            }
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard generation == rebindGeneration, isOnAir else { return }
+            await updateAddress()
+            guard generation == rebindGeneration, isOnAir else { return }
+            if ip == target { return }
+            phase = .reconnecting
+            status = "Reconnecting…"
         }
-        guard generation == rebindGeneration, running else { return }
+        guard generation == rebindGeneration, isOnAir else { return }
         if ip.isEmpty {
             failed = true
             status = "Wi-Fi or Personal Hotspot dropped."
         }
     }
 
-    private func updateAddress() {
-        let chosen = BroadcastServer.selectHost(HostAddress.table())
+    private func updateAddress() async {
+        let table = HostAddress.table()
+        let chosen = await gate.selectHost(table)
         let parts = chosen.split(separator: " ", maxSplits: 1).map(String.init)
         if parts.count == 2 {
             iface = parts[0]
@@ -382,7 +502,7 @@ final class BroadcastModel: ObservableObject {
         } else {
             iface = ""
             ip = ""
-            if !running {
+            if !isOnAir {
                 if !url.isEmpty {
                     url = ""
                     qrImage = nil
@@ -392,13 +512,19 @@ final class BroadcastModel: ObservableObject {
         }
     }
 
+    private func sampleStats() {
+        cpuPercent = cpuSampler.percent()
+        thermal = ProcessInfo.processInfo.thermalState
+        batteryLevel = UIDevice.current.batteryLevel
+    }
+
     private func activityState() -> BroadcastAttributes.ContentState {
-        let coarse = (Double(level) * 5).rounded() / 5
+        let coarse = (Double(level) * 10).rounded() / 10
         return BroadcastAttributes.ContentState(
             listeners: listeners,
             level: min(1, max(0, coarse)),
             muted: muted,
-            gain: gain
+            gain: (gain * 20).rounded() / 20
         )
     }
 
@@ -426,15 +552,24 @@ final class BroadcastModel: ObservableObject {
 
     private func updateNowPlaying() {
         guard remoteInstalled else { return }
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
+        let artist = (muted ? "Muted" : "Live") + " · " + listenerLabel
+        guard artist != nowPlayingKey else { return }
+        nowPlayingKey = artist
+        var info: [String: Any] = [
             MPMediaItemPropertyTitle: "RoomCast Go",
+            MPMediaItemPropertyArtist: artist,
             MPNowPlayingInfoPropertyIsLiveStream: true,
             MPNowPlayingInfoPropertyPlaybackRate: muted ? 0 : 1,
         ]
+        if let nowPlayingArtwork {
+            info[MPMediaItemPropertyArtwork] = nowPlayingArtwork
+        }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
     private func clearRemote() {
         guard remoteInstalled else { return }
+        nowPlayingKey = ""
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         let center = MPRemoteCommandCenter.shared()
         center.pauseCommand.isEnabled = false
@@ -444,6 +579,51 @@ final class BroadcastModel: ObservableObject {
     nonisolated private static func pathKey(_ path: NWPath) -> String {
         let names = path.availableInterfaces.map { "\($0.type):\($0.name)" }.sorted()
         return "\(path.status)|\(names.joined(separator: ","))"
+    }
+}
+
+/// Process CPU across every thread, as a percent of one core. It can pass
+/// 100 when more than one core is busy. Sampled from the one-second poll.
+private struct AppCPUSampler {
+    private var lastCPU = 0.0
+    private var lastWall = 0.0
+    private var primed = false
+
+    mutating func reset() {
+        primed = false
+    }
+
+    mutating func percent() -> Double {
+        let cpu = Self.taskCPUSeconds()
+        let wall = ProcessInfo.processInfo.systemUptime
+        let result: Double
+        if primed, wall > lastWall {
+            result = max(0, (cpu - lastCPU) / (wall - lastWall) * 100)
+        } else {
+            result = 0
+        }
+        lastCPU = cpu
+        lastWall = wall
+        primed = true
+        return result
+    }
+
+    private static func taskCPUSeconds() -> Double {
+        var info = task_thread_times_info_data_t()
+        var count = mach_msg_type_number_t(
+            MemoryLayout<task_thread_times_info_data_t>.stride / MemoryLayout<natural_t>.stride
+        )
+        let result = withUnsafeMutablePointer(to: &info) { pointer -> kern_return_t in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { raw in
+                task_info(mach_task_self(), task_flavor_t(TASK_THREAD_TIMES_INFO), raw, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return 0 }
+        return seconds(info.user_time) + seconds(info.system_time)
+    }
+
+    private static func seconds(_ time: time_value_t) -> Double {
+        Double(time.seconds) + Double(time.microseconds) / 1_000_000
     }
 }
 

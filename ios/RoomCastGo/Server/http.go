@@ -57,10 +57,6 @@ func (s *server) handleOffer(w http.ResponseWriter, r *http.Request) {
 	}
 	id, answer, err := s.acceptOffer(string(body))
 	if err != nil {
-		if errors.Is(err, errFull) {
-			writeError(w, http.StatusServiceUnavailable, err.Error())
-			return
-		}
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}

@@ -1,11 +1,13 @@
 # RoomCast Go
 
 iPhone-only proof that a phone can host a **voice-only** RoomCast broadcast.
-One screen: Start / Stop, Mute, mic gain, a QR code, Share, the listener
-URL, a listener count, and a live microphone meter. Opus mono at 32 kbps.
-No input picker: iOS switches the mic on its own. While a broadcast is
-running, a Live Activity on the lock screen and in the Dynamic Island shows
-the listener count, a coarse meter, and Mute / Unmute and gain buttons.
+One screen: Start / Stop, a mute button, a mic-gain slider, and, while
+live, a QR code, Share, the listener URL, a listener count, and a live
+microphone meter. Tap the listener count for CPU, heat, and battery.
+Opus mono at 32 kbps. No input picker: iOS switches the mic on its own.
+While a broadcast is running, a Live Activity on the lock screen and in
+the Dynamic Island shows the listener count, a level bar, and mute and
+gain buttons.
 
 Listeners open the same browser page as the Mac app, including the
 “Powered by RoomCast” footer, and play over WebRTC. The iPhone runs the
@@ -107,10 +109,14 @@ Press Start. The orange microphone dot means the phone is capturing. Another
 phone on the same Wi-Fi scans the QR code, or you tap Share and send the
 URL by Messages or AirDrop. The page starts muted, the same way the Mac
 listener page does, so the browser will allow autoplay. Tap the speaker
-icon. The host’s lock screen keeps the broadcast running. Mute sends
-silence and leaves the listeners connected. Gain is software volume on the
-way into Opus, from 0.5× to 3×. A phone call pauses the microphone and the
-broadcast resumes when the call ends.
+icon. The host’s lock screen keeps the broadcast running. Start and Stop
+show Starting… or Stopping… until the server answers, so a second tap does
+not undo the first. Mute sends silence and leaves the listeners connected.
+The gain slider runs from 0.5× to 3×. At 1× the built-in mic keeps its
+usual voice processing. Above 1× that automatic gain switches off so the
+boost can be heard. A phone call pauses the microphone and the broadcast
+resumes when the call ends. Tap the listener count while live for the
+listener count, app CPU, thermal state, and battery.
 
 Plug the phone in for a long event. The meter on the main screen is the
 live mic level. The lock screen meter updates about once a second.
@@ -139,18 +145,21 @@ Limits, compared with the Mac app’s venue target of about 30 phones:
   venue Wi-Fi, so the QR address will not be a venue address.
 
 Same-Wi-Fi mode (the iPhone joined to a normal network, listeners on that
-network) is the closer match to the Mac app. The server still caps the
-session list at 16. That cap is a safety limit for this proof, not a promise
-that 16 listeners will sound fine.
+network) is the closer match to the Mac app. The server does not cap the
+session list. One Opus encode is shared. Each listener adds a WebRTC
+session and its own encryption. Many browser tabs on one computer is a way
+to see that cost. It is not a promise that a hotspot full of phones will
+sound fine. See [FINDINGS.md](FINDINGS.md).
 
 ## If the build or the broadcast fails
 
 - **Xcode says the project is not a valid property list**: from
   `ios/RoomCastGo`, run `brew install xcodegen && xcodegen`.
 - **“Roomcast.xcframework is missing”**, or you just pulled a change to
-  the listener page: run `./scripts/build-server-framework.sh` from
-  `ios/RoomCastGo`, then build again. The page is compiled into the
-  framework.
+  the listener page or the Go server: run `./scripts/build-server-framework.sh`
+  from `ios/RoomCastGo`, then build again. The page and the server are
+  compiled into the framework. The current branch removed the 16-listener
+  cap, so rebuild before the many-tab test.
 - **Widget or App Group signing error**: create `group.channel.roomcast.go`
   and the App ID `channel.roomcast.go.widget` as in the table above, enable
   the group on both `channel.roomcast.go` and `channel.roomcast.go.widget`,
@@ -184,9 +193,10 @@ built-in mic, a USB sound card) without a picker.
 
 On a Linux machine, without an iPhone: the WHEP server accepts the same
 offer shape as the listener page, two listeners receive the same packets,
-and the vendored Opus encoder round-trips a sine wave. The network
-restart, mute, gain, Share, and Live Activity in this pass were not run
-on a phone here. Battery and heat are still unmeasured.
+seventeen sessions are accepted, and the vendored Opus encoder round-trips
+a sine wave. The network restart, mute, gain, Share, Live Activity, and
+stats line were not run on a phone here. Battery and heat are still
+unmeasured. `xcodebuild` was not run here.
 [FINDINGS.md](FINDINGS.md) lists each of those.
 
 Licences: [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
