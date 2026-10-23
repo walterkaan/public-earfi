@@ -1,0 +1,26 @@
+name: RoomCast Go server
+
+on:
+  pull_request:
+    paths:
+      - "ios/RoomCastGo/**"
+      - ".github/workflows/roomcast-go.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ios/RoomCastGo/**"
+      - ".github/workflows/roomcast-go.yml"
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Listener server
+        working-directory: ios/RoomCastGo/Server
+        run: go test -count=1 ./...
+      - name: Vendored Opus encoder
+        run: ios/RoomCastGo/scripts/test-opus.sh
