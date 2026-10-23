@@ -221,6 +221,7 @@ final class BroadcastModel: ObservableObject {
     }
 
     private func startGranted() async {
+        await Task.yield()
         guard phase == .starting else { return }
         await updateAddress()
         guard phase == .starting else { return }
@@ -253,7 +254,10 @@ final class BroadcastModel: ObservableObject {
             return
         }
         do {
-            try capture.start()
+            // AVAudioSession.setActive and engine start can take seconds;
+            // keep them off the main thread so "Starting…" stays responsive.
+            let cap = capture
+            try await Task.detached(priority: .userInitiated) { try cap.start() }.value
         } catch {
             capture.stop()
             await gate.stop()
