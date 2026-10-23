@@ -16,9 +16,6 @@ struct BroadcastView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 4)
                 mixRow
-                if model.usbInput {
-                    musicPicker
-                }
                 startButton
                 if let detail = detailText {
                     Text(detail)
@@ -244,7 +241,7 @@ struct BroadcastView: View {
     private var meter: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(model.muted ? "Microphone · not sent" : "Microphone")
+                Text(model.muted ? "Sound Source · not sent" : "Sound Source")
                 Spacer()
                 Text(model.inputName.isEmpty ? " " : model.inputName)
                     .lineLimit(1)

@@ -29,7 +29,7 @@ final class BroadcastModel: ObservableObject {
     @Published var muted = false
     @Published var gain = 1.0
     /// Remembered across launches. Applied only while a USB input is connected.
-    @Published var musicPreferred = UserDefaults.standard.bool(forKey: "capture.music")
+    @Published var musicPreferred = true // USB always uses Music quality
     @Published var usbInput = false
     @Published var cpuPercent = 0.0
     @Published var thermal = ProcessInfo.processInfo.thermalState
