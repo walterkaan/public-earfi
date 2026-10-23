@@ -18,9 +18,11 @@ The app is iPhone only, iOS 17 or newer, portrait. Bundle id
 - A Mac with Xcode 15 or newer, including the iOS 17 SDK. Open Xcode once so
   it finishes installing components. If `xcodebuild` is missing, run
   `sudo xcode-select -s /Applications/Xcode.app`.
-- Go 1.26 or newer from https://go.dev/dl/. The server tests run on older Go;
-  building the iPhone framework does not. Quit and reopen Terminal after
-  installing so `go version` shows 1.26 or newer.
+- Go 1.26 or newer, Apple silicon. On a Mac, `brew install go` is the
+  reliable install. An old Intel copy at `/usr/local/go` (a 2017 build is
+  enough) is killed by macOS with exit 137 and hides a newer Go when it
+  comes first on `PATH`. Open a new Terminal and check that `go version`
+  prints `darwin/arm64` and `which go` is not `/usr/local/go/bin/go`.
 - An iPhone on iOS 17 or newer, and a USB cable. The framework is built for
   a real device (`iphoneos` arm64). A simulator will not link.
 - Your Apple Developer Program membership.
@@ -113,7 +115,10 @@ that 16 listeners will sound fine.
 
 - **“Roomcast.xcframework is missing”** in Xcode: run
   `./scripts/build-server-framework.sh` from `ios/RoomCastGo`, then build again.
-- **“Go is too old”**: install Go 1.26 or newer and open a new Terminal.
+- **Go is too old, not Apple silicon, or macOS kills `go` with exit 137**:
+  `which go` is probably an old Intel build at `/usr/local/go/bin/go`.
+  Run `brew install go`, open a new Terminal, and confirm `which go` is
+  `/opt/homebrew/bin/go` and `go version` says `darwin/arm64`.
 - **Run destination is a simulator**: switch to the plugged-in iPhone. The
   framework has no simulator slice.
 - **Port already in use**: another RoomCast Go (or the Mac app) is already
