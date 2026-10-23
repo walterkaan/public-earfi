@@ -24,6 +24,7 @@ final class BroadcastModel: ObservableObject {
     @Published var networkNote = "Join a Wi-Fi network, or turn on Personal Hotspot."
     @Published var listeners = 0
     @Published var level: Float = 0
+    @Published var clipping = false
     @Published var inputName = ""
     @Published var qrImage: UIImage?
     @Published var muted = false
@@ -297,6 +298,9 @@ final class BroadcastModel: ObservableObject {
             Task { @MainActor in
                 self?.level = level
             }
+        }
+        capture.onClip = { [weak self] on in
+            Task { @MainActor in self?.clipping = on }
         }
         capture.onProfile = { [weak self] text in
             Task { @MainActor in self?.profileText = text }

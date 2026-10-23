@@ -8,6 +8,10 @@ import os
 final class AudioCapture {
     var onPacket: ((Data) -> Void)?
     var onLevel: ((Float) -> Void)?
+    /// True while the incoming audio is hitting the ceiling (held ~1 s).
+    var onClip: ((Bool) -> Void)?
+    private var clipUntil = Date.distantPast
+    private var clipShown = false
     var onInput: ((String) -> Void)?
     var onInterrupted: ((Bool) -> Void)?
     var onUSB: ((Bool) -> Void)?
@@ -436,7 +440,9 @@ final class AudioCapture {
         }
 
         var sum: Float = 0
+        var hot = 0
         for index in 0..<sampleCount {
+            if abs(frame[index]) >= 0.98 { hot += 1 }
             let driven = frame[index] * gain
             let heard: Float
             if leveler {
@@ -456,10 +462,18 @@ final class AudioCapture {
         let level = min(1, max(0, (db + 50) / 50))
         smoothed = smoothed * 0.65 + level * 0.35
         let now = Date()
+        if hot >= 3 || (!leveler && gain <= 1 && hot >= 1 && hot >= sampleCount / 200) {
+            clipUntil = now.addingTimeInterval(1.0)
+        }
         if now.timeIntervalSince(lastLevelAt) > 0.08 {
             lastLevelAt = now
             let shown = smoothed
             onLevel?(shown)
+            let clipping = now < clipUntil
+            if clipping != clipShown {
+                clipShown = clipping
+                onClip?(clipping)
+            }
         }
         guard let encoder, let packet = frame.withUnsafeBufferPointer({ buffer -> Data? in
             guard let base = buffer.baseAddress else { return nil }

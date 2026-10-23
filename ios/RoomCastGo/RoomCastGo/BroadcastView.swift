@@ -256,8 +256,14 @@ struct BroadcastView: View {
             HStack {
                 Text(model.muted ? "Sound Source · not sent" : (model.profileText.isEmpty || model.phase == .idle ? "Sound Source" : "Sound Source · \(model.profileText)"))
                 Spacer()
-                Text(model.inputName.isEmpty ? " " : model.inputName)
-                    .lineLimit(1)
+                if model.clipping && !model.muted {
+                    Text("Too loud, turn the source down")
+                        .lineLimit(1)
+                        .foregroundStyle(Color.red)
+                } else {
+                    Text(model.inputName.isEmpty ? " " : model.inputName)
+                        .lineLimit(1)
+                }
             }
             .font(.caption2.weight(.medium))
             .foregroundStyle(.white.opacity(0.7))
@@ -265,7 +271,7 @@ struct BroadcastView: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.12))
                     Capsule()
-                        .fill(model.muted ? Color.roomPink : Color.roomTeal)
+                        .fill(model.muted ? Color.roomPink : (model.clipping ? Color.red : Color.roomTeal))
                         .frame(width: max(0, geo.size.width * CGFloat(model.level)))
                 }
             }
