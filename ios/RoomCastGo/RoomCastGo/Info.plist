@@ -44,7 +44,7 @@
 		<key>UIColorName</key>
 		<string>LaunchBackground</string>
 		<key>UIImageName</key>
-		<string>LaunchLogo</string>
+		<string>Logo</string>
 		<key>UIImageRespectsSafeAreaInsets</key>
 		<true/>
 	</dict>
