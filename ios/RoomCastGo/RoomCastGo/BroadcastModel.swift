@@ -294,12 +294,13 @@ final class BroadcastModel: ObservableObject {
         let generation = rebindGeneration
         Task { @MainActor in
             defer {
-                guard generation == self.rebindGeneration else { return }
-                self.rebindRunning = false
-                let followUp = self.rebindAgain && self.running
-                self.rebindAgain = false
-                if followUp {
-                    self.scheduleRebind()
+                if generation == self.rebindGeneration {
+                    self.rebindRunning = false
+                    let followUp = self.rebindAgain && self.running
+                    self.rebindAgain = false
+                    if followUp {
+                        self.scheduleRebind()
+                    }
                 }
             }
             try? await Task.sleep(nanoseconds: 700_000_000)
@@ -440,8 +441,8 @@ final class BroadcastModel: ObservableObject {
         center.playCommand.isEnabled = false
     }
 
-    private static func pathKey(_ path: NWPath) -> String {
-        let names = path.availableInterfaces.map { "\($0.type.rawValue):\($0.name)" }.sorted()
+    nonisolated private static func pathKey(_ path: NWPath) -> String {
+        let names = path.availableInterfaces.map { "\($0.type):\($0.name)" }.sorted()
         return "\(path.status)|\(names.joined(separator: ","))"
     }
 }
