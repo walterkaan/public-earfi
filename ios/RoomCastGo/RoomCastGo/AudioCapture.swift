@@ -587,6 +587,13 @@ final class AudioCapture {
     /// `kAUVoiceIOProperty_VoiceProcessingEnableAGC` is 2107. Turning it off
     /// leaves echo control on. Returns whether the property took.
     private func setHardwareAGC(_ enabled: Bool) -> Bool {
+        // Disabled: on iPhone 15 / iOS 26 setting 2107 on the running voice-processing
+        // unit silenced the mic entirely (no meter, no audio). Keep Apple's AGC on and
+        // boost above 1x in software with the soft clipper instead.
+        return false
+    }
+
+    private func setHardwareAGCUnused(_ enabled: Bool) -> Bool {
         guard voiceProcessing, let unit = engine.inputNode.audioUnit else { return false }
         var value: UInt32 = enabled ? 1 : 0
         let status = AudioUnitSetProperty(
