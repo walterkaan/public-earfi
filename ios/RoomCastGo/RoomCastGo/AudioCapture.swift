@@ -11,6 +11,7 @@ final class AudioCapture {
     var onInput: ((String) -> Void)?
     var onInterrupted: ((Bool) -> Void)?
     var onUSB: ((Bool) -> Void)?
+    var onProfile: ((String) -> Void)?
     var onCaptureFailure: ((String) -> Void)?
 
     static var routeIsUSB: Bool {
@@ -220,6 +221,9 @@ final class AudioCapture {
         let captureChannels: AVAudioChannelCount = (musicActive && format.channelCount >= 2) ? 2 : 1
         channels = Int(captureChannels)
         encoder = try OpusEncoderBox(music: musicActive, channels: channels)
+        let kbps = musicActive ? (channels >= 2 ? 128 : 96) : 32
+        let profile = "\(kbps) kbps \(channels >= 2 ? "stereo" : "mono")"
+        DispatchQueue.main.async { [weak self] in self?.onProfile?(profile) }
         guard let target = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: 48_000,

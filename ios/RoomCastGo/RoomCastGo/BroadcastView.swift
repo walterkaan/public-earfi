@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct BroadcastView: View {
+    @State private var confirmStop = false
     @ObservedObject var model: BroadcastModel
     @Environment(\.scenePhase) private var scenePhase
     @State private var shareURL: String?
@@ -83,7 +84,13 @@ struct BroadcastView: View {
     }
 
     private var startButton: some View {
-        Button(action: model.toggle) {
+        Button {
+            if model.phase == .live || model.phase == .reconnecting {
+                confirmStop = true
+            } else {
+                model.toggle()
+            }
+        } label: {
             HStack(spacing: 10) {
                 if model.phase == .starting || model.phase == .stopping {
                     ProgressView()
@@ -103,6 +110,12 @@ struct BroadcastView: View {
         .buttonStyle(SteadyButtonStyle())
         .disabled(buttonLocked)
         .accessibilityLabel(buttonTitle)
+        .confirmationDialog("Stop the broadcast?", isPresented: $confirmStop, titleVisibility: .visible) {
+            Button("Stop broadcast", role: .destructive) { model.toggle() }
+            Button("Keep broadcasting", role: .cancel) {}
+        } message: {
+            Text("Listeners will lose the sound.")
+        }
     }
 
     private var buttonTitle: String {
@@ -241,7 +254,7 @@ struct BroadcastView: View {
     private var meter: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(model.muted ? "Sound Source · not sent" : "Sound Source")
+                Text(model.muted ? "Sound Source · not sent" : (model.profileText.isEmpty || model.phase == .idle ? "Sound Source" : "Sound Source · \(model.profileText)"))
                 Spacer()
                 Text(model.inputName.isEmpty ? " " : model.inputName)
                     .lineLimit(1)

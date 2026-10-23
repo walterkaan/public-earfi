@@ -31,6 +31,7 @@ final class BroadcastModel: ObservableObject {
     /// Remembered across launches. Applied only while a USB input is connected.
     @Published var musicPreferred = true // USB always uses Music quality
     @Published var usbInput = false
+    @Published var profileText = ""
     @Published var cpuPercent = 0.0
     @Published var thermal = ProcessInfo.processInfo.thermalState
     @Published var batteryLevel: Float = -1
@@ -296,6 +297,9 @@ final class BroadcastModel: ObservableObject {
             Task { @MainActor in
                 self?.level = level
             }
+        }
+        capture.onProfile = { [weak self] text in
+            Task { @MainActor in self?.profileText = text }
         }
         capture.onInput = { [weak self] name in
             Task { @MainActor in
