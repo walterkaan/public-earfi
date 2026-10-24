@@ -195,13 +195,13 @@ final class BroadcastModel: ObservableObject {
         phase = .starting
         failed = false
         status = "Starting…"
-        switch AVAudioSession.sharedInstance().recordPermission {
+        switch AVAudioApplication.shared.recordPermission {
         case .granted:
             Task { await self.startGranted() }
         case .denied:
             failStart("Microphone access is off. Turn it on in Settings → Privacy & Security → Microphone.")
         case .undetermined:
-            AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+            AVAudioApplication.requestRecordPermission {  [weak self] granted in
                 Task { @MainActor in
                     guard let self, self.phase == .starting else { return }
                     if granted {
