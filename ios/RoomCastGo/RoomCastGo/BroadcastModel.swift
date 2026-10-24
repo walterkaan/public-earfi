@@ -20,6 +20,13 @@ final class BroadcastModel: ObservableObject {
     @Published var phase: BroadcastPhase = .idle
     @Published var failed = false
     @Published var status = "Ready"
+    /// Wi-Fi or hotspot losses this broadcast, shown once it is live again.
+    private var dropCount = 0
+    private var liveStatus: String {
+        if muted { return "Muted. Listeners hear silence." }
+        if dropCount == 0 { return "Live" }
+        return "Wi-Fi unreliable? Dropped \(dropCount) \(dropCount == 1 ? "time" : "times")."
+    }
     @Published var url = ""
     @Published var networkNote = "Join a Wi-Fi network, or turn on Personal Hotspot."
     @Published var listeners = 0
@@ -143,7 +150,7 @@ final class BroadcastModel: ObservableObject {
         updateNowPlaying()
         guard isOnAir else { return }
         if status == "Live" || status == "Muted. Listeners hear silence." {
-            status = muted ? "Muted. Listeners hear silence." : "Live"
+            status = liveStatus
         }
         pushActivity(force: true)
     }
@@ -194,6 +201,7 @@ final class BroadcastModel: ObservableObject {
         guard phase == .idle else { return }
         phase = .starting
         failed = false
+        dropCount = 0
         status = "Starting…"
         switch AVAudioApplication.shared.recordPermission {
         case .granted:
@@ -283,7 +291,7 @@ final class BroadcastModel: ObservableObject {
         listeners = 0
         cpuSampler.reset()
         sampleStats()
-        status = muted ? "Muted. Listeners hear silence." : "Live"
+        status = liveStatus
         // Now Playing card dropped: the Live Activity has mute, gain and the meter.
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         activity.start(activityState())
@@ -318,7 +326,7 @@ final class BroadcastModel: ObservableObject {
                     self.failed = false
                     self.status = "Interrupted. It resumes when the call ends."
                 } else {
-                    self.status = self.muted ? "Muted. Listeners hear silence." : "Live"
+                    self.status = self.liveStatus
                 }
             }
         }
@@ -505,6 +513,7 @@ final class BroadcastModel: ObservableObject {
             guard !Task.isCancelled, generation == self.rebindGeneration, self.isOnAir else { return }
             if await self.hostUnchanged() { return }
             self.phase = .reconnecting
+            self.dropCount += 1
             self.failed = false
             self.status = "Reconnecting…"
             await self.rebind(generation: generation)
@@ -529,7 +538,7 @@ final class BroadcastModel: ObservableObject {
             if phase == .reconnecting {
                 failed = false
                 phase = .live
-                status = muted ? "Muted. Listeners hear silence." : "Live"
+                status = liveStatus
             }
             return
         }
@@ -572,7 +581,7 @@ final class BroadcastModel: ObservableObject {
             } else if muted {
                 status = "Muted. Listeners hear silence."
             } else {
-                status = "Live"
+                status = liveStatus
             }
             pushActivity(force: true)
             if rebindAgain {
