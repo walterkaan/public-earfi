@@ -34,8 +34,9 @@ enum BroadcastGain {
     }
 
     static func label(_ gain: Double) -> String {
-        if gain == floor(gain) { return "\(Int(gain))×" }
-        return String(format: "%g×", gain)
+        let r = (gain * 10).rounded() / 10
+        if r == floor(r) { return "\(Int(r))×" }
+        return String(format: "%.1f×", r)
     }
 }
 
