@@ -296,7 +296,7 @@ final class AudioCapture {
         // (one buffer, two channels); the mixer wants deinterleaved
         // buffers, or it logs render err -50 on every cycle.
         let format = AVAudioFormat(standardFormatWithSampleRate: hwFormat.sampleRate,
-                                   channels: 1) ?? hwFormat
+                                   channels: hwFormat.channelCount) ?? hwFormat
         let source = AVAudioSourceNode(format: format) { _, _, frameCount, audioBufferList -> OSStatus in
             let buffers = UnsafeMutableAudioBufferListPointer(audioBufferList)
             for buffer in buffers {
