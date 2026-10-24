@@ -304,7 +304,7 @@ enum AppStoreListing {
     /// Placeholder until RoomCast Go has an App Store id. Replace `APP_ID`
     /// with the numeric id from App Store Connect. The Rate link stays
     /// hidden while this is still the placeholder.
-    static let appID = "APP_ID"
+    static let appID = "6826514025"
 
     static var writeReviewURL: URL? {
         guard appID != "APP_ID", !appID.isEmpty, appID.allSatisfy(\.isNumber) else { return nil }
