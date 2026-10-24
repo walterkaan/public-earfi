@@ -220,6 +220,10 @@ final class AudioCapture {
             try? engine.outputNode.setVoiceProcessingEnabled(false)
             voiceProcessing = false
             hardwareLeveler = false
+            // iOS opens USB inputs as mono unless asked; ask for stereo when the device has it.
+            if musicActive, session.maximumInputNumberOfChannels >= 2 {
+                try? session.setPreferredInputNumberOfChannels(2)
+            }
             engine.prepare()
         }
 
