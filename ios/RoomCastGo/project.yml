@@ -50,7 +50,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: channel.roomcast.go
         PRODUCT_NAME: RoomCastGo
         MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: RoomCastGo/Info.plist
         CODE_SIGN_ENTITLEMENTS: RoomCastGo/RoomCastGo.entitlements
@@ -118,7 +118,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: channel.roomcast.go.widget
         PRODUCT_NAME: RoomCastGoWidget
         MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"
         DEVELOPMENT_TEAM: 6G2V545X95
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: RoomCastGoWidget/Info.plist
