@@ -6,6 +6,7 @@ struct BroadcastView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var shareURL: String?
     @State private var showStats = false
+    @State private var liveSince: Date?
 
     var body: some View {
         ZStack {
@@ -18,6 +19,9 @@ struct BroadcastView: View {
                     .padding(.top, 4)
                 mixRow
                 startButton
+                if model.isOnAir, let since = liveSince {
+                    liveLine(since: since)
+                }
                 if let detail = detailText {
                     Text(detail)
                         .font(.footnote.weight(.medium))
@@ -52,7 +56,13 @@ struct BroadcastView: View {
             .padding(.bottom, 8)
         }
         .preferredColorScheme(.dark)
-        .onAppear { model.appear() }
+        .onAppear {
+            model.appear()
+            if model.isOnAir && liveSince == nil { liveSince = Date() }
+        }
+        .onChange(of: model.isOnAir) { _, onAir in
+            liveSince = onAir ? (liveSince ?? Date()) : nil
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 model.sceneBecameActive()
@@ -110,12 +120,33 @@ struct BroadcastView: View {
         .buttonStyle(SteadyButtonStyle())
         .disabled(buttonLocked)
         .accessibilityLabel(buttonTitle)
-        .confirmationDialog("Stop the broadcast?", isPresented: $confirmStop, titleVisibility: .visible) {
+        .alert("Stop the broadcast?", isPresented: $confirmStop) {
             Button("Stop broadcast", role: .destructive) { model.toggle() }
             Button("Keep broadcasting", role: .cancel) {}
         } message: {
             Text("Listeners will lose the sound.")
         }
+    }
+
+    private func liveLine(since: Date) -> some View {
+        TimelineView(.periodic(from: since, by: 1)) { context in
+            let secs = max(0, Int(context.date.timeIntervalSince(since)))
+            let time = secs >= 3600
+                ? String(format: "%d:%02d:%02d", secs / 3600, (secs / 60) % 60, secs % 60)
+                : String(format: "%d:%02d", secs / 60, secs % 60)
+            HStack(spacing: 6) {
+                Circle().fill(Color.roomRed).frame(width: 8, height: 8)
+                Text(model.phase == .reconnecting ? "Reconnecting · \(time)" : "Live · \(time)")
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.white)
+            }
+            .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private var sourceName: String {
+        model.inputName.isEmpty ? "iPhone mic" : model.inputName
     }
 
     private var buttonTitle: String {
@@ -166,20 +197,35 @@ struct BroadcastView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(model.muted ? "Unmute" : "Mute")
-            Slider(
-                value: Binding(
-                    get: { model.gain },
-                    set: { model.setGain($0) }
-                ),
-                in: BroadcastGain.range(music: model.musicActive)
-            )
-            .tint(Color.roomTeal)
-            .accessibilityLabel("Mic gain")
-            Text(BroadcastGain.label(model.gain))
-                .font(.subheadline.weight(.semibold).monospacedDigit())
-                .foregroundStyle(.white)
-                .frame(width: 52, alignment: .trailing)
+            .accessibilityLabel(model.muted ? "Unmute, \(sourceName)" : "Mute, \(sourceName)")
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text("Gain")
+                    Spacer(minLength: 4)
+                    Text(sourceName)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.75))
+                .accessibilityHidden(true)
+                HStack(spacing: 8) {
+                    Slider(
+                        value: Binding(
+                            get: { model.gain },
+                            set: { model.setGain($0) }
+                        ),
+                        in: BroadcastGain.range(music: model.musicActive)
+                    )
+                    .tint(Color.roomTeal)
+                    .accessibilityLabel("Gain")
+                    .accessibilityValue(BroadcastGain.label(model.gain))
+                    Text(BroadcastGain.label(model.gain))
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .accessibilityHidden(true)
+                }
+            }
         }
     }
 
@@ -260,9 +306,6 @@ struct BroadcastView: View {
                     Text("Too loud, turn the source down")
                         .lineLimit(1)
                         .foregroundStyle(Color.red)
-                } else {
-                    Text(model.inputName.isEmpty ? " " : model.inputName)
-                        .lineLimit(1)
                 }
             }
             .font(.caption2.weight(.medium))
