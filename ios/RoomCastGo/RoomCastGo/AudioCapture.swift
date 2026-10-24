@@ -290,13 +290,8 @@ final class AudioCapture {
         engine.prepare()
     }
 
-    private func connectSilence(format hwFormat: AVAudioFormat) {
+    private func connectSilence(format: AVAudioFormat) {
         detachSilence()
-        // The voice-processing output can report an interleaved format
-        // (one buffer, two channels); the mixer wants deinterleaved
-        // buffers, or it logs render err -50 on every cycle.
-        let format = AVAudioFormat(standardFormatWithSampleRate: hwFormat.sampleRate,
-                                   channels: hwFormat.channelCount) ?? hwFormat
         let source = AVAudioSourceNode(format: format) { _, _, frameCount, audioBufferList -> OSStatus in
             let buffers = UnsafeMutableAudioBufferListPointer(audioBufferList)
             for buffer in buffers {
