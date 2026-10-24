@@ -511,7 +511,17 @@ final class BroadcastModel: ObservableObject {
             }
             try? await Task.sleep(nanoseconds: 700_000_000)
             guard !Task.isCancelled, generation == self.rebindGeneration, self.isOnAir else { return }
-            if await self.hostUnchanged() { return }
+            if await self.hostUnchanged() {
+                // Back on the same address after a drop: the server never
+                // stopped, so just show Live again.
+                if self.phase == .reconnecting {
+                    self.failed = false
+                    self.phase = .live
+                    self.status = self.liveStatus
+                    self.pushActivity(force: true)
+                }
+                return
+            }
             self.phase = .reconnecting
             self.dropCount += 1
             self.failed = false
