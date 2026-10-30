@@ -58,6 +58,8 @@ final class MiniPlayerController {
   private var hosting: NSHostingView<MiniPlayerView>?
   private var model: AppModel?
   private let positionKey = "roomcast.miniPlayer.origin"
+  /// After stop from the floater, keep it visible until the app is foregrounded.
+  private var lingerWhileInactive = false
 
   func attach(model: AppModel) {
     self.model = model
@@ -82,11 +84,19 @@ final class MiniPlayerController {
   }
 
   private func shouldShow(for model: AppModel) -> Bool {
-    guard model.isBroadcasting else { return false }
-    if NSApp.isActive, let main = Self.mainWindow(), main.isVisible, !main.isMiniaturized {
-      return false
+    if model.isBroadcasting {
+      lingerWhileInactive = true
+      if NSApp.isActive, let main = Self.mainWindow(), main.isVisible, !main.isMiniaturized {
+        return false
+      }
+      return true
     }
-    return true
+    // Stopped: keep the floater until the user brings RoomCast forward.
+    if lingerWhileInactive && !NSApp.isActive {
+      return true
+    }
+    lingerWhileInactive = false
+    return false
   }
 
   private func show(model: AppModel) {
@@ -215,15 +225,17 @@ private struct MiniPlayerView: View {
         }
         .frame(height: 6)
       }
-      Button(action: onStop) {
-        Image(systemName: "stop.fill")
-          .font(.system(size: 12, weight: .bold))
-          .foregroundStyle(.white)
-          .frame(width: 28, height: 28)
-          .background(Circle().fill(Color.red.opacity(0.85)))
+      if model.isBroadcasting {
+        Button(action: onStop) {
+          Image(systemName: "stop.fill")
+            .font(.system(size: 12, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 28, height: 28)
+            .background(Circle().fill(Color.red.opacity(0.85)))
+        }
+        .buttonStyle(.plain)
+        .help("Stop broadcasting")
       }
-      .buttonStyle(.plain)
-      .help("Stop broadcasting")
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 10)

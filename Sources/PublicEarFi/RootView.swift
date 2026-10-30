@@ -42,7 +42,7 @@ struct RootView: View {
         .keyboardShortcut(.defaultAction)
       Button("Not now", role: .cancel) { model.skipMicrophoneAndOpenSettings() }
     } message: {
-      Text("macOS will ask for the microphone so RoomCast can hear your sound source.")
+      Text("macOS may ask for microphone permission. This enables RoomCast to connect to your internal mic.")
     }
     .alert("Allow incoming connections?", isPresented: $model.showFirewall) {
       Button("Continue") { model.confirmFirewallAndStart() }
@@ -518,8 +518,9 @@ struct SupportLinks: View {
       TintedLinkButton("Patreon", destination: AppLinks.patreon, showsHeart: true)
       TintedLinkButton(
         "Buy Me a Coffee", destination: AppLinks.buyMeACoffee, showsHeart: true)
+      Spacer(minLength: 0)
     }
-    .frame(maxWidth: .infinity)
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 

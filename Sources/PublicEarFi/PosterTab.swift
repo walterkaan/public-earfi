@@ -298,15 +298,15 @@ struct FirstRunSheet: View {
   @Environment(\.dismiss) private var dismiss
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      HStack(spacing: 12) {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 10) {
         Image(nsImage: NSApp.applicationIconImage)
           .resizable()
           .interpolation(.high)
-          .frame(width: 48, height: 48)
+          .frame(width: 36, height: 36)
           .accessibilityLabel("RoomCast")
         Text("Welcome to RoomCast")
-          .font(.title2.bold())
+          .font(.title3.bold())
           .foregroundStyle(AppChrome.heading)
       }
       Text(
@@ -318,7 +318,7 @@ struct FirstRunSheet: View {
         "Sound can come from the Mac's microphone, an application, a headset or earbuds, or a mixing desk for larger events."
       )
       .helperText()
-      VStack(alignment: .leading, spacing: 10) {
+      VStack(alignment: .leading, spacing: 6) {
         welcomeStep(
           "1", symbol: "mic.fill", title: "Pick your sound source",
           detail: nil)
@@ -338,7 +338,7 @@ struct FirstRunSheet: View {
           .keyboardShortcut(.defaultAction)
       }
     }
-    .padding(22)
+    .padding(14)
     .frame(width: 560)
     .background(AppChrome.window)
   }
