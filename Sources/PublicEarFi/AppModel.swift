@@ -314,7 +314,7 @@ final class AppModel: ObservableObject {
     beginBroadcast()
   }
 
-  /// Cancel is the first button, so Return and Escape leave the stream up.
+  /// Keep Broadcasting is the first button, so Return and Escape leave the stream up.
   private func confirmStopWhileListenersRemain() {
     let count = listeners
     let alert = NSAlert()
@@ -325,9 +325,10 @@ final class AppModel: ObservableObject {
         format: String(localized: "Stop broadcasting? %d people are listening."), count)
     }
     alert.alertStyle = .warning
-    alert.addButton(withTitle: String(localized: "Cancel"))
-    let stop = alert.addButton(withTitle: String(localized: "Stop Broadcasting"))
-    stop.hasDestructiveAction = true
+    // Avoid hasDestructiveAction: on recent macOS it paints red label on a dark
+    // red fill that fails contrast. Standard warning buttons stay legible.
+    alert.addButton(withTitle: String(localized: "Keep Broadcasting"))
+    alert.addButton(withTitle: String(localized: "Stop Broadcasting"))
     if alert.runModal() == .alertSecondButtonReturn {
       controller.stop()
     }
@@ -455,9 +456,24 @@ final class AppModel: ObservableObject {
   }
 
   func openQuickPosterPDF() {
+    refreshPosterPasswordFromKeychain()
     guard let page = quickPosterModel() else { return }
     let url = AppPaths.posterFile(home: FileManager.default.homeDirectoryForCurrentUser)
     PosterActions.writeAndOpenPDF(model: page, url: url) { self.rememberPoster() }
+  }
+
+  /// Re-read the Keychain immediately before a PDF so a password saved earlier
+  /// (or unlocked after launch) actually prints.
+  private func refreshPosterPasswordFromKeychain() {
+    let passwordLoad = PosterPasswordStore.load()
+    if !passwordLoad.password.isEmpty || !passwordLoad.unreadable {
+      posterPassword = passwordLoad.password
+    }
+    if passwordLoad.unreadable && posterPassword.isEmpty {
+      posterPasswordNotice = "The saved Wi-Fi password could not be read from the Keychain."
+    } else if !passwordLoad.unreadable {
+      posterPasswordNotice = nil
+    }
   }
 
   private func quickPosterModel() -> PosterRenderModel? {
@@ -474,42 +490,28 @@ final class AppModel: ObservableObject {
       hidden: settings.posterWiFiHidden,
       listenerURL: listenerURL
     )
-    if plan.includesWiFiCode {
-      let codes = plan.codes.map { code in
-        PosterCodeBlock(
-          label: code.label,
-          image: QRCodeMaker.image(text: code.payload, side: 2048),
-          lines: code.lines
-        )
-      }
-      return PosterRenderModel(
-        header: broadcastTitle,
-        description: "",
-        steps: [],
-        url: listenerURL,
-        qr: nil,
-        showFooter: true,
-        paper: paper,
-        footerText: PosterBuilder.poweredBy,
-        headerPoints: 36,
-        stepPoints: 16,
-        qrFraction: 0.42,
-        codes: codes,
-        closing: plan.closing
+    let codes = plan.codes.map { code in
+      PosterCodeBlock(
+        label: code.label,
+        image: QRCodeMaker.image(text: code.payload, side: 2048),
+        lines: code.lines
       )
     }
     return PosterRenderModel(
       header: broadcastTitle,
       description: "",
-      steps: plan.steps,
+      steps: [],
       url: listenerURL,
-      qr: QRCodeMaker.image(text: plan.codes.first?.payload ?? listenerURL, side: 2048),
+      qr: codes.count == 1 ? codes.first?.image : nil,
       showFooter: true,
       paper: paper,
       footerText: PosterBuilder.poweredBy,
-      headerPoints: 44,
-      stepPoints: 17,
-      qrFraction: 0.62
+      headerPoints: 36,
+      stepPoints: 16,
+      qrFraction: 0.42,
+      codes: codes,
+      closing: plan.closing,
+      usesQuickLayout: true
     )
   }
 

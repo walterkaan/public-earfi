@@ -29,16 +29,16 @@ struct PublicEarFiApp: App {
       AppMenus(model: model)
     }
 
-    // Was fixed 820x620 via .frame(width:height:), which blocked drag-resize.
-    // Default height is ~2/3 of that (414). Min sizes leave headroom; max is flexible.
+    // Resizable Settings. Default ~900×620 content (~950×660 with title bar,
+    // about 3:2). Autosave name bumps when the default changes (see chrome).
     Settings {
       SettingsTab()
         .environmentObject(model)
-        .frame(minWidth: 640, minHeight: 360)
+        .frame(minWidth: 720, minHeight: 480)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(.dark)
     }
-    .defaultSize(width: 820, height: 414)
+    .defaultSize(width: 900, height: 620)
     .windowResizability(.contentMinSize)
 
     Window("Poster", id: "poster") {

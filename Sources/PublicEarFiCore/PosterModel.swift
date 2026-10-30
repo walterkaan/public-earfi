@@ -122,10 +122,16 @@ public struct QuickPosterPlan: Equatable {
 
 public enum PosterBuilder {
   public static let footer = "RoomCast: free and open source"
-  public static let poweredBy = "Powered by RoomCast"
+  /// Main-window PDF footer under the step-3 row.
+  public static let poweredBy = "RoomCast · free sound to every phone"
+  public static let listenEyebrow = "LISTEN ON YOUR PHONE"
+  public static let scanTagline = "Scan to listen. No app needed."
   public static let joinWiFi = "Join the Wi-Fi"
-  public static let openBroadcast = "Open the broadcast"
-  public static let tapPlay = "Tap play; use your own earphones"
+  public static let openBroadcast = "Open the sound"
+  public static let tapPlay = "Tap Play, then pop in your own earphones"
+  public static let typeInBrowser = "Or type this in your browser"
+  public static let joinVenueFirst = "Join the venue Wi-Fi first"
+  public static let passwordBlank = "Password: ____________"
   public static let defaultHeader = "Listen live on your phone"
   public static let defaultInstructions = """
     Join the Wi-Fi network {network}
@@ -158,12 +164,28 @@ public enum PosterBuilder {
     return [
       join,
       "Scan the QR code with your phone camera",
-      "Tap play; use your own earphones",
+      tapPlay,
     ]
   }
 
-  /// Main-window poster. A network name adds a Wi-Fi join code before the
+  /// Host:port line under the listen QR. Drops the scheme and a trailing slash.
+  public static func listenDisplayAddress(_ listenerURL: String) -> String {
+    if let endpoint = ListenerLink.endpoint(listenerURL) {
+      return endpoint
+    }
+    var text = listenerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let scheme = text.range(of: "://") {
+      text = String(text[scheme.upperBound...])
+    }
+    while text.hasSuffix("/") {
+      text.removeLast()
+    }
+    return text
+  }
+
+  /// Main-window poster. A network name adds a Wi-Fi join code beside the
   /// listener code. The password is printed on that page and is not stored here.
+  /// An empty password (or a Keychain miss) leaves a blank to write in by hand.
   public static func quickPlan(
     networkName: String,
     password: String,
@@ -172,20 +194,25 @@ public enum PosterBuilder {
     listenerURL: String
   ) -> QuickPosterPlan {
     let network = networkName.trimmingCharacters(in: .whitespacesAndNewlines)
+    let address = listenDisplayAddress(listenerURL)
     if network.isEmpty {
       return QuickPosterPlan(
-        steps: quickSteps(networkName: ""),
+        steps: [],
         codes: [
-          QuickPosterPlan.Code(label: "", payload: listenerURL, lines: [listenerURL])
+          QuickPosterPlan.Code(
+            label: "1. \(openBroadcast)",
+            payload: listenerURL,
+            lines: [address, joinVenueFirst]
+          )
         ],
-        closing: ""
+        closing: "3. \(tapPlay)"
       )
     }
     var networkLines = [network]
     if security == .none {
       networkLines.append("No password")
     } else if password.isEmpty {
-      networkLines.append("Password:")
+      networkLines.append(passwordBlank)
     } else {
       networkLines.append("Password: \(password)")
     }
@@ -204,7 +231,7 @@ public enum PosterBuilder {
         QuickPosterPlan.Code(
           label: "2. \(openBroadcast)",
           payload: listenerURL,
-          lines: [listenerURL]
+          lines: [address, typeInBrowser]
         ),
       ],
       closing: "3. \(tapPlay)"

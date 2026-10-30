@@ -1,144 +1,304 @@
-".local hostname" = ".local hostname";
-".local" = ".local";
-"0 = unlimited" = "0 = unlimited";
-"0 dB leaves the volume unchanged. Increase or decrease the broadcast's volume." = "0 dB leaves the volume unchanged. Increase or decrease the broadcast's volume.";
-"16–256 kbps" = "16–256 kbps";
-"A4" = "A4";
-"About RoomCast" = "About RoomCast";
-"All inputs summed" = "All inputs summed";
-"Allow incoming connections?" = "Allow incoming connections?";
-"An open network has no password. The poster will not print one." = "An open network has no password. The poster will not print one.";
-"Apply New Settings Now" = "Apply New Settings Now";
-"Apply now (brief interruption)" = "Apply now (brief interruption)";
-"Apply now" = "Apply now";
-"Auto (UDP+TCP)" = "Auto (UDP+TCP)";
-"Auto" = "Auto";
-"Automatic" = "Automatic";
-"Bluetooth earbuds switch to call mode while they are the microphone. The mic stays speech quality. Their own playback drops to call quality, so the stage may be harder to hear. A wired or USB microphone, or separate wired headphones, avoids that. Turn Bluetooth off on your phone, and on any other nearby device paired to the earbuds, before you go live, so the phone does not take them back and cut the stream." = "Bluetooth earbuds switch to call mode while they are the microphone. The mic stays speech quality. Their own playback drops to call quality, so the stage may be harder to hear. A wired or USB microphone, or separate wired headphones, avoids that. Turn Bluetooth off on your phone, and on any other nearby device paired to the earbuds, before you go live, so the phone does not take them back and cut the stream.";
-"Brief interruption, then the new settings are live." = "Brief interruption, then the new settings are live.";
-"Broadcast music from an app" = "Broadcast music from an app";
-"Broadcast" = "Broadcast";
-"Buy Me a Coffee" = "Buy Me a Coffee";
-"Cancel" = "Cancel";
-"Change Sound Source" = "Change Sound Source";
-"Changes take effect next time you start broadcasting." = "Changes take effect next time you start broadcasting.";
-"Choose Sound Source" = "Choose Sound Source";
-"Choose a microphone, headset, or mixing desk" = "Choose a microphone, headset, or mixing desk";
-"Closing the laptop lid will still sleep the Mac unless it is on power with an external display." = "Closing the laptop lid will still sleep the Mac unless it is on power with an external display.";
-"Continue" = "Continue";
-"Copied" = "Copied";
-"Copy Listener Link" = "Copy Listener Link";
-"Copy QR Image" = "Copy QR Image";
-"Copy QR image" = "Copy QR image";
-"Copy all notices" = "Copy all notices";
-"Copy diagnostics" = "Copy diagnostics";
-"Copy link" = "Copy link";
-"Copyright (c) 2026 Walter Kaan · MIT License" = "Copyright (c) 2026 Walter Kaan · MIT License";
-"Custom bitrate" = "Custom bitrate";
-"Description" = "Description";
-"Doesn't work? Try: %@" = "Doesn't work? Try: %@";
-"Done" = "Done";
-"EF" = "EF";
-"Export PDF…" = "Export PDF…";
-"Export Poster PDF…" = "Export Poster PDF…";
-"FAQ" = "FAQ";
-"Getting Started" = "Getting Started";
-"Guest Wi-Fi with client isolation, and separate VLANs, also block listeners." = "Guest Wi-Fi with client isolation, and separate VLANs, also block listeners.";
-"Header" = "Header";
-"Hidden network" = "Hidden network";
-"IP address" = "IP address";
-"IP" = "IP";
-"Input level" = "Input level";
-"Keep Mac awake while broadcasting" = "Keep Mac awake while broadcasting";
-"Keep the printed address stable" = "Keep the printed address stable";
-"Ko-fi" = "Ko-fi";
-"Launch at login" = "Launch at login";
-"Letter" = "Letter";
-"Licence files were not found in the app bundle." = "Licence files were not found in the app bundle.";
-"Listen QR code" = "Listen QR code";
-"Listen QR code, opens %@" = "Listen QR code, opens %@";
-"Listen" = "Listen";
-"Live" = "Live";
-"Log" = "Log";
-"Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start." = "Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start.";
-"Microphone" = "Microphone";
-"Mono" = "Mono";
-"Music 96k" = "Music 96k";
-"No device" = "No device";
-"No input device is available." = "No input device is available.";
-"No signal for about 5 seconds. Check the desk feed and the selected input." = "No signal for about 5 seconds. Check the desk feed and the selected input.";
-"No sound is reaching the input. Check the desk feed and the selected source." = "No sound is reaching the input. Check the desk feed and the selected source.";
-"Not broadcasting." = "Not broadcasting.";
-"Not connected" = "Not connected";
-"Not live yet: press Start Broadcasting" = "Not live yet: press Start Broadcasting";
-"Not now" = "Not now";
-"Open PDF QR Poster" = "Open PDF QR Poster";
-"Open THIRD_PARTY_NOTICES on GitHub" = "Open THIRD_PARTY_NOTICES on GitHub";
-"Open the README" = "Open the README";
-"Password, security, and hidden network are in Settings → Poster. The main-window PDF has a join code when this name is filled in. This window's PDF does not include the password." = "Password, security, and hidden network are in Settings → Poster. The main-window PDF has a join code when this name is filled in. This window's PDF does not include the password.";
-"Patreon" = "Patreon";
-"Phones join this network before the listen code works. Leave it blank to print a line you can write in. Use this Mac’s Wi-Fi only when that is the network people will join." = "Phones join this network before the listen code works. Leave it blank to print a line you can write in. Use this Mac’s Wi-Fi only when that is the network people will join.";
-"Pick your sound source" = "Pick your sound source";
-"Port" = "Port";
-"Poster…" = "Poster…";
-"Preview and PDF" = "Preview and PDF";
-"Print the poster or show it. Guests scan to join the Wi-Fi, then scan to listen with earphones." = "Print the poster or show it. Guests scan to join the Wi-Fi, then scan to listen with earphones.";
-"Reset every setting, including the poster text and the Wi-Fi password?" = "Reset every setting, including the poster text and the Wi-Fi password?";
-"Reset to defaults" = "Reset to defaults";
-"Reset to defaults…" = "Reset to defaults…";
-"Restore default instructions" = "Restore default instructions";
-"RoomCast 1.0 Beta Release" = "RoomCast 1.0 Beta Release";
-"RoomCast FAQ" = "RoomCast FAQ";
-"RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no account, and the Wi-Fi doesn't need internet." = "RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no account, and the Wi-Fi doesn't need internet.";
-"RoomCast" = "RoomCast";
-"Save a PDF of the QR poster and open it. Print that PDF yourself." = "Save a PDF of the QR poster and open it. Print that PDF yourself.";
-"Save and Close" = "Save and Close";
-"Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code." = "Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code.";
-"Share the QR" = "Share the QR";
-"Show Log" = "Show Log";
-"Show footer" = "Show footer";
-"Show instructions" = "Show instructions";
-"Show the QR code full screen" = "Show the QR code full screen";
-"Some Android phones can't open .local addresses." = "Some Android phones can't open .local addresses.";
-"Something needs attention. Copy diagnostics for the details." = "Something needs attention. Copy diagnostics for the details.";
-"Sound can come from the Mac's microphone, an application, a headset or earbuds, or a mixing desk for larger events." = "Sound can come from the Mac's microphone, an application, a headset or earbuds, or a mixing desk for larger events.";
-"Sound is reaching listeners. Checked %@." = "Sound is reaching listeners. Checked %@.";
-"Sound" = "Sound";
-"Speech 32k" = "Speech 32k";
-"Standard 64k" = "Standard 64k";
-"Start Broadcasting" = "Start Broadcasting";
-"Start broadcasting when the app opens" = "Start broadcasting when the app opens";
-"Start broadcasting" = "Start broadcasting";
-"Starting the broadcast." = "Starting the broadcast.";
-"Starting…" = "Starting…";
-"Stereo" = "Stereo";
-"Stop Broadcasting" = "Stop Broadcasting";
-"Stop broadcasting to change source" = "Stop broadcasting to change source";
-"Stop broadcasting? %d people are listening." = "Stop broadcasting? %d people are listening.";
-"Stop broadcasting? 1 person is listening." = "Stop broadcasting? 1 person is listening.";
-"Stop leftover helper" = "Stop leftover helper";
-"Stopped · Sound from: %@" = "Stopped · Sound from: %@";
-"Support RoomCast" = "Support RoomCast";
-"TCP only = Wi-Fi-friendly; try it if listeners hear dropouts." = "TCP only = Wi-Fi-friendly; try it if listeners hear dropouts.";
-"TCP only" = "TCP only";
-"The audio interface is unplugged. Plug it back in." = "The audio interface is unplugged. Plug it back in.";
-"The audio stalled. RoomCast is restarting it." = "The audio stalled. RoomCast is restarting it.";
-"The listener server is not answering. RoomCast is retrying." = "The listener server is not answering. RoomCast is retrying.";
-"The poster QR code contains this Mac’s current IP address. If the address changes, phones still looking at the old poster cannot connect." = "The poster QR code contains this Mac’s current IP address. If the address changes, phones still looking at the old poster cannot connect.";
-"The stream hit a problem and is retrying. Copy diagnostics if it continues." = "The stream hit a problem and is retrying. Copy diagnostics if it continues.";
-"UDP only" = "UDP only";
-"Use current network name" = "Use current network name";
-"View licence" = "View licence";
-"Volume" = "Volume";
-"Volume, from -12 dB to +24 dB. Changes apply immediately, including while you are live. Double-click to reset to 0 dB." = "Volume, from -12 dB to +24 dB. Changes apply immediately, including while you are live. Double-click to reset to 0 dB.";
-"WebRTC ICE port. Phones receive the audio on this UDP or TCP port. It is not Icecast." = "WebRTC ICE port. Phones receive the audio on this UDP or TCP port. It is not Icecast.";
-"Welcome to RoomCast" = "Welcome to RoomCast";
-"Wi-Fi network name (optional)" = "Wi-Fi network name (optional)";
-"github.com/walterkaan/public-earfi" = "github.com/walterkaan/public-earfi";
-"macOS will ask for the microphone so RoomCast can hear your sound source." = "macOS will ask for the microphone so RoomCast can hear your sound source.";
-"macOS will ask to allow incoming connections so phones on the Wi-Fi can reach this Mac." = "macOS will ask to allow incoming connections so phones on the Wi-Fi can reach this Mac.";
-"stereo" = "stereo";
-"— dB" = "— dB";
-"• Ask the venue for a DHCP reservation for this Mac (recommended)." = "• Ask the venue for a DHCP reservation for this Mac (recommended).";
-"• Or set a manual IP in System Settings → Network." = "• Or set a manual IP in System Settings → Network.";
-"• Or switch the poster address to the .local hostname. iPhone and Mac resolve it. Many Android phones and guest networks do not." = "• Or switch the poster address to the .local hostname. iPhone and Mac resolve it. Many Android phones and guest networks do not.";
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>.local</key>
+	<string>.local</string>
+	<key>.local hostname</key>
+	<string>.local hostname</string>
+	<key>0 = unlimited</key>
+	<string>0 = unlimited</string>
+	<key>0 dB leaves the volume unchanged. Increase or decrease the broadcast's volume.</key>
+	<string>0 dB leaves the volume unchanged. Increase or decrease the broadcast's volume.</string>
+	<key>16–256 kbps</key>
+	<string>16–256 kbps</string>
+	<key>A4</key>
+	<string>A4</string>
+	<key>About RoomCast</key>
+	<string>About RoomCast</string>
+	<key>All inputs summed</key>
+	<string>All inputs summed</string>
+	<key>Allow incoming connections?</key>
+	<string>Allow incoming connections?</string>
+	<key>An open network has no password. The poster will not print one.</key>
+	<string>An open network has no password. The poster will not print one.</string>
+	<key>Apply New Settings Now</key>
+	<string>Apply New Settings Now</string>
+	<key>Apply now</key>
+	<string>Apply now</string>
+	<key>Apply now (brief interruption)</key>
+	<string>Apply now (brief interruption)</string>
+	<key>Auto</key>
+	<string>Auto</string>
+	<key>Auto (UDP+TCP)</key>
+	<string>Auto (UDP+TCP)</string>
+	<key>Automatic</key>
+	<string>Automatic</string>
+	<key>Bluetooth earbuds switch to call mode while they are the microphone. The mic stays speech quality. Their own playback drops to call quality, so the stage may be harder to hear. A wired or USB microphone, or separate wired headphones, avoids that. Turn Bluetooth off on your phone, and on any other nearby device paired to the earbuds, before you go live, so the phone does not take them back and cut the stream.</key>
+	<string>Bluetooth earbuds switch to call mode while they are the microphone. The mic stays speech quality. Their own playback drops to call quality, so the stage may be harder to hear. A wired or USB microphone, or separate wired headphones, avoids that. Turn Bluetooth off on your phone, and on any other nearby device paired to the earbuds, before you go live, so the phone does not take them back and cut the stream.</string>
+	<key>Brief interruption, then the new settings are live.</key>
+	<string>Brief interruption, then the new settings are live.</string>
+	<key>Broadcast</key>
+	<string>Broadcast</string>
+	<key>Broadcast music from an app</key>
+	<string>Broadcast music from an app</string>
+	<key>Buy Me a Coffee</key>
+	<string>Buy Me a Coffee</string>
+	<key>Cancel</key>
+	<string>Cancel</string>
+	<key>Change Sound Source</key>
+	<string>Change Sound Source</string>
+	<key>Changes take effect next time you start broadcasting.</key>
+	<string>Changes take effect next time you start broadcasting.</string>
+	<key>Choose Sound Source</key>
+	<string>Choose Sound Source</string>
+	<key>Choose TCP only if listeners hear dropouts.</key>
+	<string>Choose TCP only if listeners hear dropouts.</string>
+	<key>Choose a microphone, headset, or mixing desk</key>
+	<string>Choose a microphone, headset, or mixing desk</string>
+	<key>Closing the laptop lid will still sleep the Mac unless it is on power with an external display.</key>
+	<string>Closing the laptop lid will still sleep the Mac unless it is on power with an external display.</string>
+	<key>Continue</key>
+	<string>Continue</string>
+	<key>Copied</key>
+	<string>Copied</string>
+	<key>Copy Listener Link</key>
+	<string>Copy Listener Link</string>
+	<key>Copy QR Image</key>
+	<string>Copy QR Image</string>
+	<key>Copy QR image</key>
+	<string>Copy QR image</string>
+	<key>Copy all notices</key>
+	<string>Copy all notices</string>
+	<key>Copy diagnostics</key>
+	<string>Copy diagnostics</string>
+	<key>Copy link</key>
+	<string>Copy link</string>
+	<key>Copyright (c) 2026 Walter Kaan · MIT License</key>
+	<string>Copyright (c) 2026 Walter Kaan · MIT License</string>
+	<key>Custom bitrate</key>
+	<string>Custom bitrate</string>
+	<key>Description</key>
+	<string>Description</string>
+	<key>Doesn't work? Try: %@</key>
+	<string>Doesn't work? Try: %@</string>
+	<key>Done</key>
+	<string>Done</string>
+	<key>EF</key>
+	<string>EF</string>
+	<key>Export PDF…</key>
+	<string>Export PDF…</string>
+	<key>Export Poster PDF…</key>
+	<string>Export Poster PDF…</string>
+	<key>FAQ</key>
+	<string>FAQ</string>
+	<key>Getting Started</key>
+	<string>Getting Started</string>
+	<key>Guest Wi-Fi with client isolation, and separate VLANs, also block listeners.</key>
+	<string>Guest Wi-Fi with client isolation, and separate VLANs, also block listeners.</string>
+	<key>Header</key>
+	<string>Header</string>
+	<key>Help</key>
+	<string>Help</string>
+	<key>Hidden network</key>
+	<string>Hidden network</string>
+	<key>IP</key>
+	<string>IP</string>
+	<key>IP address</key>
+	<string>IP address</string>
+	<key>Input level</key>
+	<string>Input level</string>
+	<key>Keep Broadcasting</key>
+	<string>Keep Broadcasting</string>
+	<key>Keep Mac awake while broadcasting</key>
+	<string>Keep Mac awake while broadcasting</string>
+	<key>Keep the printed address stable</key>
+	<string>Keep the printed address stable</string>
+	<key>Ko-fi</key>
+	<string>Ko-fi</string>
+	<key>Launch at login</key>
+	<string>Launch at login</string>
+	<key>Letter</key>
+	<string>Letter</string>
+	<key>Licence files were not found in the app bundle.</key>
+	<string>Licence files were not found in the app bundle.</string>
+	<key>Listen</key>
+	<string>Listen</string>
+	<key>Listen QR code</key>
+	<string>Listen QR code</string>
+	<key>Listen QR code, opens %@</key>
+	<string>Listen QR code, opens %@</string>
+	<key>Live</key>
+	<string>Live</string>
+	<key>Log</key>
+	<string>Log</string>
+	<key>Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start.</key>
+	<string>Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start.</string>
+	<key>Microphone</key>
+	<string>Microphone</string>
+	<key>Mono</key>
+	<string>Mono</string>
+	<key>Music 96k</key>
+	<string>Music 96k</string>
+	<key>No device</key>
+	<string>No device</string>
+	<key>No input device is available.</key>
+	<string>No input device is available.</string>
+	<key>No signal for about 5 seconds. Check the desk feed and the selected input.</key>
+	<string>No signal for about 5 seconds. Check the desk feed and the selected input.</string>
+	<key>No sound is reaching the input. Check the desk feed and the selected source.</key>
+	<string>No sound is reaching the input. Check the desk feed and the selected source.</string>
+	<key>Not broadcasting.</key>
+	<string>Not broadcasting.</string>
+	<key>Not connected</key>
+	<string>Not connected</string>
+	<key>Not live yet: press Start Broadcasting</key>
+	<string>Not live yet: press Start Broadcasting</string>
+	<key>Not now</key>
+	<string>Not now</string>
+	<key>Open PDF QR Poster</key>
+	<string>Open PDF QR Poster</string>
+	<key>Open THIRD_PARTY_NOTICES on GitHub</key>
+	<string>Open THIRD_PARTY_NOTICES on GitHub</string>
+	<key>Open the README</key>
+	<string>Open the README</string>
+	<key>Password, security, and hidden network are in Settings → Poster. The main-window PDF has a join code when this name is filled in. This window's PDF does not include the password.</key>
+	<string>Password, security, and hidden network are in Settings → Poster. The main-window PDF has a join code when this name is filled in. This window's PDF does not include the password.</string>
+	<key>Patreon</key>
+	<string>Patreon</string>
+	<key>Phones join this network before the listen code works. Leave it blank to print a line you can write in. Use this Mac’s Wi-Fi only when that is the network people will join.</key>
+	<string>Phones join this network before the listen code works. Leave it blank to print a line you can write in. Use this Mac’s Wi-Fi only when that is the network people will join.</string>
+	<key>Pick your sound source</key>
+	<string>Pick your sound source</string>
+	<key>Port</key>
+	<string>Port</string>
+	<key>Poster…</key>
+	<string>Poster…</string>
+	<key>Preview and PDF</key>
+	<string>Preview and PDF</string>
+	<key>Print the poster or show it. Guests scan to join the Wi-Fi, then scan to listen with earphones.</key>
+	<string>Print the poster or show it. Guests scan to join the Wi-Fi, then scan to listen with earphones.</string>
+	<key>Reset every setting, including the poster text and the Wi-Fi password?</key>
+	<string>Reset every setting, including the poster text and the Wi-Fi password?</string>
+	<key>Reset to defaults</key>
+	<string>Reset to defaults</string>
+	<key>Reset to defaults…</key>
+	<string>Reset to defaults…</string>
+	<key>Restore default instructions</key>
+	<string>Restore default instructions</string>
+	<key>RoomCast</key>
+	<string>RoomCast</string>
+	<key>RoomCast 1.0 Beta Release</key>
+	<string>RoomCast 1.0 Beta Release</string>
+	<key>RoomCast FAQ</key>
+	<string>RoomCast FAQ</string>
+	<key>RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no account, and the Wi-Fi doesn't need internet.</key>
+	<string>RoomCast sends sound from your Mac to people's phones over Wi-Fi. No sign-in, no account, and the Wi-Fi doesn't need internet.</string>
+	<key>Save a PDF of the QR poster and open it. Print that PDF yourself.</key>
+	<string>Save a PDF of the QR poster and open it. Print that PDF yourself.</string>
+	<key>Save and Close</key>
+	<string>Save and Close</string>
+	<key>Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code.</key>
+	<string>Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code.</string>
+	<key>Share the QR</key>
+	<string>Share the QR</string>
+	<key>Show Log</key>
+	<string>Show Log</string>
+	<key>Show footer</key>
+	<string>Show footer</string>
+	<key>Show instructions</key>
+	<string>Show instructions</string>
+	<key>Show the QR code full screen</key>
+	<string>Show the QR code full screen</string>
+	<key>Shown on Lockscreen and Users' Browser</key>
+	<string>Shown on Lockscreen and Users' Browser</string>
+	<key>Some Android phones can't open .local addresses.</key>
+	<string>Some Android phones can't open .local addresses.</string>
+	<key>Something needs attention. Copy diagnostics for the details.</key>
+	<string>Something needs attention. Copy diagnostics for the details.</string>
+	<key>Sound</key>
+	<string>Sound</string>
+	<key>Sound can come from the Mac's microphone, an application, a headset or earbuds, or a mixing desk for larger events.</key>
+	<string>Sound can come from the Mac's microphone, an application, a headset or earbuds, or a mixing desk for larger events.</string>
+	<key>Sound is reaching listeners. Checked %@.</key>
+	<string>Sound is reaching listeners. Checked %@.</string>
+	<key>Speech 32k</key>
+	<string>Speech 32k</string>
+	<key>Standard 64k</key>
+	<string>Standard 64k</string>
+	<key>Start Broadcasting</key>
+	<string>Start Broadcasting</string>
+	<key>Start broadcasting</key>
+	<string>Start broadcasting</string>
+	<key>Start broadcasting when the app opens</key>
+	<string>Start broadcasting when the app opens</string>
+	<key>Starting the broadcast.</key>
+	<string>Starting the broadcast.</string>
+	<key>Starting…</key>
+	<string>Starting…</string>
+	<key>Stereo</key>
+	<string>Stereo</string>
+	<key>Stop Broadcasting</key>
+	<string>Stop Broadcasting</string>
+	<key>Stop broadcasting to change source</key>
+	<string>Stop broadcasting to change source</string>
+	<key>Stop broadcasting? %d people are listening.</key>
+	<string>Stop broadcasting? %d people are listening.</string>
+	<key>Stop broadcasting? 1 person is listening.</key>
+	<string>Stop broadcasting? 1 person is listening.</string>
+	<key>Stop leftover helper</key>
+	<string>Stop leftover helper</string>
+	<key>Stopped · Sound from: %@</key>
+	<string>Stopped · Sound from: %@</string>
+	<key>Support RoomCast</key>
+	<string>Support RoomCast</string>
+	<key>TCP only</key>
+	<string>TCP only</string>
+	<key>TCP only = Wi-Fi-friendly; try it if listeners hear dropouts.</key>
+	<string>TCP only = Wi-Fi-friendly; try it if listeners hear dropouts.</string>
+	<key>The audio interface is unplugged. Plug it back in.</key>
+	<string>The audio interface is unplugged. Plug it back in.</string>
+	<key>The audio stalled. RoomCast is restarting it.</key>
+	<string>The audio stalled. RoomCast is restarting it.</string>
+	<key>The listener server is not answering. RoomCast is retrying.</key>
+	<string>The listener server is not answering. RoomCast is retrying.</string>
+	<key>The poster QR code contains this Mac’s current IP address. If the address changes, phones still looking at the old poster cannot connect.</key>
+	<string>The poster QR code contains this Mac’s current IP address. If the address changes, phones still looking at the old poster cannot connect.</string>
+	<key>The stream hit a problem and is retrying. Copy diagnostics if it continues.</key>
+	<string>The stream hit a problem and is retrying. Copy diagnostics if it continues.</string>
+	<key>UDP only</key>
+	<string>UDP only</string>
+	<key>Use current network name</key>
+	<string>Use current network name</string>
+	<key>View licence</key>
+	<string>View licence</string>
+	<key>Volume</key>
+	<string>Volume</string>
+	<key>Volume, from -12 dB to +24 dB. Changes apply immediately, including while you are live. Double-click to reset to 0 dB.</key>
+	<string>Volume, from -12 dB to +24 dB. Changes apply immediately, including while you are live. Double-click to reset to 0 dB.</string>
+	<key>WebRTC ICE port. Phones receive the audio on this UDP or TCP port.</key>
+	<string>WebRTC ICE port. Phones receive the audio on this UDP or TCP port.</string>
+	<key>WebRTC ICE port. Phones receive the audio on this UDP or TCP port. It is not Icecast.</key>
+	<string>WebRTC ICE port. Phones receive the audio on this UDP or TCP port. It is not Icecast.</string>
+	<key>Welcome to RoomCast</key>
+	<string>Welcome to RoomCast</string>
+	<key>Wi-Fi network name (optional)</key>
+	<string>Wi-Fi network name (optional)</string>
+	<key>github.com/walterkaan/public-earfi</key>
+	<string>github.com/walterkaan/public-earfi</string>
+	<key>macOS will ask for the microphone so RoomCast can hear your sound source.</key>
+	<string>macOS will ask for the microphone so RoomCast can hear your sound source.</string>
+	<key>macOS will ask to allow incoming connections so phones on the Wi-Fi can reach this Mac.</key>
+	<string>macOS will ask to allow incoming connections so phones on the Wi-Fi can reach this Mac.</string>
+	<key>stereo</key>
+	<string>stereo</string>
+	<key>— dB</key>
+	<string>— dB</string>
+	<key>• Ask the venue for a DHCP reservation for this Mac (recommended).</key>
+	<string>• Ask the venue for a DHCP reservation for this Mac (recommended).</string>
+	<key>• Or set a manual IP in System Settings → Network.</key>
+	<string>• Or set a manual IP in System Settings → Network.</string>
+	<key>• Or switch the poster address to the .local hostname. iPhone and Mac resolve it. Many Android phones and guest networks do not.</key>
+	<string>• Or switch the poster address to the .local hostname. iPhone and Mac resolve it. Many Android phones and guest networks do not.</string>
+</dict>
+</plist>

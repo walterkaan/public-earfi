@@ -1584,6 +1584,56 @@
           }
         }
       }
+    },
+    "Keep Broadcasting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep Broadcasting"
+          }
+        }
+      }
+    },
+    "Help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help"
+          }
+        }
+      }
+    },
+    "Shown on Lockscreen and Users' Browser": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shown on Lockscreen and Users' Browser"
+          }
+        }
+      }
+    },
+    "Choose TCP only if listeners hear dropouts.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose TCP only if listeners hear dropouts."
+          }
+        }
+      }
+    },
+    "WebRTC ICE port. Phones receive the audio on this UDP or TCP port.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WebRTC ICE port. Phones receive the audio on this UDP or TCP port."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

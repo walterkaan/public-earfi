@@ -585,7 +585,7 @@ final class PosterAndSupervisorTests: XCTestCase {
       [
         "Join Wi-Fi Hall-Guest",
         "Scan the QR code with your phone camera",
-        "Tap play; use your own earphones",
+        "Tap Play, then pop in your own earphones",
       ]
     )
     let blank = PosterBuilder.quickSteps(networkName: "  ")
@@ -593,7 +593,7 @@ final class PosterAndSupervisorTests: XCTestCase {
     XCTAssertTrue(blank[0].hasPrefix("Join Wi-Fi "))
     XCTAssertTrue(blank[0].contains("____"))
     XCTAssertFalse(blank[0].contains("Hall"))
-    XCTAssertEqual(PosterBuilder.poweredBy, "Powered by RoomCast")
+    XCTAssertEqual(PosterBuilder.poweredBy, "RoomCast · free sound to every phone")
   }
 
   func testQuickPosterAddsAWiFiCodeWhenTheNetworkIsSet() {
@@ -607,9 +607,10 @@ final class PosterAndSupervisorTests: XCTestCase {
     )
     XCTAssertFalse(blank.includesWiFiCode)
     XCTAssertEqual(blank.codes.map(\.payload), [url])
-    XCTAssertEqual(blank.closing, "")
-    XCTAssertTrue(blank.steps[0].contains("____"))
-    XCTAssertFalse(blank.steps.joined(separator: "\n").contains("secret"))
+    XCTAssertEqual(blank.closing, "3. Tap Play, then pop in your own earphones")
+    XCTAssertEqual(blank.steps, [])
+    XCTAssertEqual(blank.codes[0].lines, ["192.168.1.20:8889", PosterBuilder.joinVenueFirst])
+    XCTAssertFalse(blank.codes[0].lines.joined(separator: "\n").contains("secret"))
 
     let joined = PosterBuilder.quickPlan(
       networkName: "Hall-Guest",
@@ -625,11 +626,22 @@ final class PosterAndSupervisorTests: XCTestCase {
       "WIFI:T:WPA;S:Hall-Guest;P:p\\:q\\;r;H:false;;"
     )
     XCTAssertEqual(joined.codes[0].lines, ["Hall-Guest", "Password: p:q;r"])
-    XCTAssertEqual(joined.codes[1].label, "2. Open the broadcast")
+    XCTAssertEqual(joined.codes[1].label, "2. Open the sound")
     XCTAssertEqual(joined.codes[1].payload, url)
-    XCTAssertEqual(joined.codes[1].lines, [url])
-    XCTAssertEqual(joined.closing, "3. Tap play; use your own earphones")
+    XCTAssertEqual(
+      joined.codes[1].lines, ["192.168.1.20:8889", PosterBuilder.typeInBrowser])
+    XCTAssertEqual(joined.closing, "3. Tap Play, then pop in your own earphones")
     XCTAssertFalse(joined.codes[1].payload.contains("WIFI:"))
+
+    let emptyPassword = PosterBuilder.quickPlan(
+      networkName: "Hall-Guest",
+      password: "",
+      security: .wpa,
+      hidden: false,
+      listenerURL: url
+    )
+    XCTAssertEqual(
+      emptyPassword.codes[0].lines, ["Hall-Guest", PosterBuilder.passwordBlank])
 
     let hidden = PosterBuilder.quickPlan(
       networkName: "a\\b;c,d:e\"f",

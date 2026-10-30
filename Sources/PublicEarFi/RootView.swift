@@ -191,9 +191,14 @@ struct RunningTab: View {
           Text("Input level")
             .helperText()
             .frame(width: 90, alignment: .leading)
-          LevelBar(fraction: model.levelFraction, peak: model.meterPeakFraction)
+          LevelBar(
+            fraction: model.noSignal ? 0 : model.levelFraction,
+            peak: model.noSignal ? 0 : model.meterPeakFraction,
+            dimmed: model.noSignal
+          )
           Text(levelText)
             .helperText()
+            .foregroundStyle(model.noSignal ? AppChrome.helper.opacity(0.45) : AppChrome.helper)
             .frame(width: 64, alignment: .trailing)
         }
         .accessibilityElement(children: .ignore)
@@ -323,6 +328,8 @@ struct RunningTab: View {
       Card {
         SectionLabel(text: "Support RoomCast")
         SupportLinks()
+        SectionLabel(text: "Help")
+          .padding(.top, 10)
         HStack(spacing: 10) {
           TintedPushButton("Getting Started") { model.reopenGettingStarted() }
           TintedPushButton("FAQ") { model.openFAQ() }
@@ -425,18 +432,25 @@ struct RunningTab: View {
   }
 
   private var statusColor: Color {
+    // Orange is reserved for the no-signal warning. Live uses teal so the
+    // border and dot do not look like a problem state.
+    if model.noSignal, case .live = model.phase {
+      return .orange
+    }
     switch model.phase {
     case .stopped:
       return Color.gray
     case .live:
-      return shouldPulse ? AppChrome.heading : .orange
+      return AppChrome.heading
+    case .starting:
+      return AppChrome.primary
     default:
-      return .orange
+      return AppChrome.primary
     }
   }
 
   private var levelText: String {
-    if model.levelDB <= -100 { return "— dB" }
+    if model.noSignal || model.levelDB <= -100 { return "— dB" }
     return String(format: "%.0f dB", model.levelDB)
   }
 
@@ -682,38 +696,45 @@ private struct DarkFocusRing: ViewModifier {
 struct LevelBar: View {
   var fraction: Double
   var peak: Double
+  var dimmed: Bool = false
 
   var body: some View {
     GeometryReader { geometry in
       let width = geometry.size.width
-      let level = min(1, max(0, fraction))
-      let held = min(1, max(0, peak))
+      let level = dimmed ? 0 : min(1, max(0, fraction))
+      let held = dimmed ? 0 : min(1, max(0, peak))
       ZStack(alignment: .leading) {
         RoundedRectangle(cornerRadius: 3)
-          .fill(Color.white.opacity(0.12))
-        Rectangle()
-          .fill(Color.orange.opacity(0.45))
-          .frame(width: max(0, width * 0.05))
-          .offset(x: width * 0.9)
-        Rectangle()
-          .fill(Color.red.opacity(0.55))
-          .frame(width: max(0, width * 0.05))
-          .offset(x: width * 0.95)
+          .fill(Color.white.opacity(dimmed ? 0.06 : 0.12))
+        if !dimmed {
+          Rectangle()
+            .fill(Color.orange.opacity(0.45))
+            .frame(width: max(0, width * 0.05))
+            .offset(x: width * 0.9)
+          Rectangle()
+            .fill(Color.red.opacity(0.55))
+            .frame(width: max(0, width * 0.05))
+            .offset(x: width * 0.95)
+        }
         RoundedRectangle(cornerRadius: 3)
           .fill(meterColor(level))
           .frame(width: max(0, width * level))
-        Rectangle()
-          .fill(Color.white)
-          .frame(width: 2)
-          .offset(x: min(max(0, width * held - 1), max(0, width - 2)))
+        if !dimmed {
+          Rectangle()
+            .fill(Color.white)
+            .frame(width: 2)
+            .offset(x: min(max(0, width * held - 1), max(0, width - 2)))
+        }
       }
       .clipShape(RoundedRectangle(cornerRadius: 3))
     }
     .frame(height: 12)
+    .opacity(dimmed ? 0.55 : 1)
     .accessibilityHidden(true)
   }
 
   private func meterColor(_ level: Double) -> Color {
+    if dimmed { return Color.white.opacity(0.18) }
     if level >= 0.95 { return Color(red: 0.92, green: 0.24, blue: 0.2) }
     if level >= 0.9 { return .orange }
     return AppChrome.heading
@@ -820,10 +841,17 @@ struct SettingsTab: View {
             SettingsSidebarIcon(symbol: pane.symbol, tint: pane.tint)
           }
           .tag(pane)
+          .listRowBackground(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+              .fill(selected == pane ? AppChrome.primary.opacity(0.28) : Color.clear)
+              .padding(.horizontal, 4)
+          )
         }
       }
       .listStyle(.sidebar)
       .scrollContentBackground(.hidden)
+      .tint(AppChrome.primary)
+      .accentColor(AppChrome.primary)
     }
     .background(AppChrome.window)
     .frame(maxHeight: .infinity, alignment: .top)
@@ -832,7 +860,7 @@ struct SettingsTab: View {
   private var settingsDetail: some View {
     VStack(spacing: 0) {
       ScrollView {
-        VStack(alignment: .center, spacing: 18) {
+        VStack(alignment: .leading, spacing: 14) {
           settingsHeader(for: selected)
           VStack(alignment: .leading, spacing: 14) {
             paneContent(selected)
@@ -867,19 +895,18 @@ struct SettingsTab: View {
   }
 
   private func settingsHeader(for pane: SettingsPane) -> some View {
-    VStack(spacing: 8) {
-      SettingsSidebarIcon(symbol: pane.symbol, tint: pane.tint, side: 56, pointSize: 26)
+    VStack(alignment: .leading, spacing: 4) {
       Text(pane.title)
-        .font(.system(size: 22, weight: .bold))
+        .font(.system(size: 15, weight: .semibold))
         .foregroundStyle(.white)
       Text(pane.description)
-        .font(.system(size: 13))
+        .font(.system(size: 12))
         .foregroundStyle(AppChrome.helper)
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: 420)
+        .fixedSize(horizontal: false, vertical: true)
     }
-    .frame(maxWidth: .infinity)
+    .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, 24)
+    .padding(.top, 4)
   }
 
   @ViewBuilder
@@ -955,11 +982,11 @@ struct SettingsTab: View {
       if model.settings.channelMode == .stereo {
         Picker("Input", selection: channelBinding) {
           ForEach(1...channelUpper, id: \.self) { channel in
-            Text("Input \(channel)").tag(channel)
+            Text("Inputs \(channel)–\(channel + 1)").tag(channel)
           }
         }
         .labelsHidden()
-        .frame(width: 110)
+        .frame(width: 130)
       } else {
         Text("All inputs summed")
           .helperText()
@@ -1039,10 +1066,8 @@ struct SettingsTab: View {
       TextField(model.defaultBroadcastTitle, text: titleBinding)
         .frame(maxWidth: 280)
     }
-    Text(
-      "Shown on the lock screen and in the browser tab. Leave this blank for \(model.defaultBroadcastTitle). A blank title follows the app name. Changing it does not change the link."
-    )
-    .helperText()
+    Text("Shown on Lockscreen and Users' Browser")
+      .helperText()
     LabeledRow(title: "Network mode") {
       Picker("Network", selection: networkBinding) {
         Text("Auto (UDP+TCP)").tag(NetworkMode.auto)
@@ -1052,7 +1077,7 @@ struct SettingsTab: View {
       .pickerStyle(.segmented)
       .labelsHidden()
     }
-    Text("TCP only = Wi-Fi-friendly; try it if listeners hear dropouts.")
+    Text("Choose TCP only if listeners hear dropouts.")
       .helperText()
   }
 
@@ -1077,10 +1102,8 @@ struct SettingsTab: View {
     LabeledRow(title: "ICE port") {
       TextField("8189", text: iceText).frame(width: 80)
     }
-    Text(
-      "WebRTC ICE port. Phones receive the audio on this UDP or TCP port. It is not Icecast."
-    )
-    .helperText()
+    Text("WebRTC ICE port. Phones receive the audio on this UDP or TCP port.")
+      .helperText()
     LabeledRow(title: "URL style") {
       Picker("URL", selection: styleBinding) {
         Text("IP address").tag(URLStyle.ip)
@@ -1263,12 +1286,14 @@ private enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
   }
 
   var tint: Color {
+    // Section icons stay inside the app palette (violet / teal / support pink /
+    // muted helper). Avoid system red/orange/blue that fight the navy chrome.
     switch self {
-    case .audio: return Color(red: 1.0, green: 0.35, blue: 0.45)
-    case .stream: return Color(red: 0.25, green: 0.55, blue: 1.0)
-    case .poster: return Color(red: 0.55, green: 0.35, blue: 0.95)
-    case .general: return Color(red: 0.45, green: 0.50, blue: 0.58)
-    case .advanced: return Color(red: 0.95, green: 0.55, blue: 0.20)
+    case .audio: return AppChrome.heading
+    case .stream: return AppChrome.primary
+    case .poster: return AppChrome.primary.opacity(0.85)
+    case .general: return Color(red: 0.55, green: 0.58, blue: 0.70)
+    case .advanced: return AppChrome.support
     }
   }
 
@@ -1384,12 +1409,13 @@ final class EscapeMonitorView: NSView {
 }
 
 /// Keeps Settings content below a normal title bar (no fullSizeContentView),
-/// resizable at ~2/3 the old 620pt height, with a fresh frame-autosave name.
+/// resizable, with a fresh frame-autosave name when the default size changes.
 private struct SettingsWindowChrome: NSViewRepresentable {
   /// Bump when default size / chrome changes so old frame keys are ignored.
-  static let autosaveName = "RoomCast.Settings.v3"
-  static let defaultContentSize = NSSize(width: 820, height: 414)
-  static let minContentSize = NSSize(width: 640, height: 360)
+  static let autosaveName = "RoomCast.Settings.v4"
+  /// ~900×620 content ≈ 950×660 with title bar (~3:2).
+  static let defaultContentSize = NSSize(width: 900, height: 620)
+  static let minContentSize = NSSize(width: 720, height: 480)
 
   func makeNSView(context: Context) -> NSView {
     let view = NSView(frame: .zero)
@@ -1421,8 +1447,9 @@ private struct SettingsWindowChrome: NSViewRepresentable {
       context.coordinator.didApply = true
       let key = "NSWindow Frame \(Self.autosaveName)"
       let hasSaved = UserDefaults.standard.string(forKey: key) != nil
-      let tallLegacy = window.contentLayoutRect.height >= 560
-      if !hasSaved || tallLegacy {
+      // Only seed the default once per autosave generation. Do not fight a
+      // user who later makes the window taller or shorter than 620.
+      if !hasSaved {
         window.setContentSize(Self.defaultContentSize)
         if let screen = window.screen ?? NSScreen.main {
           var frame = window.frame

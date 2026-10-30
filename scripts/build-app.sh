@@ -24,16 +24,24 @@ fi
 
 rm -rf "$ROOT/build/swift-arm64" "$ROOT/build/swift-x86_64"
 swift build -c release --triple arm64-apple-macosx13.0 "${SWIFT_SDK[@]}" --build-path "$ROOT/build/swift-arm64"
-swift build -c release --triple x86_64-apple-macosx13.0 "${SWIFT_SDK[@]}" --build-path "$ROOT/build/swift-x86_64"
+if [[ "${SKIP_X86:-}" == "1" ]]; then
+  echo "SKIP_X86=1: arm64-only assemble"
+else
+  swift build -c release --triple x86_64-apple-macosx13.0 "${SWIFT_SDK[@]}" --build-path "$ROOT/build/swift-x86_64"
+fi
 
 APP="$ROOT/dist/RoomCast.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Helpers" "$APP/Contents/Resources"
 
-lipo -create \
-  "$ROOT/build/swift-arm64/release/RoomCast" \
-  "$ROOT/build/swift-x86_64/release/RoomCast" \
-  -output "$APP/Contents/MacOS/RoomCast"
+if [[ "${SKIP_X86:-}" == "1" ]]; then
+  cp "$ROOT/build/swift-arm64/release/RoomCast" "$APP/Contents/MacOS/RoomCast"
+else
+  lipo -create \
+    "$ROOT/build/swift-arm64/release/RoomCast" \
+    "$ROOT/build/swift-x86_64/release/RoomCast" \
+    -output "$APP/Contents/MacOS/RoomCast"
+fi
 chmod +x "$APP/Contents/MacOS/RoomCast"
 
 cp "$ROOT/build/helpers/ffmpeg" "$ROOT/build/helpers/mediamtx" "$APP/Contents/Helpers/"
@@ -55,9 +63,14 @@ cp "$ROOT/Sources/PublicEarFiCore/ListenerPage.en.json" \
   "$APP/Contents/Resources/ListenerPage.en.json"
 # SwiftPM resource bundles, before the signature. The listener page reads
 # these from Contents/Resources and must not call Bundle.module.
-"$ROOT/scripts/install-app-resources.sh" "$APP" \
-  "$ROOT/build/swift-arm64/release" \
-  "$ROOT/build/swift-x86_64/release"
+if [[ "${SKIP_X86:-}" == "1" ]]; then
+  "$ROOT/scripts/install-app-resources.sh" "$APP" \
+    "$ROOT/build/swift-arm64/release"
+else
+  "$ROOT/scripts/install-app-resources.sh" "$APP" \
+    "$ROOT/build/swift-arm64/release" \
+    "$ROOT/build/swift-x86_64/release"
+fi
 
 sed \
   -e "s/__VERSION__/${VERSION}/g" \
