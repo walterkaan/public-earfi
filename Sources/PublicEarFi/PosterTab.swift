@@ -342,7 +342,7 @@ struct FirstRunSheet: View {
       }
     }
     .padding(14)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .frame(width: 560, height: 340, alignment: .topLeading)
     .background(AppChrome.window)
     .onChange(of: model.showFirstRun) { show in
       if !show { dismiss() }

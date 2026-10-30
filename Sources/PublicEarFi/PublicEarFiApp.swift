@@ -29,13 +29,17 @@ struct PublicEarFiApp: App {
       AppMenus(model: model)
     }
 
+    // Was fixed 820x620 via .frame(width:height:), which blocked drag-resize.
+    // Default height is ~2/3 of that (414). Min sizes leave headroom; max is flexible.
     Settings {
       SettingsTab()
         .environmentObject(model)
-        .frame(minWidth: 760, minHeight: 560)
-        .frame(width: 820, height: 620)
+        .frame(minWidth: 640, minHeight: 360)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(.dark)
     }
+    .defaultSize(width: 820, height: 414)
+    .windowResizability(.contentMinSize)
 
     Window("Poster", id: "poster") {
       PosterTab()
@@ -53,16 +57,15 @@ struct PublicEarFiApp: App {
     }
     .defaultSize(width: 720, height: 480)
 
-    // Getting Started was a modal sheet (fixed size). A Window is ~2/3 that
-    // height by default and the user can drag-resize it.
+    // Getting Started: fixed size, not drag-resizable.
     Window("Getting Started", id: "getting-started") {
       FirstRunSheet()
         .environmentObject(model)
-        .frame(minWidth: 420, minHeight: 260)
+        .frame(width: 560, height: 340)
         .preferredColorScheme(.dark)
     }
     .defaultSize(width: 560, height: 340)
-    .windowResizability(.contentMinSize)
+    .windowResizability(.contentSize)
   }
 }
 

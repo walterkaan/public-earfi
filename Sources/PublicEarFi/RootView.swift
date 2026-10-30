@@ -763,6 +763,7 @@ struct SettingsTab: View {
       }
     )
     .background(SettingsAutosave { model.saveAndCloseSettings() })
+    .background(SettingsWindowChrome())
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .id(model.settingsRevision)
     .onChange(of: search) { _ in
@@ -1375,6 +1376,61 @@ final class EscapeMonitorView: NSView {
     onEscape?()
     window.close()
     return nil
+  }
+}
+
+/// Sizes the SwiftUI Settings window: ~2/3 the old fixed 620pt height, resizable,
+/// and a new frame-autosave name so macOS does not restore the tall stale frame.
+private struct SettingsWindowChrome: NSViewRepresentable {
+  /// Bump when default size changes so old `NSWindow Frame …` keys are ignored.
+  static let autosaveName = "RoomCast.Settings.v2"
+  static let defaultContentSize = NSSize(width: 820, height: 414)
+  static let minContentSize = NSSize(width: 640, height: 360)
+
+  func makeNSView(context: Context) -> NSView {
+    let view = NSView(frame: .zero)
+    view.isHidden = true
+    return view
+  }
+
+  func updateNSView(_ view: NSView, context: Context) {
+    DispatchQueue.main.async {
+      guard let window = view.window else { return }
+      if window.frameAutosaveName != Self.autosaveName {
+        window.setFrameAutosaveName(Self.autosaveName)
+      }
+      if !window.styleMask.contains(.resizable) {
+        window.styleMask.insert(.resizable)
+      }
+      window.contentMinSize = Self.minContentSize
+      let minFrame = window.frameRect(
+        forContentRect: NSRect(origin: .zero, size: Self.minContentSize))
+      window.minSize = minFrame.size
+
+      guard !context.coordinator.didApply else { return }
+      context.coordinator.didApply = true
+      // No v2 autosave yet, or still looking like the old fixed 620-tall window.
+      let key = "NSWindow Frame \(Self.autosaveName)"
+      let hasSaved = UserDefaults.standard.string(forKey: key) != nil
+      let tallLegacy = window.contentLayoutRect.height >= 560
+      if !hasSaved || tallLegacy {
+        window.setContentSize(Self.defaultContentSize)
+        if let screen = window.screen ?? NSScreen.main {
+          var frame = window.frame
+          let visible = screen.visibleFrame
+          frame.origin.x = visible.midX - frame.width / 2
+          frame.origin.y = visible.midY - frame.height / 2
+          window.setFrame(frame, display: true)
+        }
+        window.saveFrame(usingName: Self.autosaveName)
+      }
+    }
+  }
+
+  func makeCoordinator() -> Coordinator { Coordinator() }
+
+  final class Coordinator {
+    var didApply = false
   }
 }
 
