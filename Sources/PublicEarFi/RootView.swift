@@ -328,20 +328,6 @@ struct RunningTab: View {
       }
 
       Card {
-        SectionLabel(text: "Health")
-        HStack(alignment: .top, spacing: 8) {
-          Image(systemName: healthSymbol)
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(healthColor)
-            .accessibilityHidden(true)
-          Text(healthSentence)
-            .font(.system(size: 13))
-            .foregroundStyle(.white)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        TintedPushButton("Copy diagnostics") { model.copyDiagnostics() }
-      }
-      Card {
         SectionLabel(text: "Support RoomCast")
         SupportLinks()
       }
@@ -442,7 +428,7 @@ struct RunningTab: View {
   }
 
   private var shouldPulse: Bool {
-    isLive && !model.noSignal && healthLooksGood
+    isLive && !model.noSignal
   }
 
   private var statusColor: Color {
@@ -454,98 +440,6 @@ struct RunningTab: View {
     default:
       return .orange
     }
-  }
-
-  private var healthLooksGood: Bool {
-    let line = model.healthLine
-    let folded = line.lowercased()
-    if folded.contains("audio healthy") { return true }
-    if line.contains("— OK") { return true }
-    return folded == "ready"
-  }
-
-  private var healthSymbol: String {
-    switch model.phase {
-    case .stopped:
-      return "pause.circle"
-    case .live where shouldPulse:
-      return "checkmark.circle.fill"
-    default:
-      return "exclamationmark.triangle.fill"
-    }
-  }
-
-  private var healthColor: Color {
-    switch model.phase {
-    case .stopped:
-      return Color.gray
-    case .live where shouldPulse:
-      return AppChrome.heading
-    default:
-      return .orange
-    }
-  }
-
-  private var healthSentence: String {
-    if model.noSignal && isLive {
-      return String(
-        localized:
-          "No sound is reaching the input. Check the desk feed and the selected source."
-      )
-    }
-    switch model.phase {
-    case .stopped:
-      return String(localized: "Not broadcasting.")
-    case .starting:
-      return String(localized: "Starting the broadcast.")
-    case .live where healthLooksGood:
-      return String(
-        format: String(localized: "Sound is reaching listeners. Checked %@."), healthClock)
-    case .waitingForDevice:
-      return String(localized: "The audio interface is unplugged. Plug it back in.")
-    default:
-      return healthFix(model.healthLine)
-    }
-  }
-
-  private var healthClock: String {
-    let token = model.healthLine.split(separator: " ").first.map(String.init) ?? ""
-    let parts = token.split(separator: ":")
-    if parts.count >= 2, parts[0].allSatisfy(\.isNumber), parts[1].count == 2 {
-      return "\(parts[0]):\(parts[1])"
-    }
-    let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.dateFormat = "HH:mm"
-    return formatter.string(from: model.now)
-  }
-
-  private func healthFix(_ line: String) -> String {
-    let folded = line.lowercased()
-    if folded.contains("stalled") {
-      return String(localized: "The audio stalled. RoomCast is restarting it.")
-    }
-    if folded.contains("unplugged") {
-      return String(localized: "The audio interface is unplugged. Plug it back in.")
-    }
-    if folded.contains("not answering") {
-      return String(localized: "The listener server is not answering. RoomCast is retrying.")
-    }
-    if folded.contains("retry") || folded.contains("keeps stopping") {
-      return String(
-        localized:
-          "The stream hit a problem and is retrying. Copy diagnostics if it continues."
-      )
-    }
-    let sentence = line.split(whereSeparator: \.isNewline).first.map(String.init) ?? line
-    if sentence.isEmpty || sentence == "Ready" {
-      return String(localized: "Something needs attention. Copy diagnostics for the details.")
-    }
-    let parts = sentence.split(separator: " ", maxSplits: 1).map(String.init)
-    if let first = parts.first, first.contains(":"), parts.count == 2 {
-      return parts[1]
-    }
-    return sentence
   }
 
   private var levelText: String {
@@ -615,7 +509,7 @@ enum AppLinks {
   static let buyMeACoffee = URL(string: "https://buymeacoffee.com/roomcast")!
 }
 
-/// Ko-fi, Patreon, and Buy Me a Coffee, in the card under Health.
+/// Ko-fi, Patreon, and Buy Me a Coffee, in the support card.
 struct SupportLinks: View {
   var body: some View {
     HStack(spacing: 10) {

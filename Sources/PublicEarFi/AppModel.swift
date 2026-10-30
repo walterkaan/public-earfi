@@ -56,6 +56,9 @@ final class AppModel: ObservableObject {
   /// The preview meter must not open the device during this time: a second
   /// engine rebinding it leaves the 48 kHz capture tap with nothing to write.
   private var captureOwnsInput = false
+  /// Last known LAN reachability while live, for Wi-Fi lost/restored alerts.
+  private var hadReachableLAN: Bool?
+  private var lastDockVUUpdate = Date.distantPast
   private var silenceWatch = SilenceWatch()
   private var timer: Timer?
   private var meterTimer: Timer?
@@ -87,6 +90,7 @@ final class AppModel: ObservableObject {
         if previous != count {
           self.announce("\(count) listening")
         }
+        self.refreshChrome()
       }
     }
     controller.onLog = { [weak self] line in
@@ -141,6 +145,13 @@ final class AppModel: ObservableObject {
     default:
       return true
     }
+  }
+
+  /// Dock badge / VU and the floating mini-player.
+  func refreshChrome() {
+    DockFeedback.shared.sync(
+      listeners: listeners, level: levelFraction, broadcasting: isBroadcasting)
+    MiniPlayerController.shared.sync()
   }
 
   var hasPendingChanges: Bool {
@@ -670,12 +681,17 @@ final class AppModel: ObservableObject {
       listeners = 0
       runningSignature = nil
       captureOwnsInput = false
+      hadReachableLAN = nil
       restartMeter()
     case .starting, .live, .waitingForDevice, .problem:
       captureOwnsInput = true
       meter.stop()
+      if hadReachableLAN == nil {
+        hadReachableLAN = rankedNetworks.contains(where: \.isUp) && selectedIP != nil
+      }
     }
     updateSleepAssertion()
+    refreshChrome()
   }
 
   private func updateSleepAssertion() {
@@ -706,6 +722,15 @@ final class AppModel: ObservableObject {
     }
     notePeak()
     noteLevelAnnouncement()
+    if isBroadcasting {
+      let now = Date()
+      if now.timeIntervalSince(lastDockVUUpdate) >= 0.12 {
+        lastDockVUUpdate = now
+        DockFeedback.shared.sync(
+          listeners: listeners, level: levelFraction, broadcasting: true)
+        MiniPlayerController.shared.sync()
+      }
+    }
   }
 
   private func notePeak() {
@@ -782,6 +807,20 @@ final class AppModel: ObservableObject {
     networks = InterfaceEnumerator.candidates()
     knownSSID = InterfaceEnumerator.currentSSID()
     let ip = selectedIP
+    let reachable = rankedNetworks.contains(where: \.isUp) && ip != nil
+    if isBroadcasting {
+      if let hadReachableLAN {
+        if hadReachableLAN && !reachable {
+          BroadcastNotifier.wifiLost()
+          health = "Wi-Fi was lost. Broadcasting will resume when the network returns."
+        } else if !hadReachableLAN && reachable {
+          BroadcastNotifier.wifiRestored()
+        }
+      }
+      hadReachableLAN = reachable
+    } else {
+      hadReachableLAN = nil
+    }
     if let lastAnnouncedIP, let ip, lastAnnouncedIP != ip, isBroadcasting {
       health = "Address changed to \(ip). Listeners need the new link."
     }

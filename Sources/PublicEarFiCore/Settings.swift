@@ -64,11 +64,11 @@ public struct AppSettings: Codable, Equatable {
 
   public init(
     inputDeviceUID: String? = nil,
-    channelMode: ChannelMode = .mono,
+    channelMode: ChannelMode = .stereo,
     inputChannel: Int = 1,
     inputGainDB: Double = InputGain.defaultDB,
-    quality: QualityPreset = .speech,
-    customBitrateKbps: Int = 64,
+    quality: QualityPreset = .music,
+    customBitrateKbps: Int = 96,
     streamName: String = "live",
     broadcastTitle: String = "",
     listenerPort: Int = 8889,
@@ -135,7 +135,8 @@ public struct AppSettings: Codable, Equatable {
     case .standard:
       return 64
     case .music:
-      return channelMode == .stereo ? 128 : 96
+      // Matches the Music 96k label for both mono and stereo.
+      return 96
     case .custom:
       return min(256, max(16, customBitrateKbps))
     }

@@ -333,7 +333,7 @@ struct FirstRunSheet: View {
       }
       HStack {
         Spacer()
-        TintedPushButton("Not now") { dismiss() }
+        TintedPushButton("Close") { dismiss() }
         GreenPushButton("Choose Sound Source") { model.finishFirstRun() }
           .keyboardShortcut(.defaultAction)
       }

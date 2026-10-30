@@ -6,13 +6,13 @@ final class SettingsTests: XCTestCase {
   func testDefaultsMatchTheSpecTable() {
     let settings = AppSettings.defaults
     XCTAssertNil(settings.inputDeviceUID)
-    XCTAssertEqual(settings.channelMode, .mono)
+    XCTAssertEqual(settings.channelMode, .stereo)
     XCTAssertEqual(settings.inputChannel, 1)
     XCTAssertEqual(settings.inputGainDB, 0)
     XCTAssertEqual(FFmpegCommand.sampleRate, 48_000)
-    XCTAssertEqual(settings.quality, .speech)
-    XCTAssertEqual(settings.resolvedBitrateKbps, 32)
-    XCTAssertEqual(settings.opusApplication, "voip")
+    XCTAssertEqual(settings.quality, .music)
+    XCTAssertEqual(settings.resolvedBitrateKbps, 96)
+    XCTAssertEqual(settings.opusApplication, "audio")
     XCTAssertEqual(settings.streamName, "live")
     XCTAssertEqual(settings.listenerPort, 8889)
     XCTAssertEqual(settings.icePort, 8189)
@@ -35,7 +35,7 @@ final class SettingsTests: XCTestCase {
     XCTAssertTrue(settings.posterUseFooter)
     XCTAssertEqual(AppSettings.listenerTarget, 30)
     XCTAssertEqual(
-      settings.bandwidthHint, "Speech · 32 kbps · about 30 phones ≈ 0.96 Mbps")
+      settings.bandwidthHint, "Music · 96 kbps · about 30 phones ≈ 2.88 Mbps")
     XCTAssertTrue(validate(settings).isEmpty)
   }
 
@@ -56,10 +56,10 @@ final class SettingsTests: XCTestCase {
     XCTAssertEqual(
       settings.bandwidthHint, "Music · 96 kbps · about 30 phones ≈ 2.88 Mbps")
     settings.channelMode = .stereo
-    XCTAssertEqual(settings.resolvedBitrateKbps, 128)
+    XCTAssertEqual(settings.resolvedBitrateKbps, 96)
     XCTAssertEqual(
-      settings.bandwidthHint, "Music · 128 kbps · about 30 phones ≈ 3.84 Mbps")
-    XCTAssertEqual(formatMbps(settings.estimatedMegabits(listeners: 10)), "1.28")
+      settings.bandwidthHint, "Music · 96 kbps · about 30 phones ≈ 2.88 Mbps")
+    XCTAssertEqual(formatMbps(settings.estimatedMegabits(listeners: 10)), "0.96")
 
     settings.quality = .custom
     settings.customBitrateKbps = 16
