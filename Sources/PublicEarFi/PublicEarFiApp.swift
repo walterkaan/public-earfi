@@ -20,11 +20,11 @@ struct PublicEarFiApp: App {
     WindowGroup("RoomCast 1.0 Beta Release", id: "main") {
       RootView()
         .environmentObject(model)
-        .frame(minWidth: 620, minHeight: 820)
+        .frame(minWidth: 520, minHeight: 820)
         .preferredColorScheme(.dark)
         .background(MainWindowLifecycle(model: model, appDelegate: appDelegate))
     }
-    .defaultSize(width: 680, height: 860)
+    .defaultSize(width: 560, height: 900)
     .commands {
       AppMenus(model: model)
     }
@@ -168,6 +168,7 @@ enum AppIdentity {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
   static weak var shared: AppDelegate?
+  @MainActor private static var reopenInFlight = false
   weak var model: AppModel?
   var openMainWindow: (() -> Void)?
 
@@ -216,8 +217,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   /// Brings the main broadcast window back when it was closed or miniaturised.
+  /// Idempotent: reuses any existing main window and ignores overlapping reopen calls.
   @MainActor
   static func reopenMainWindow() {
+    if reopenInFlight { return }
+    reopenInFlight = true
+    defer {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+        reopenInFlight = false
+      }
+    }
+
     if let window = MiniPlayerController.mainWindow() {
       if window.isMiniaturized {
         window.deminiaturize(nil)
@@ -226,16 +236,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       NSApp.activate(ignoringOtherApps: true)
       return
     }
-    // SwiftUI dropped the WindowGroup instance; open a fresh one.
-    let conf = NSApplication.shared.windows
-    for window in conf where window.title.hasPrefix("RoomCast") {
-      window.makeKeyAndOrderFront(nil)
-      return
+
+    // Only one open path — openWindow callback OR notification, never both.
+    if let open = shared?.openMainWindow {
+      open()
+    } else {
+      NotificationCenter.default.post(name: .roomCastOpenMainWindow, object: nil)
     }
-    shared?.openMainWindow?()
-    NotificationCenter.default.post(name: .roomCastOpenMainWindow, object: nil)
     NSApp.activate(ignoringOtherApps: true)
   }
+
 }
 
 extension Notification.Name {

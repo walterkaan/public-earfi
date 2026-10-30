@@ -271,15 +271,17 @@ struct RunningTab: View {
             .accessibilityLabel(qrAccessibility)
             VStack(alignment: .leading, spacing: 6) {
               Text(shownURL)
-                .font(.system(size: 22, weight: .semibold, design: .monospaced))
+                .font(.system(size: 20, weight: .semibold, design: .monospaced))
                 .lineLimit(1)
-                .minimumScaleFactor(0.55)
+                .minimumScaleFactor(0.5)
                 .textSelection(.enabled)
               if let secondary = model.secondaryURL {
                 Text("Doesn't work? Try: \(shownHost(secondary))")
                   .helperText()
                   .textSelection(.enabled)
               }
+              TintedPushButton(linkCopied ? "Copied" : "Copy link") { copyListenerLink() }
+                .disabled(model.listenerURL == nil)
               if model.settings.urlStyle == .localHostname {
                 Text("Some Android phones can't open .local addresses.")
                   .helperText()
@@ -301,11 +303,10 @@ struct RunningTab: View {
           }
         }
         HStack {
-          TintedPushButton(linkCopied ? "Copied" : "Copy link") { copyListenerLink() }
-            .disabled(model.listenerURL == nil)
           TintedPushButton("Open PDF QR Poster") { model.openQuickPosterPDF() }
             .disabled(model.listenerURL == nil)
             .help("Save a PDF of the QR poster and open it. Print that PDF yourself.")
+          Spacer(minLength: 0)
         }
         if model.rankedNetworks.count > 1 {
           Picker("Address", selection: addressBinding) {
@@ -330,6 +331,13 @@ struct RunningTab: View {
       Card {
         SectionLabel(text: "Support RoomCast")
         SupportLinks()
+        HStack(spacing: 10) {
+          TintedPushButton("Getting Started") { model.reopenGettingStarted() }
+          TintedPushButton("FAQ") { model.openFAQ() }
+          TintedPushButton("Troubleshooting") { model.openTroubleshooting() }
+          Spacer(minLength: 0)
+        }
+        .padding(.top, 4)
       }
       if model.hasPendingChanges {
         WarningBanner(
@@ -339,13 +347,6 @@ struct RunningTab: View {
         ) {
           model.applyNow()
         }
-      }
-      Spacer(minLength: 8)
-      HStack(spacing: 10) {
-        Spacer()
-        TintedPushButton("Getting Started") { model.reopenGettingStarted() }
-        TintedPushButton("FAQ") { model.openFAQ() }
-        Spacer()
       }
     }
     .onAppear { pulse = true }

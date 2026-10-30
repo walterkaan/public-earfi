@@ -2,6 +2,21 @@ import AppKit
 import SwiftUI
 import UserNotifications
 
+/// Loads the packaged RoomCast icon, falling back to the application icon image.
+enum RoomCastIcon {
+  static var image: NSImage {
+    if let url = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+      let image = NSImage(contentsOf: url)
+    {
+      return image
+    }
+    if let named = NSImage(named: "AppIcon") {
+      return named
+    }
+    return NSApp.applicationIconImage ?? NSImage(size: NSSize(width: 128, height: 128))
+  }
+}
+
 /// Local alerts when Wi-Fi drops or returns while broadcasting.
 enum BroadcastNotifier {
   private static let category = "roomcast.network"
@@ -15,7 +30,9 @@ enum BroadcastNotifier {
   }
 
   static func wifiRestored() {
-    post(id: "wifi-restored", title: "RoomCast", body: "Wi-Fi is back. Share the listener link again if the address changed.")
+    post(
+      id: "wifi-restored", title: "RoomCast",
+      body: "Wi-Fi is back. Share the listener link again if the address changed.")
   }
 
   private static func post(id: String, title: String, body: String) {
@@ -51,11 +68,14 @@ final class MiniPlayerController {
     let want = shouldShow(for: model)
     if want {
       show(model: model)
-      hosting?.rootView = MiniPlayerView(model: model, onStop: { [weak model] in
-        model?.toggleBroadcast()
-      }, onReveal: { [weak self] in
-        self?.revealMainWindow()
-      })
+      hosting?.rootView = MiniPlayerView(
+        model: model,
+        onStop: { [weak model] in
+          model?.toggleBroadcast()
+        },
+        onReveal: { [weak self] in
+          self?.revealMainWindow()
+        })
     } else {
       hide()
     }
@@ -71,13 +91,16 @@ final class MiniPlayerController {
 
   private func show(model: AppModel) {
     if panel == nil {
-      let view = MiniPlayerView(model: model, onStop: { [weak model] in
-        model?.toggleBroadcast()
-      }, onReveal: { [weak self] in
-        self?.revealMainWindow()
-      })
+      let view = MiniPlayerView(
+        model: model,
+        onStop: { [weak model] in
+          model?.toggleBroadcast()
+        },
+        onReveal: { [weak self] in
+          self?.revealMainWindow()
+        })
       let host = NSHostingView(rootView: view)
-      host.frame = NSRect(x: 0, y: 0, width: 220, height: 72)
+      host.frame = NSRect(x: 0, y: 0, width: 220, height: 78)
       let panel = NSPanel(
         contentRect: host.frame,
         styleMask: [.borderless, .nonactivatingPanel, .utilityWindow],
@@ -110,11 +133,17 @@ final class MiniPlayerController {
   private func initialOrigin(size: NSSize) -> NSPoint {
     if let saved = UserDefaults.standard.string(forKey: positionKey) {
       let origin = NSPointFromString(saved)
-      return clampedOrigin(origin, size: size)
+      // Zero origin usually means a failed parse; fall through to default.
+      if origin != .zero {
+        return clampedOrigin(origin, size: size)
+      }
     }
     guard let screen = NSScreen.main else { return .zero }
     let visible = screen.visibleFrame
-    return NSPoint(x: visible.maxX - size.width - 24, y: visible.minY + 24)
+    // Default: top-right of the visible screen.
+    return NSPoint(
+      x: visible.maxX - size.width - 24,
+      y: visible.maxY - size.height - 24)
   }
 
   private func hide() {
@@ -122,9 +151,11 @@ final class MiniPlayerController {
   }
 
   private func clampedOrigin(_ origin: NSPoint, size: NSSize) -> NSPoint {
-    guard let screen = NSScreen.screens.first(where: {
-      $0.frame.contains(origin)
-    }) ?? NSScreen.main else { return origin }
+    guard
+      let screen = NSScreen.screens.first(where: {
+        $0.frame.contains(origin)
+      }) ?? NSScreen.main
+    else { return origin }
     let visible = screen.visibleFrame
     return NSPoint(
       x: min(max(origin.x, visible.minX), visible.maxX - size.width),
@@ -135,13 +166,22 @@ final class MiniPlayerController {
     AppDelegate.reopenMainWindow()
   }
 
+  /// Prefer the visible main window; otherwise any RoomCast document window
+  /// that is not the floating mini-player (including closed/hidden ones).
   static func mainWindow() -> NSWindow? {
-    NSApp.windows.first { window in
-      guard window.canBecomeMain || window.canBecomeKey else { return false }
+    let candidates = NSApp.windows.filter { window in
       if window is NSPanel { return false }
+      if window == MiniPlayerController.shared.panel { return false }
       let title = window.title
       return title.hasPrefix("RoomCast")
     }
+    if let visible = candidates.first(where: { $0.isVisible && !$0.isMiniaturized }) {
+      return visible
+    }
+    if let mini = candidates.first(where: \.isMiniaturized) {
+      return mini
+    }
+    return candidates.first
   }
 }
 
@@ -152,6 +192,12 @@ private struct MiniPlayerView: View {
 
   var body: some View {
     HStack(spacing: 10) {
+      Image(nsImage: RoomCastIcon.image)
+        .resizable()
+        .interpolation(.high)
+        .frame(width: 28, height: 28)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 4) {
         Text(model.isBroadcasting ? "Live" : "Idle")
           .font(.system(size: 11, weight: .semibold))
@@ -181,7 +227,7 @@ private struct MiniPlayerView: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 10)
-    .frame(width: 220, height: 72)
+    .frame(width: 220, height: 78)
     .background {
       RoundedRectangle(cornerRadius: 12, style: .continuous)
         .fill(.ultraThinMaterial)
@@ -202,7 +248,6 @@ final class DockFeedback {
   static let shared = DockFeedback()
 
   private var meterView: DockMeterView?
-  private var lastLevel: Double = 0
   private var active = false
 
   func sync(listeners: Int, level: Double, broadcasting: Bool) {
@@ -214,7 +259,6 @@ final class DockFeedback {
         meterView = view
         tile.contentView = view
       }
-      lastLevel = level
       meterView?.level = level
       meterView?.needsDisplay = true
       tile.display()
@@ -233,7 +277,7 @@ private final class DockMeterView: NSView {
   var level: Double = 0
 
   override func draw(_ dirtyRect: NSRect) {
-    guard let icon = NSApp.applicationIconImage else { return }
+    let icon = RoomCastIcon.image
     let bounds = self.bounds
     icon.draw(
       in: bounds, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true,

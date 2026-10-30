@@ -601,6 +601,13 @@ final class AppModel: ObservableObject {
     }
   }
 
+  /// The public troubleshooting guide.
+  func openTroubleshooting() {
+    if let url = URL(string: "https://roomcast.channel/troubleshooting.html") {
+      NSWorkspace.shared.open(url)
+    }
+  }
+
   func openNotices() {
     if let url = URL(
       string: "https://github.com/walterkaan/public-earfi/blob/main/THIRD_PARTY_NOTICES.md")
