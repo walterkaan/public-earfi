@@ -32,7 +32,8 @@ struct PublicEarFiApp: App {
     Settings {
       SettingsTab()
         .environmentObject(model)
-        .frame(width: 700, height: 600)
+        .frame(minWidth: 760, minHeight: 560)
+        .frame(width: 820, height: 620)
         .preferredColorScheme(.dark)
     }
 

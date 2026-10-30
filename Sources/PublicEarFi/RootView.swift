@@ -752,20 +752,16 @@ struct SettingsTab: View {
   @EnvironmentObject private var model: AppModel
   @State private var confirmReset = false
   @State private var closeSettingsRequest = 0
+  @State private var selected: SettingsPane = .audio
+  @State private var search = ""
 
   var body: some View {
-    TabView {
-      settingsPage { soundFields }
-        .tabItem { Label("Sound", systemImage: "mic") }
-      settingsPage { posterFields }
-        .tabItem { Label("Poster", systemImage: "qrcode") }
-      settingsPage { streamFields }
-        .tabItem { Label("Stream", systemImage: "antenna.radiowaves.left.and.right") }
-      settingsPage { macFields }
-        .tabItem { Label("This Mac", systemImage: "desktopcomputer") }
-      settingsPage { advancedFields }
-        .tabItem { Label("Advanced", systemImage: "gearshape") }
+    NavigationSplitView {
+      settingsSidebar
+    } detail: {
+      settingsDetail
     }
+    .navigationSplitViewStyle(.balanced)
     .background(AppChrome.window)
     .background(CloseSettingsWindow(request: closeSettingsRequest))
     .background(
@@ -776,6 +772,11 @@ struct SettingsTab: View {
     .background(SettingsAutosave { model.saveAndCloseSettings() })
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .id(model.settingsRevision)
+    .onChange(of: search) { _ in
+      if !filteredPanes.contains(selected), let first = filteredPanes.first {
+        selected = first
+      }
+    }
     .alert(
       "Reset every setting, including the poster text and the Wi-Fi password?",
       isPresented: $confirmReset
@@ -790,26 +791,113 @@ struct SettingsTab: View {
     }
   }
 
-  private func settingsPage<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+  private var filteredPanes: [SettingsPane] {
+    let query = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard !query.isEmpty else { return SettingsPane.allCases }
+    return SettingsPane.allCases.filter { pane in
+      pane.title.lowercased().contains(query)
+        || pane.description.lowercased().contains(query)
+        || pane.keywords.contains(where: { $0.contains(query) })
+    }
+  }
+
+  private var settingsSidebar: some View {
     VStack(spacing: 0) {
-      VStack(alignment: .leading, spacing: 12) {
-        content()
-        if let issue = validate(model.settings).first {
-          Text(issue.message)
-            .font(.system(size: 13))
-            .foregroundStyle(Color(red: 1, green: 0.62, blue: 0.58))
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        Spacer(minLength: 12)
+      HStack {
+        Image(systemName: "magnifyingglass")
+          .foregroundStyle(.secondary)
+        TextField("Search", text: $search)
+          .textFieldStyle(.plain)
       }
-      .padding(.horizontal, 16)
-      .padding(.top, 16)
-      .padding(.bottom, 12)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .padding(8)
+      .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.08)))
+      .padding(.horizontal, 12)
+      .padding(.top, 12)
+      .padding(.bottom, 8)
+
+      List(selection: $selected) {
+        ForEach(filteredPanes) { pane in
+          Label {
+            Text(pane.title)
+          } icon: {
+            SettingsSidebarIcon(symbol: pane.symbol, tint: pane.tint)
+          }
+          .tag(pane)
+        }
+      }
+      .listStyle(.sidebar)
+      .scrollContentBackground(.hidden)
+    }
+    .background(AppChrome.window)
+    .frame(minWidth: 200)
+  }
+
+  private var settingsDetail: some View {
+    VStack(spacing: 0) {
+      ScrollView {
+        VStack(alignment: .center, spacing: 18) {
+          settingsHeader(for: selected)
+          VStack(alignment: .leading, spacing: 14) {
+            paneContent(selected)
+            if let issue = validate(model.settings).first {
+              Text(issue.message)
+                .font(.system(size: 13))
+                .foregroundStyle(Color(red: 1, green: 0.62, blue: 0.58))
+                .fixedSize(horizontal: false, vertical: true)
+            }
+          }
+          .padding(16)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+              .fill(AppChrome.card)
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+              .stroke(Color.white.opacity(0.08), lineWidth: 1)
+          )
+          .padding(.horizontal, 24)
+          .padding(.bottom, 16)
+        }
+        .padding(.top, 20)
+        .frame(maxWidth: .infinity)
+      }
       settingsSaveRow
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(AppChrome.window)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  private func settingsHeader(for pane: SettingsPane) -> some View {
+    VStack(spacing: 8) {
+      SettingsSidebarIcon(symbol: pane.symbol, tint: pane.tint, side: 56, pointSize: 26)
+      Text(pane.title)
+        .font(.system(size: 22, weight: .bold))
+        .foregroundStyle(.white)
+      Text(pane.description)
+        .font(.system(size: 13))
+        .foregroundStyle(AppChrome.helper)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: 420)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.horizontal, 24)
+  }
+
+  @ViewBuilder
+  private func paneContent(_ pane: SettingsPane) -> some View {
+    switch pane {
+    case .audio:
+      soundFields
+    case .stream:
+      streamFields
+    case .poster:
+      posterFields
+    case .general:
+      macFields
+    case .advanced:
+      advancedFields
+    }
   }
 
   private var settingsSaveRow: some View {
@@ -836,7 +924,6 @@ struct SettingsTab: View {
 
   @ViewBuilder
   private var soundFields: some View {
-    SectionLabel(text: "Audio input")
     LabeledRow(title: "Device") {
       Picker("Device", selection: deviceBinding) {
         Text("Automatic").tag(String?.none)
@@ -895,7 +982,6 @@ struct SettingsTab: View {
 
   @ViewBuilder
   private var posterFields: some View {
-    SectionLabel(text: "Poster")
     LabeledRow(title: "Wi-Fi name") {
       TextField("Network name", text: posterNetworkBinding)
         .frame(maxWidth: 280)
@@ -943,7 +1029,6 @@ struct SettingsTab: View {
 
   @ViewBuilder
   private var streamFields: some View {
-    SectionLabel(text: "Stream")
     LabeledRow(title: "Stream name") {
       TextField("live", text: streamBinding)
         .frame(width: 120)
@@ -975,7 +1060,6 @@ struct SettingsTab: View {
 
   @ViewBuilder
   private var macFields: some View {
-    SectionLabel(text: "This Mac")
     Toggle("Keep Mac awake while broadcasting", isOn: awakeBinding)
     Text(
       "Closing the laptop lid will still sleep the Mac unless it is on power with an external display."
@@ -992,7 +1076,6 @@ struct SettingsTab: View {
 
   @ViewBuilder
   private var advancedFields: some View {
-    SectionLabel(text: "Advanced")
     LabeledRow(title: "ICE port") {
       TextField("8189", text: iceText).frame(width: 80)
     }
@@ -1150,6 +1233,93 @@ struct SettingsTab: View {
       set: { value in model.mutate { $0.posterWiFiHidden = value } })
   }
 }
+
+/// Sidebar panes for the System Settings–style window.
+private enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
+  case audio
+  case stream
+  case poster
+  case general
+  case advanced
+
+  var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .audio: return "Audio"
+    case .stream: return "Stream"
+    case .poster: return "Poster"
+    case .general: return "General"
+    case .advanced: return "Advanced"
+    }
+  }
+
+  var symbol: String {
+    switch self {
+    case .audio: return "mic.fill"
+    case .stream: return "dot.radiowaves.left.and.right"
+    case .poster: return "qrcode"
+    case .general: return "gearshape.fill"
+    case .advanced: return "slider.horizontal.3"
+    }
+  }
+
+  var tint: Color {
+    switch self {
+    case .audio: return Color(red: 1.0, green: 0.35, blue: 0.45)
+    case .stream: return Color(red: 0.25, green: 0.55, blue: 1.0)
+    case .poster: return Color(red: 0.55, green: 0.35, blue: 0.95)
+    case .general: return Color(red: 0.45, green: 0.50, blue: 0.58)
+    case .advanced: return Color(red: 0.95, green: 0.55, blue: 0.20)
+    }
+  }
+
+  var description: String {
+    switch self {
+    case .audio:
+      return "Choose the microphone or desk feed, channels, and stream quality."
+    case .stream:
+      return "Name the broadcast and how RoomCast talks to phones on the Wi-Fi."
+    case .poster:
+      return "Wi-Fi details printed on the QR poster so guests can join and listen."
+    case .general:
+      return "Keep the Mac awake, launch at login, and start broadcasting automatically."
+    case .advanced:
+      return "Ports, listener limits, logging, and custom bitrate for organisers who need them."
+    }
+  }
+
+  var keywords: [String] {
+    switch self {
+    case .audio:
+      return ["mic", "device", "mono", "stereo", "quality", "speech", "music", "bitrate", "blackhole"]
+    case .stream:
+      return ["port", "title", "udp", "tcp", "network", "name"]
+    case .poster:
+      return ["wifi", "wi-fi", "password", "ssid", "security", "hidden", "qr"]
+    case .general:
+      return ["awake", "login", "launch", "autostart", "sleep"]
+    case .advanced:
+      return ["ice", "webrtc", "url", "local", "listeners", "log", "custom", "reset"]
+    }
+  }
+}
+
+private struct SettingsSidebarIcon: View {
+  var symbol: String
+  var tint: Color
+  var side: CGFloat = 26
+  var pointSize: CGFloat = 13
+
+  var body: some View {
+    Image(systemName: symbol)
+      .font(.system(size: pointSize, weight: .semibold))
+      .foregroundStyle(.white)
+      .frame(width: side, height: side)
+      .background(RoundedRectangle(cornerRadius: side * 0.24, style: .continuous).fill(tint))
+  }
+}
+
 
 /// Escape closes the window that contains this view. The main window does not
 /// use it, and a window titled as the broadcast is never closed from here.
