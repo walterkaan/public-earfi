@@ -749,12 +749,15 @@ struct SettingsTab: View {
   @State private var search = ""
 
   var body: some View {
-    NavigationSplitView {
+    // Manual sidebar+detail (not NavigationSplitView): avoids the tall
+    // window toolbar / sidebar-toggle that was covering the detail header
+    // and pushing the sidebar under the traffic lights.
+    HStack(spacing: 0) {
       settingsSidebar
-    } detail: {
+        .frame(width: 220)
+      Divider()
       settingsDetail
     }
-    .navigationSplitViewStyle(.balanced)
     .background(AppChrome.window)
     .background(CloseSettingsWindow(request: closeSettingsRequest))
     .background(
@@ -806,7 +809,7 @@ struct SettingsTab: View {
       .padding(8)
       .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.08)))
       .padding(.horizontal, 12)
-      .padding(.top, 12)
+      .padding(.top, 10)
       .padding(.bottom, 8)
 
       List(selection: $selected) {
@@ -823,7 +826,7 @@ struct SettingsTab: View {
       .scrollContentBackground(.hidden)
     }
     .background(AppChrome.window)
-    .frame(minWidth: 200)
+    .frame(maxHeight: .infinity, alignment: .top)
   }
 
   private var settingsDetail: some View {
@@ -853,13 +856,14 @@ struct SettingsTab: View {
           .padding(.horizontal, 24)
           .padding(.bottom, 16)
         }
-        .padding(.top, 20)
-        .frame(maxWidth: .infinity)
+        .padding(.top, 12)
+        .frame(maxWidth: .infinity, alignment: .top)
       }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
       settingsSaveRow
     }
     .background(AppChrome.window)
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
   }
 
   private func settingsHeader(for pane: SettingsPane) -> some View {
@@ -1379,11 +1383,11 @@ final class EscapeMonitorView: NSView {
   }
 }
 
-/// Sizes the SwiftUI Settings window: ~2/3 the old fixed 620pt height, resizable,
-/// and a new frame-autosave name so macOS does not restore the tall stale frame.
+/// Keeps Settings content below a normal title bar (no fullSizeContentView),
+/// resizable at ~2/3 the old 620pt height, with a fresh frame-autosave name.
 private struct SettingsWindowChrome: NSViewRepresentable {
-  /// Bump when default size changes so old `NSWindow Frame …` keys are ignored.
-  static let autosaveName = "RoomCast.Settings.v2"
+  /// Bump when default size / chrome changes so old frame keys are ignored.
+  static let autosaveName = "RoomCast.Settings.v3"
   static let defaultContentSize = NSSize(width: 820, height: 414)
   static let minContentSize = NSSize(width: 640, height: 360)
 
@@ -1396,6 +1400,12 @@ private struct SettingsWindowChrome: NSViewRepresentable {
   func updateNSView(_ view: NSView, context: Context) {
     DispatchQueue.main.async {
       guard let window = view.window else { return }
+      // Content must sit below a normal title bar — never under traffic lights.
+      if window.styleMask.contains(.fullSizeContentView) {
+        window.styleMask.remove(.fullSizeContentView)
+      }
+      window.titlebarAppearsTransparent = false
+      window.titleVisibility = .visible
       if window.frameAutosaveName != Self.autosaveName {
         window.setFrameAutosaveName(Self.autosaveName)
       }
@@ -1409,7 +1419,6 @@ private struct SettingsWindowChrome: NSViewRepresentable {
 
       guard !context.coordinator.didApply else { return }
       context.coordinator.didApply = true
-      // No v2 autosave yet, or still looking like the old fixed 620-tall window.
       let key = "NSWindow Frame \(Self.autosaveName)"
       let hasSaved = UserDefaults.standard.string(forKey: key) != nil
       let tallLegacy = window.contentLayoutRect.height >= 560
