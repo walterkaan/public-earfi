@@ -712,6 +712,13 @@ final class AppModel: ObservableObject {
       let decibels = controller.recentCaptureDecibels()
       levelDB = decibels
       levelFraction = min(1, max(0, (decibels + 60) / 60))
+      // Drive SilenceWatch off the same reading the meter shows (30 Hz).
+      // The 1 Hz tick used to sample separately and could trip noSignal while
+      // the bar still had real level — then the UI greying zeroed the meter.
+      if case .live = phase {
+        silenceWatch.update(decibels: decibels, now: Date())
+        noSignal = silenceWatch.showing
+      }
     } else {
       let reading = meter.latest()
       levelDB = reading.decibels
@@ -760,10 +767,11 @@ final class AppModel: ObservableObject {
 
   private func tick() {
     now = Date()
-    if case .live = phase {
-      silenceWatch.update(decibels: controller.recentCaptureDecibels(), now: now)
-      noSignal = silenceWatch.showing
-    } else {
+    // noSignal is updated in pollMeter while live (same cadence as the meter).
+    switch phase {
+    case .live:
+      break
+    default:
       silenceWatch.reset()
       noSignal = false
     }

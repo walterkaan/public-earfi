@@ -192,13 +192,13 @@ struct RunningTab: View {
             .helperText()
             .frame(width: 90, alignment: .leading)
           LevelBar(
-            fraction: model.noSignal ? 0 : model.levelFraction,
-            peak: model.noSignal ? 0 : model.meterPeakFraction,
-            dimmed: model.noSignal
+            fraction: meterNoSignal ? 0 : model.levelFraction,
+            peak: meterNoSignal ? 0 : model.meterPeakFraction,
+            dimmed: meterNoSignal
           )
           Text(levelText)
             .helperText()
-            .foregroundStyle(model.noSignal ? AppChrome.helper.opacity(0.45) : AppChrome.helper)
+            .foregroundStyle(meterNoSignal ? AppChrome.helper.opacity(0.45) : AppChrome.helper)
             .frame(width: 64, alignment: .trailing)
         }
         .accessibilityElement(children: .ignore)
@@ -449,8 +449,15 @@ struct RunningTab: View {
     }
   }
 
+  /// Grey/empty the meter only when the no-signal warning is up and the live
+  /// reading is still quiet. If capture is clearly audible, keep showing it
+  /// even while SilenceWatch hysteresis has not cleared yet.
+  private var meterNoSignal: Bool {
+    model.noSignal && model.levelDB < CaptureFormatPlan.silenceClearDB
+  }
+
   private var levelText: String {
-    if model.noSignal || model.levelDB <= -100 { return "— dB" }
+    if meterNoSignal || model.levelDB <= -100 { return "— dB" }
     return String(format: "%.0f dB", model.levelDB)
   }
 
