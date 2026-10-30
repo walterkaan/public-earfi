@@ -123,7 +123,7 @@ public struct QuickPosterPlan: Equatable {
 public enum PosterBuilder {
   public static let footer = "RoomCast: free and open source"
   /// Main-window PDF footer under the step-3 row.
-  public static let poweredBy = "RoomCast · free sound to every phone"
+  public static let poweredBy = "RoomCast · Your Mac's audio cast to every phone on the Wi-Fi"
   public static let listenEyebrow = "LISTEN ON YOUR PHONE"
   public static let scanTagline = "Scan to listen. No app needed."
   public static let joinWiFi = "Join the Wi-Fi"

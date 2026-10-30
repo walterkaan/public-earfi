@@ -593,7 +593,7 @@ final class PosterAndSupervisorTests: XCTestCase {
     XCTAssertTrue(blank[0].hasPrefix("Join Wi-Fi "))
     XCTAssertTrue(blank[0].contains("____"))
     XCTAssertFalse(blank[0].contains("Hall"))
-    XCTAssertEqual(PosterBuilder.poweredBy, "RoomCast · free sound to every phone")
+    XCTAssertEqual(PosterBuilder.poweredBy, "RoomCast · Your Mac's audio cast to every phone on the Wi-Fi")
   }
 
   func testQuickPosterAddsAWiFiCodeWhenTheNetworkIsSet() {

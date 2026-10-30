@@ -117,7 +117,7 @@ def render(scale: int):
     )
     draw.text(
         (title_x, bbox[3] + int(12 * scale)),
-        "Free sound to every phone",
+        "Your Mac's audio cast to every phone on the Wi-Fi",
         font=subtitle_font,
         fill=MUTED,
     )

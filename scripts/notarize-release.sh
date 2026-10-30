@@ -10,7 +10,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-IDENTITY="${SIGN_IDENTITY:-Developer ID Application: Walter Kaan (6G2V545X95)}"
+# Day-to-day builds often export SIGN_IDENTITY=- (ad-hoc). A release must use
+# Developer ID; treat "-" / empty as unset so notarization can succeed.
+_DEFAULT_IDENTITY="Developer ID Application: Walter Kaan (6G2V545X95)"
+if [[ -z "${SIGN_IDENTITY:-}" || "${SIGN_IDENTITY}" == "-" ]]; then
+  IDENTITY="$_DEFAULT_IDENTITY"
+else
+  IDENTITY="$SIGN_IDENTITY"
+fi
 PROFILE="${NOTARY_KEYCHAIN_PROFILE:-roomcast}"
 VERSION="${PUBLIC_EARFI_VERSION:-1.0.0}"
 export SIGN_IDENTITY="$IDENTITY"
