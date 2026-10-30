@@ -23,6 +23,9 @@ enum ListenerPageSelfTest {
     if !html.contains("Waiting for the host to start…") || html.contains("location.reload") {
       return fail("listener page is missing the waiting state")
     }
+    if !html.contains("Tap to listen") || !html.contains("createMediaStreamSource") {
+      return fail("listener page is missing audible unlock / VU meter")
+    }
     let server = ListenerHTTPServer(
       port: 0,
       upstreamPort: 9,

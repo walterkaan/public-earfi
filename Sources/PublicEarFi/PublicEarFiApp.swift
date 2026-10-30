@@ -52,6 +52,17 @@ struct PublicEarFiApp: App {
         .preferredColorScheme(.dark)
     }
     .defaultSize(width: 720, height: 480)
+
+    // Getting Started was a modal sheet (fixed size). A Window is ~2/3 that
+    // height by default and the user can drag-resize it.
+    Window("Getting Started", id: "getting-started") {
+      FirstRunSheet()
+        .environmentObject(model)
+        .frame(minWidth: 420, minHeight: 260)
+        .preferredColorScheme(.dark)
+    }
+    .defaultSize(width: 560, height: 340)
+    .windowResizability(.contentMinSize)
   }
 }
 
@@ -72,6 +83,10 @@ private struct MainWindowLifecycle: View {
         MiniPlayerController.shared.attach(model: model)
         BroadcastNotifier.requestPermission()
         model.refreshChrome()
+        if model.showFirstRun { openWindow(id: "getting-started") }
+      }
+      .onChange(of: model.showFirstRun) { show in
+        if show { openWindow(id: "getting-started") }
       }
       .onReceive(NotificationCenter.default.publisher(for: .roomCastOpenMainWindow)) { _ in
         openWindow(id: "main")

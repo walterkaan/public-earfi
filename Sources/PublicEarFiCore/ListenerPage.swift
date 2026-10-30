@@ -99,7 +99,11 @@ public enum ListenerPage {
       <style>
       html,body{margin:0;padding:0;height:100%;background:#161a42;font-family:Arial,sans-serif;color:#fff}
       #video{position:absolute;top:0;left:0;width:100%;height:calc(100% - 44px);background:#161a42}
-      #message{position:absolute;left:0;top:0;right:0;bottom:44px;display:flex;align-items:center;text-align:center;justify-content:center;font-size:16px;font-weight:bold;color:#fff;pointer-events:none;padding:20px;box-sizing:border-box;text-shadow:0 0 5px #000}
+      #message{position:absolute;left:0;top:0;right:0;bottom:44px;display:flex;align-items:center;text-align:center;justify-content:center;font-size:16px;font-weight:bold;color:#fff;pointer-events:none;padding:20px;box-sizing:border-box;text-shadow:0 0 5px #000;z-index:1}
+      #unlock{position:absolute;left:0;top:0;right:0;bottom:44px;display:none;align-items:center;justify-content:center;z-index:5;background:rgba(22,26,66,0.88);cursor:pointer;-webkit-tap-highlight-color:transparent}
+      #unlockBtn{border:0;border-radius:18px;padding:22px 36px;font-size:22px;font-weight:700;color:#161a42;background:#2fd0bd;box-shadow:0 8px 28px rgba(0,0,0,0.35);pointer-events:none}
+      #vu{position:absolute;left:16px;right:16px;bottom:56px;height:26px;z-index:3;pointer-events:none;opacity:0;transition:opacity .2s}
+      #vu.on{opacity:1}
       #credit{position:absolute;left:0;right:0;bottom:0;height:44px;display:flex;align-items:center;justify-content:center;gap:8px;background:#161a42;border-top:1px solid rgba(47,208,189,0.35);z-index:2;font-size:13px}
       #credit img{width:28px;height:28px;border-radius:7px;display:block}
       #credit a{color:rgba(255,255,255,0.58);text-decoration:none}
@@ -107,14 +111,25 @@ public enum ListenerPage {
       <script defer src="\(readerPath)"></script>
       </head>
       <body>
-      <video id="video" title="\(safeTitle)"></video>
+      <video id="video" title="\(safeTitle)" playsinline webkit-playsinline></video>
       <div id="message">\(waiting)</div>
+      <div id="unlock" role="button" aria-label="\(Self.pageCopy("tapToListen"))"><span id="unlockBtn">\(Self.pageCopy("tapToListen"))</span></div>
+      <canvas id="vu" width="320" height="26" aria-hidden="true"></canvas>
       <script>
       const video=document.getElementById("video");
       const message=document.getElementById("message");
+      const unlock=document.getElementById("unlock");
+      const vu=document.getElementById("vu");
       let defaultControls=false;
       let reader=null;
+      let audioCtx=null;
+      let analyser=null;
+      let meterRAF=0;
+      let audible=false;
+      let trackStream=null;
       const setMessage=(str)=>{video.controls=str!==""?false:defaultControls;message.innerText=str;};
+      const showUnlock=()=>{unlock.style.display="flex";};
+      const hideUnlock=()=>{unlock.style.display="none";};
       const parseBoolString=(str,defaultVal)=>{
       str=(str||"").toLowerCase();
       if(["1","yes","true"].includes(str))return true;
@@ -138,17 +153,117 @@ public enum ListenerPage {
       };
       refreshTitle();
       document.addEventListener("visibilitychange",()=>{
-      if(document.visibilityState==="visible")refreshTitle();
+      if(document.visibilityState==="visible"){
+      refreshTitle();
+      if(audible)startMeter();
+      }else{
+      stopMeter();
+      }
       });
       const loadAttributesFromQuery=()=>{
       const params=new URLSearchParams(window.location.search);
       video.controls=parseBoolString(params.get("controls"),true);
-      video.muted=parseBoolString(params.get("muted"),true);
+      // Prefer unmuted; browsers that block audible autoplay get the Tap overlay.
+      video.muted=parseBoolString(params.get("muted"),false);
       video.autoplay=parseBoolString(params.get("autoplay"),true);
       video.playsInline=parseBoolString(params.get("playsinline"),true);
       video.disablepictureinpicture=parseBoolString(params.get("disablepictureinpicture"),false);
       defaultControls=video.controls;
       };
+      const ensureAudioGraph=()=>{
+      const AC=window.AudioContext||window.webkitAudioContext;
+      if(!AC||!trackStream)return;
+      if(!audioCtx)audioCtx=new AC();
+      if(!analyser){
+      try{
+      const src=audioCtx.createMediaStreamSource(trackStream);
+      analyser=audioCtx.createAnalyser();
+      analyser.fftSize=256;
+      analyser.smoothingTimeConstant=0.75;
+      src.connect(analyser);
+      }catch(err){analyser=null;}
+      }
+      };
+      const stopMeter=()=>{
+      if(meterRAF){cancelAnimationFrame(meterRAF);meterRAF=0;}
+      };
+      const startMeter=()=>{
+      if(!analyser||document.hidden)return;
+      stopMeter();
+      vu.classList.add("on");
+      const bins=new Uint8Array(analyser.frequencyBinCount);
+      const paint=()=>{
+      meterRAF=requestAnimationFrame(paint);
+      if(document.hidden||!analyser)return;
+      analyser.getByteFrequencyData(bins);
+      const w=vu.clientWidth||320;
+      const h=vu.clientHeight||26;
+      if(vu.width!==w)vu.width=w;
+      if(vu.height!==h)vu.height=h;
+      const ctx=vu.getContext("2d");
+      if(!ctx)return;
+      ctx.clearRect(0,0,w,h);
+      const bars=24;
+      const gap=2;
+      const bw=Math.max(2,(w-(bars-1)*gap)/bars);
+      for(let i=0;i<bars;i++){
+      const idx=Math.min(bins.length-1,Math.floor(i*bins.length/bars));
+      const level=bins[idx]/255;
+      const bh=Math.max(2,level*h);
+      const x=i*(bw+gap);
+      ctx.fillStyle="rgba(47,208,189,"+(0.35+level*0.65).toFixed(2)+")";
+      ctx.fillRect(x,h-bh,bw,bh);
+      }
+      };
+      paint();
+      };
+      const markAudible=()=>{
+      audible=true;
+      hideUnlock();
+      ensureAudioGraph();
+      if(audioCtx&&audioCtx.state==="suspended"){
+      audioCtx.resume().catch(()=>{});
+      }
+      startMeter();
+      };
+      const tryAudiblePlay=()=>{
+      video.muted=false;
+      const p=video.play();
+      if(p&&typeof p.then==="function"){
+      return p.then(()=>{
+      if(video.muted){showUnlock();return false;}
+      markAudible();
+      return true;
+      }).catch(()=>{showUnlock();return false;});
+      }
+      if(video.paused||video.muted){showUnlock();return Promise.resolve(false);}
+      markAudible();
+      return Promise.resolve(true);
+      };
+      // Safari iOS: create/resume AudioContext inside the gesture.
+      const unlockFromGesture=()=>{
+      if(!trackStream)return;
+      ensureAudioGraph();
+      const resume=audioCtx?audioCtx.resume():Promise.resolve();
+      Promise.resolve(resume).catch(()=>{}).then(()=>{
+      video.muted=false;
+      const p=video.play();
+      if(p&&typeof p.then==="function"){
+      p.then(markAudible).catch(()=>{showUnlock();});
+      }else{
+      markAudible();
+      }
+      });
+      };
+      const onFirstGesture=()=>{
+      if(audible)return;
+      if(!trackStream)return;
+      unlockFromGesture();
+      };
+      ["pointerdown","touchstart","click"].forEach((type)=>{
+      document.addEventListener(type,onFirstGesture,{passive:true});
+      });
+      unlock.addEventListener("click",(evt)=>{evt.preventDefault();onFirstGesture();});
       const waitingText="\(Self.pageCopy("waiting"))";
       let retryTimer=null;
       let connected=false;
@@ -163,6 +278,7 @@ public enum ListenerPage {
       onError:(err)=>{
       if(ticket!==generation||connected)return;
       setMessage(waitingText);
+      hideUnlock();
       if(retryTimer!==null)clearTimeout(retryTimer);
       retryTimer=setTimeout(connect,1500);
       },
@@ -171,8 +287,10 @@ public enum ListenerPage {
       connected=true;
       if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
       setMessage("");
-      video.srcObject=evt.streams[0];
+      trackStream=evt.streams[0];
+      video.srcObject=trackStream;
       applyTitle(document.title);
+      tryAudiblePlay();
       },
       onDataChannel:(evt)=>{
       evt.channel.binaryType="arraybuffer";
@@ -190,7 +308,7 @@ public enum ListenerPage {
       connect();
       });
       video.addEventListener("play",()=>applyTitle(document.title));
-      window.addEventListener("beforeunload",()=>{if(reader!==null)reader.close();});
+      window.addEventListener("beforeunload",()=>{if(reader!==null)reader.close();stopMeter();if(audioCtx){try{audioCtx.close();}catch(err){}}});
       </script>
       \(credit)
       </body>

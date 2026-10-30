@@ -334,13 +334,23 @@ struct FirstRunSheet: View {
       HStack {
         Spacer()
         TintedPushButton("Close") { dismiss() }
-        GreenPushButton("Choose Sound Source") { model.finishFirstRun() }
+        GreenPushButton("Choose Sound Source") {
+          model.finishFirstRun()
+          dismiss()
+        }
           .keyboardShortcut(.defaultAction)
       }
     }
     .padding(14)
-    .frame(width: 560)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background(AppChrome.window)
+    .onChange(of: model.showFirstRun) { show in
+      if !show { dismiss() }
+    }
+    .onDisappear {
+      // Closing the window (red button or Close) clears the flag so auto-start can run.
+      if model.showFirstRun { model.showFirstRun = false }
+    }
   }
 
   private func welcomeStep(

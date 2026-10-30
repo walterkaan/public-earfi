@@ -34,16 +34,8 @@ struct RootView: View {
     .preferredColorScheme(.dark)
     .toolbarBackground(AppChrome.window, for: .windowToolbar)
     .onAppear { model.onAppear() }
-    .sheet(isPresented: $model.showFirstRun) { FirstRunSheet() }
     .sheet(isPresented: $model.showWhy) { WhySheet() }
     .sheet(isPresented: $model.showQR) { QRSheet() }
-    .alert("Microphone", isPresented: $model.showMicrophoneExplain) {
-      Button("Continue") { model.confirmMicrophoneAndContinue() }
-        .keyboardShortcut(.defaultAction)
-      Button("Not now", role: .cancel) { model.skipMicrophoneAndOpenSettings() }
-    } message: {
-      Text("macOS may ask for microphone permission. This enables RoomCast to connect to your internal mic.")
-    }
     .alert("Allow incoming connections?", isPresented: $model.showFirewall) {
       Button("Continue") { model.confirmFirewallAndStart() }
       Button("Cancel", role: .cancel) {}

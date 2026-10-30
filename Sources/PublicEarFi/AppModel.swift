@@ -17,7 +17,6 @@ final class AppModel: ObservableObject {
   @Published var noSignal = false
   @Published var logLines: [String] = []
   @Published var showFirstRun = false
-  @Published var showMicrophoneExplain = false
   @Published var showFirewall = false
   @Published var showWhy = false
   @Published var showQR = false
@@ -279,13 +278,7 @@ final class AppModel: ObservableObject {
   func finishFirstRun() {
     UserDefaults.standard.set(true, forKey: Self.firstRunKey)
     showFirstRun = false
-    showMicrophoneExplain = true
-  }
-
-  /// The system microphone prompt follows this explainer. Settings opens
-  /// after macOS has asked, so the prompt is not hidden behind that window.
-  func confirmMicrophoneAndContinue() {
-    showMicrophoneExplain = false
+    // Ask for mic access then open Settings — no intermediate alert.
     AVCaptureDevice.requestAccess(for: .audio) { _ in
       Task { @MainActor in
         self.refreshDevices()
@@ -293,11 +286,6 @@ final class AppModel: ObservableObject {
         self.openSettings()
       }
     }
-  }
-
-  func skipMicrophoneAndOpenSettings() {
-    showMicrophoneExplain = false
-    openSettings()
   }
 
   func openSettings() {
