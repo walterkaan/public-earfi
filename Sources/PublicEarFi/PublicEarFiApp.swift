@@ -17,7 +17,7 @@ struct PublicEarFiApp: App {
   @StateObject private var model = AppModel()
 
   var body: some Scene {
-    WindowGroup("RoomCast 1.0 Beta Release", id: "main") {
+    WindowGroup("RoomCast", id: "main") {
       RootView()
         .environmentObject(model)
         .frame(minWidth: 520, minHeight: 820)

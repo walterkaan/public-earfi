@@ -25,10 +25,10 @@ struct RootView: View {
       .padding(.bottom, 16)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .navigationTitle("RoomCast 1.0 Beta Release")
+    .navigationTitle("RoomCast")
     .background {
       // Zero size so this AppKit view cannot paint over the hero.
-      MainWindowTitle(title: "RoomCast 1.0 Beta Release")
+      MainWindowTitle(title: "RoomCast")
         .frame(width: 0, height: 0)
     }
     .preferredColorScheme(.dark)
@@ -1371,7 +1371,7 @@ struct EscapeCloser: NSViewRepresentable {
 final class EscapeMonitorView: NSView {
   var onEscape: (() -> Void)?
   private var monitor: Any?
-  private let mainTitle = "RoomCast 1.0 Beta Release"
+  private let mainTitle = "RoomCast"
 
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()

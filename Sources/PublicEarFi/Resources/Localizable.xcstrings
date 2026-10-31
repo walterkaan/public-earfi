@@ -1101,17 +1101,6 @@
         }
       }
     },
-    "RoomCast 1.0 Beta Release": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "RoomCast 1.0 Beta Release"
-          }
-        }
-      }
-    },
     "Broadcast": {
       "extractionState": "manual",
       "localizations": {
