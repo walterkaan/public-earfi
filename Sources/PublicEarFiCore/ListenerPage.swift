@@ -5,6 +5,8 @@ public enum ListenerAction: Equatable {
   case page
   /// `{"title":"..."}` for the page to read.
   case titleJSON
+  /// Lock-screen / Media Session artwork PNG (96 / 192 / 256 / 512).
+  case artwork(size: Int)
   /// An older `/live` (or the current stream name) link. Send the phone to `/`.
   case redirectRoot
   /// Forward this request to MediaMTX. `path` includes the query when there is one.
@@ -18,6 +20,9 @@ public enum ListenerPage {
   public static let titlePath = "/earfi.json"
   public static let readerPath = "/reader.js"
   public static let whepPath = "/whep"
+  public static let artworkSizes = [96, 192, 256, 512]
+
+  public static func artworkPath(size: Int) -> String { "/artwork-\(size).png" }
 
   public static func action(method: String, requestTarget: String, streamName: String)
     -> ListenerAction
@@ -36,6 +41,9 @@ public enum ListenerPage {
     }
     if (verb == "GET" || verb == "HEAD") && isPageAlias(path, streamName: streamName) {
       return .redirectRoot
+    }
+    if (verb == "GET" || verb == "HEAD"), let size = artworkSize(for: path) {
+      return .artwork(size: size)
     }
     return .notFound
   }
@@ -271,25 +279,70 @@ public enum ListenerPage {
       const stopTimer=()=>{
         if(timerID){clearInterval(timerID);timerID=0;}
       };
+      let sessionTitle="";
+      let sessionHost="";
+      const artworkList=[96,192,256,512].map((size)=>({
+        src:new URL("/artwork-"+size+".png",window.location.href).href,
+        sizes:size+"x"+size,
+        type:"image/png"
+      }));
+      const setSessionPlayback=(state)=>{
+        try{if(navigator.mediaSession)navigator.mediaSession.playbackState=state;}catch(err){}
+      };
+      const refreshMediaSession=()=>{
+        if(!navigator.mediaSession||typeof MediaMetadata!=="function")return;
+        const artist=sessionHost?("from "+sessionHost):"RoomCast";
+        navigator.mediaSession.metadata=new MediaMetadata({
+          title:sessionTitle||"RoomCast",
+          artist:artist,
+          album:"RoomCast Live",
+          artwork:artworkList
+        });
+        // Live stream: do not publish position (avoids a scrubber when possible).
+        setSessionPlayback((audible&&!player.paused)?"playing":"paused");
+      };
+      const clearSeekActions=()=>{
+        if(!navigator.mediaSession||typeof navigator.mediaSession.setActionHandler!=="function")return;
+        ["seekbackward","seekforward","seekto","previoustrack","nexttrack"].forEach((action)=>{
+          try{navigator.mediaSession.setActionHandler(action,null);}catch(err){}
+        });
+      };
+      const bindMediaSessionActions=()=>{
+        if(!navigator.mediaSession||typeof navigator.mediaSession.setActionHandler!=="function")return;
+        const set=(action,handler)=>{try{navigator.mediaSession.setActionHandler(action,handler);}catch(err){}};
+        set("play",()=>{if(!trackStream)return;unlockFromGesture();});
+        set("pause",()=>{
+          if(!audible||player.paused)return;
+          player.pause();
+          setPlayingUI(false);
+          setSessionPlayback("paused");
+        });
+        set("stop",()=>{
+          if(audible&&!player.paused){player.pause();setPlayingUI(false);}
+          setSessionPlayback("none");
+        });
+        clearSeekActions();
+      };
       const applyTitle=(title)=>{
         if(!title)return;
+        sessionTitle=title;
         document.title=title;
         titleEl.textContent=title;
         player.setAttribute("title",title);
-        if(navigator.mediaSession&&typeof MediaMetadata==="function"){
-          navigator.mediaSession.metadata=new MediaMetadata({title:title});
-          try{navigator.mediaSession.playbackState=player.paused?"paused":"playing";}catch(err){}
-        }
+        refreshMediaSession();
       };
       const applyHost=(host)=>{
-        if(!hostEl)return;
-        if(!host){hostEl.hidden=true;hostEl.textContent="";return;}
+        sessionHost=host||"";
+        if(!hostEl){refreshMediaSession();return;}
+        if(!host){hostEl.hidden=true;hostEl.textContent="";refreshMediaSession();return;}
         hostEl.hidden=false;
         hostEl.textContent="from "+host;
+        refreshMediaSession();
       };
       const earfiSpec=\(scriptSpec);
       applyTitle(earfiSpec.title);
       applyHost(earfiSpec.host||"");
+      bindMediaSessionActions();
       const refreshTitle=()=>{
         fetch("\(titlePath)").then((res)=>res.json()).then((data)=>{
           applyTitle(data.title);
@@ -322,6 +375,9 @@ public enum ListenerPage {
         if(!audioCtx)audioCtx=new AC();
         if(!analyser){
           try{
+            // Tap the WebRTC MediaStream (not the <audio> element) so iOS Safari
+            // can analyse levels. Do not connect to destination — playback stays
+            // on the <audio> element / Media Session.
             const src=audioCtx.createMediaStreamSource(trackStream);
             analyser=audioCtx.createAnalyser();
             analyser.fftSize=256;
@@ -329,6 +385,12 @@ public enum ListenerPage {
             src.connect(analyser);
           }catch(err){analyser=null;}
         }
+      };
+      const resumeAudioGraph=()=>{
+        ensureAudioGraph();
+        if(!audioCtx)return Promise.resolve();
+        if(audioCtx.state==="suspended")return audioCtx.resume().catch(()=>{});
+        return Promise.resolve();
       };
       const stopMeter=()=>{
         if(meterRAF){cancelAnimationFrame(meterRAF);meterRAF=0;}
@@ -363,13 +425,13 @@ public enum ListenerPage {
         playBtn.disabled=false;
         setPlayingUI(true);
         setMessage("");
-        ensureAudioGraph();
-        if(audioCtx&&audioCtx.state==="suspended"){
-          audioCtx.resume().catch(()=>{});
-        }
-        startMeter();
         startTimer();
-        try{if(navigator.mediaSession)navigator.mediaSession.playbackState="playing";}catch(err){}
+        clearSeekActions();
+        setSessionPlayback("playing");
+        resumeAudioGraph().then(()=>{
+          if(!analyser)ensureAudioGraph();
+          startMeter();
+        });
       };
       const tryAudiblePlay=()=>{
         player.muted=false;
@@ -385,11 +447,11 @@ public enum ListenerPage {
         markAudible();
         return Promise.resolve(true);
       };
+      // Safari iOS: create/resume AudioContext inside the Play gesture.
       const unlockFromGesture=()=>{
         if(!trackStream)return;
-        ensureAudioGraph();
-        const resume=audioCtx?audioCtx.resume():Promise.resolve();
-        Promise.resolve(resume).catch(()=>{}).then(()=>{
+        resumeAudioGraph().then(()=>{
+          if(!analyser)ensureAudioGraph();
           player.muted=false;
           const p=player.play();
           if(p&&typeof p.then==="function"){
@@ -407,8 +469,10 @@ public enum ListenerPage {
         }
         player.pause();
         setPlayingUI(false);
-        try{if(navigator.mediaSession)navigator.mediaSession.playbackState="paused";}catch(err){}
+        setSessionPlayback("paused");
+        clearSeekActions();
       };
+      playBtn.addEventListener("click",(evt)=>{evt.preventDefault();togglePlayback();});
       playBtn.addEventListener("click",(evt)=>{evt.preventDefault();togglePlayback();});
       const connect=()=>{
         if(connected)return;
@@ -474,6 +538,14 @@ public enum ListenerPage {
     _ = iconHref
     return
       "<footer id=\"credit\"><a href=\"https://roomcast.channel\" target=\"_blank\" rel=\"noopener\">\(label)</a></footer>"
+  }
+
+
+  private static func artworkSize(for path: String) -> Int? {
+    for size in artworkSizes {
+      if path == artworkPath(size: size) { return size }
+    }
+    return nil
   }
 
   private static func htmlEscape(_ text: String) -> String {

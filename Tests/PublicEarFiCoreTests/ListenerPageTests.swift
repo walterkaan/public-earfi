@@ -31,6 +31,17 @@ final class ListenerPageTests: XCTestCase {
       ListenerPage.action(method: "GET", requestTarget: "/earfi.json", streamName: "live"),
       .titleJSON)
     XCTAssertEqual(
+      ListenerPage.action(method: "GET", requestTarget: "/artwork-512.png", streamName: "live"),
+      .artwork(size: 512))
+    XCTAssertEqual(
+      ListenerPage.action(method: "GET", requestTarget: "/artwork-96.png", streamName: "live"),
+      .artwork(size: 96))
+    XCTAssertEqual(
+      ListenerPage.action(method: "GET", requestTarget: "/artwork-64.png", streamName: "live"),
+      .notFound)
+    XCTAssertNotNil(CoreResources.artworkPNG(size: 512))
+    XCTAssertGreaterThan(CoreResources.artworkPNG(size: 512)?.count ?? 0, 100)
+    XCTAssertEqual(
       ListenerPage.action(method: "GET", requestTarget: "/live", streamName: "live"),
       .redirectRoot)
     XCTAssertEqual(
@@ -66,7 +77,14 @@ final class ListenerPageTests: XCTestCase {
     XCTAssertTrue(plain.contains("<title>RoomCast Broadcast</title>"))
     XCTAssertFalse(plain.contains("playerTitle"))
     XCTAssertFalse(plain.contains("status-label"))
-    XCTAssertTrue(plain.contains("new MediaMetadata({title:title})"))
+    XCTAssertTrue(plain.contains("RoomCast Live"))
+    XCTAssertTrue(plain.contains("artworkList"))
+    XCTAssertTrue(plain.contains("/artwork-\"+size+\".png"))
+    XCTAssertTrue(plain.contains("clearSeekActions"))
+    XCTAssertTrue(plain.contains("createMediaStreamSource(trackStream)"))
+    XCTAssertTrue(plain.contains("resumeAudioGraph"))
+    XCTAssertFalse(plain.contains("setPositionState"))
+    XCTAssertFalse(plain.contains("mediaSession.setPositionState"))
     XCTAssertFalse(plain.contains("get(\"title\")"))
     XCTAssertTrue(plain.contains("new URL(\"/whep\""))
     XCTAssertTrue(plain.contains("The listener page could not load."))
@@ -219,6 +237,11 @@ final class ListenerPageTests: XCTestCase {
       port: server.boundPort, request: "GET /earfi.json HTTP/1.1\r\nHost: x\r\n\r\n")
     XCTAssertTrue(json.contains("\"title\":\"Hall A\""))
     XCTAssertTrue(json.contains("\"host\":\"Hall Mac\""))
+
+    let art = exchange(
+      port: server.boundPort, request: "HEAD /artwork-512.png HTTP/1.1\r\nHost: x\r\n\r\n")
+    XCTAssertTrue(art.contains("200"))
+    XCTAssertTrue(art.lowercased().contains("content-type: image/png"))
 
     server.update(title: "Hall B", streamName: "hall")
     let renamed = exchange(

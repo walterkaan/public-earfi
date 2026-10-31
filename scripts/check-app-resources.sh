@@ -26,6 +26,9 @@ resources="$APP/Contents/Resources"
 require_dir "$resources"
 require_file "$resources/favicon.png"
 require_file "$resources/ListenerPage.en.json"
+for size in 96 192 256 512; do
+  require_file "$resources/artwork-${size}.png"
+done
 require_file "$resources/AppIcon.icns"
 require_file "$resources/en.lproj/Localizable.strings"
 require_file "$resources/Licenses/credits.json"
@@ -51,6 +54,10 @@ core_icon="$(bundle_resource "$core" favicon.png)" || exit 1
 core_page="$(bundle_resource "$core" ListenerPage.en.json)" || exit 1
 require_file "$core_icon"
 require_file "$core_page"
+for size in 96 192 256 512; do
+  core_art="$(bundle_resource "$core" "artwork-${size}.png")" || exit 1
+  require_file "$core_art"
+done
 
 app_bundle="$resources/PublicEarFi_PublicEarFi.bundle"
 require_dir "$app_bundle"

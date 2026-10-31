@@ -20,6 +20,10 @@ let coreTarget: Target = .target(
   resources: [
     .copy("ListenerPage.en.json"),
     .copy("favicon.png"),
+    .copy("artwork-96.png"),
+    .copy("artwork-192.png"),
+    .copy("artwork-256.png"),
+    .copy("artwork-512.png"),
   ]
 )
 

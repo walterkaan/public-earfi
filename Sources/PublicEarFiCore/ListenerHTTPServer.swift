@@ -185,6 +185,25 @@ public final class ListenerHTTPServer: @unchecked Sendable {
         headers: [("Location", "/"), ("Cache-Control", "no-cache")],
         body: Data(), contentLength: 0
       )
+    case .artwork(let size):
+      guard let body = CoreResources.artworkPNG(size: size) else {
+        let missing = Data("Not found".utf8)
+        writeResponse(
+          client, status: 404, reason: "Not Found",
+          headers: [("Content-Type", "text/plain; charset=utf-8")],
+          body: missing, contentLength: missing.count
+        )
+        return
+      }
+      writeResponse(
+        client, status: 200, reason: "OK",
+        headers: [
+          ("Content-Type", "image/png"),
+          ("Cache-Control", "public, max-age=86400"),
+        ],
+        body: request.method.uppercased() == "HEAD" ? Data() : body,
+        contentLength: body.count
+      )
     case .proxy(let path):
       proxy(client, request: request, upstreamPath: path)
     case .notFound:

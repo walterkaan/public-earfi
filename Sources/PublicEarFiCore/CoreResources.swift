@@ -17,6 +17,17 @@ enum CoreResources {
     return "data:image/png;base64," + data.base64EncodedString()
   }
 
+
+  static let artworkSizes = [96, 192, 256, 512]
+
+  static func artworkPNG(size: Int, searching root: URL? = nil) -> Data? {
+    guard artworkSizes.contains(size),
+      let url = file(name: "artwork-\(size)", extension: "png", searching: root),
+      let data = try? Data(contentsOf: url), !data.isEmpty
+    else { return nil }
+    return data
+  }
+
   static func pageStrings(searching root: URL? = nil) -> [String: String] {
     let fallback = [
       "loadError": "The listener page could not load.",

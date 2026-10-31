@@ -110,4 +110,8 @@ favicon="$(bundle_resource "$core" favicon.png)" || exit 1
 page="$(bundle_resource "$core" ListenerPage.en.json)" || exit 1
 cp "$favicon" "$APP/Contents/Resources/favicon.png"
 cp "$page" "$APP/Contents/Resources/ListenerPage.en.json"
+for size in 96 192 256 512; do
+  art="$(bundle_resource "$core" "artwork-${size}.png")" || exit 1
+  cp "$art" "$APP/Contents/Resources/artwork-${size}.png"
+done
 echo "Installed loose listener-page resources"
