@@ -114,53 +114,84 @@ public enum ListenerPage {
       <title>\(safeTitle)</title>
       \(icon)
       <style>
-      :root{--navy:#1b1840;--violet:#8b5cf6;--teal:#5fe0c8;--muted:#b9b4e0;--dim:#6f6a9c}
+      :root{
+        --navy:#1b1840;--violet:#8b5cf6;--teal:#5fe0c8;--muted:#b9b4e0;--dim:#6f6a9c;
+        --icon:clamp(40px,8vh,56px);
+        --btn:clamp(96px,18vh,120px);
+        --stage:clamp(150px,28.5vh,190px);
+      }
       *{box-sizing:border-box;margin:0}
-      html,body{min-height:100%;}
+      html,body{
+        height:100%;height:100svh;height:100dvh;
+        max-height:100svh;max-height:100dvh;
+        overflow:hidden;
+      }
       body{
         font:-apple-system-body;
         font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;
         color:#fff;
-        min-height:100vh;min-height:100dvh;
         background:radial-gradient(circle at 50% 35%,#2e2670 0,#1b1840 45%,#0d0b24 100%);
         display:flex;flex-direction:column;align-items:center;
-        padding:max(28px,env(safe-area-inset-top)) 24px max(20px,env(safe-area-inset-bottom));
+        padding:max(12px,env(safe-area-inset-top)) 20px max(10px,env(safe-area-inset-bottom));
         text-align:center;-webkit-tap-highlight-color:transparent;
+        overflow:hidden;
       }
-      .icon{width:56px;height:56px;border-radius:13px;display:block}
+      .icon{
+        width:var(--icon);height:var(--icon);border-radius:calc(var(--icon)*0.23);
+        display:block;flex-shrink:0;
+      }
       .live{
-        margin-top:22px;display:none;gap:8px;align-items:center;
+        margin-top:clamp(6px,1.4vh,12px);display:none;gap:7px;align-items:center;
         background:rgba(95,224,200,.14);color:var(--teal);font-weight:700;
-        font-size:13px;letter-spacing:.12em;padding:6px 14px;border-radius:99px;
+        font-size:12px;letter-spacing:.12em;padding:5px 12px;border-radius:99px;flex-shrink:0;
       }
       .live.on{display:inline-flex}
-      .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 4px rgba(95,224,200,.25)}
-      h1{font:-apple-system-title2;font-size:clamp(22px,7vw,30px);font-weight:700;margin-top:14px;line-height:1.15;padding:0 8px}
-      .sub{color:var(--muted);margin-top:6px;font-size:16px}
-      #message{
-        margin-top:14px;min-height:1.3em;color:#fff;font-weight:600;font-size:15px;
-        text-shadow:0 0 5px #000;padding:0 12px;
+      .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 3px rgba(95,224,200,.25)}
+      h1{
+        font:-apple-system-title2;font-size:clamp(18px,5.5vw,26px);font-weight:700;
+        margin-top:clamp(6px,1.2vh,10px);line-height:1.15;padding:0 8px;flex-shrink:0;
       }
-      .stage{position:relative;margin:36px 0 22px;width:240px;height:240px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+      .sub{color:var(--muted);margin-top:4px;font-size:clamp(13px,3.8vw,15px);flex-shrink:0}
+      #message{
+        margin-top:clamp(4px,1vh,8px);min-height:1.2em;color:#fff;font-weight:600;font-size:14px;
+        text-shadow:0 0 5px #000;padding:0 12px;flex-shrink:0;
+      }
+      #message:empty{display:none;min-height:0;margin:0;padding:0}
+      .stage{
+        position:relative;margin:clamp(8px,2vh,16px) 0 clamp(6px,1.4vh,12px);
+        width:var(--stage);height:var(--stage);
+        display:flex;align-items:center;justify-content:center;flex-shrink:0;
+      }
       .ring{position:absolute;border-radius:50%;border:2px solid rgba(139,92,246,.35);pointer-events:none}
-      .r1{inset:0}.r2{inset:22px;border-color:rgba(139,92,246,.55)}
+      .r1{inset:0}
+      .r2{inset:clamp(10px,2.6vmin,16px);border-color:rgba(139,92,246,.55)}
       #playBtn{
-        width:150px;height:150px;border-radius:50%;border:0;padding:0;cursor:pointer;
-        background:var(--violet);box-shadow:0 12px 40px rgba(139,92,246,.55);
+        width:var(--btn);height:var(--btn);border-radius:50%;border:0;padding:0;cursor:pointer;
+        background:var(--violet);box-shadow:0 10px 32px rgba(139,92,246,.55);
         display:flex;align-items:center;justify-content:center;color:#fff;
         -webkit-appearance:none;appearance:none;
       }
       #playBtn:disabled{opacity:.55;cursor:default}
-      #playBtn .pause{display:none;gap:14px;align-items:center}
-      #playBtn .pause i{display:block;width:16px;height:56px;background:#fff;border-radius:5px}
-      #playBtn .play{display:block;width:0;height:0;border-style:solid;border-width:28px 0 28px 46px;border-color:transparent transparent transparent #fff;margin-left:8px}
+      #playBtn .pause{display:none;gap:calc(var(--btn)*0.09);align-items:center}
+      #playBtn .pause i{
+        display:block;width:calc(var(--btn)*0.1);height:calc(var(--btn)*0.37);
+        background:#fff;border-radius:5px;
+      }
+      #playBtn .play{
+        display:block;width:0;height:0;border-style:solid;
+        border-width:calc(var(--btn)*0.185) 0 calc(var(--btn)*0.185) calc(var(--btn)*0.3);
+        border-color:transparent transparent transparent #fff;margin-left:calc(var(--btn)*0.05);
+      }
       #playBtn.playing .pause{display:flex}
       #playBtn.playing .play{display:none}
-      #meter{display:flex;gap:5px;align-items:center;justify-content:center;height:44px;opacity:0;transition:opacity .2s;margin-bottom:8px}
+      #meter{
+        display:flex;gap:4px;align-items:center;justify-content:center;
+        height:clamp(28px,5vh,40px);opacity:0;transition:opacity .2s;margin-bottom:4px;flex-shrink:0;
+      }
       #meter.on{opacity:1}
-      #meter i{width:6px;border-radius:3px;background:var(--teal);height:8px;opacity:.5;display:block}
-      .tip{margin-top:auto;color:var(--muted);font-size:15px;padding-top:28px}
-      #credit{margin-top:16px;color:var(--dim);font-size:12px}
+      #meter i{width:5px;border-radius:3px;background:var(--teal);height:6px;opacity:.5;display:block}
+      .tip{margin-top:auto;color:var(--muted);font-size:clamp(12px,3.4vw,14px);padding-top:clamp(6px,1.2vh,12px);flex-shrink:0}
+      #credit{margin-top:clamp(6px,1vh,10px);color:var(--dim);font-size:11px;flex-shrink:0}
       #credit a{color:var(--dim);text-decoration:none}
       audio{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
       </style>
@@ -315,7 +346,7 @@ public enum ListenerPage {
           for(let i=0;i<half;i++){
             const idx=Math.min(bins.length-1,Math.floor((i/(half-1||1))*(bins.length*0.45)));
             const level=bins[idx]/255;
-            const h=Math.max(8,8+level*36);
+            const h=Math.max(6,6+level*30);
             const op=(0.5+level*0.45).toFixed(2);
             const left=bars[half-1-i];
             const right=bars[half+i];
