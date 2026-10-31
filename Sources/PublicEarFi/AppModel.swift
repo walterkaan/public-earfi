@@ -421,6 +421,7 @@ final class AppModel: ObservableObject {
     store.save(settings)
     refreshQR()
     controller.setPageTitle(broadcastTitle)
+    controller.setPageHost(InterfaceEnumerator.computerName())
     if settings.launchAtLogin {
       do {
         try LoginItemController.apply(true)
@@ -666,7 +667,8 @@ final class AppModel: ObservableObject {
           guard device != nil else { return "No input device is available." }
           return nil
         },
-        pageTitle: broadcastTitle
+        pageTitle: broadcastTitle,
+        pageHost: InterfaceEnumerator.computerName()
       )
     )
   }

@@ -20,6 +20,7 @@ public final class ListenerHTTPServer: @unchecked Sendable {
   private let upstreamPort: Int
   private let lock = NSLock()
   private var title: String
+  private var host: String
   private var streamName: String
   private var listenFD: Int32 = -1
   private var running = false
@@ -30,11 +31,13 @@ public final class ListenerHTTPServer: @unchecked Sendable {
     upstreamPort: Int,
     title: String,
     streamName: String,
+    host: String = "",
     bindAddress: String = "0.0.0.0"
   ) {
     self.boundPort = port
     self.upstreamPort = upstreamPort
     self.title = title
+    self.host = host
     self.streamName = streamName
     self.bindAddress = bindAddress
   }
@@ -43,10 +46,11 @@ public final class ListenerHTTPServer: @unchecked Sendable {
     stop()
   }
 
-  public func update(title: String, streamName: String) {
+  public func update(title: String, streamName: String, host: String? = nil) {
     lock.lock()
     self.title = title
     self.streamName = streamName
+    if let host { self.host = host }
     lock.unlock()
   }
 
@@ -127,10 +131,10 @@ public final class ListenerHTTPServer: @unchecked Sendable {
     finished.wait()
   }
 
-  private func snapshot() -> (title: String, streamName: String) {
+  private func snapshot() -> (title: String, streamName: String, host: String) {
     lock.lock()
     defer { lock.unlock() }
-    return (title, streamName)
+    return (title, streamName, host)
   }
 
   private func acceptLoop(_ fd: Int32) {
@@ -154,7 +158,7 @@ public final class ListenerHTTPServer: @unchecked Sendable {
       method: request.method, requestTarget: request.target, streamName: current.streamName)
     switch action {
     case .page:
-      let body = Data(ListenerPage.html(title: current.title).utf8)
+      let body = Data(ListenerPage.html(title: current.title, host: current.host).utf8)
       writeResponse(
         client, status: 200, reason: "OK",
         headers: [
@@ -165,7 +169,7 @@ public final class ListenerHTTPServer: @unchecked Sendable {
         contentLength: body.count
       )
     case .titleJSON:
-      let body = Data(ListenerPage.json(title: current.title).utf8)
+      let body = Data(ListenerPage.json(title: current.title, host: current.host).utf8)
       writeResponse(
         client, status: 200, reason: "OK",
         headers: [

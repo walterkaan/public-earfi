@@ -2,5 +2,8 @@
   "loadError": "The listener page could not load.",
   "poweredBy": "Powered by RoomCast",
   "tapToListen": "Tap to listen",
-  "waiting": "Waiting for the host to start…"
+  "waiting": "Waiting for the host to start…",
+  "keepOpen": "Keep this screen open. Earbuds work best.",
+  "play": "Play",
+  "pause": "Pause"
 }

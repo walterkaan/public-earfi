@@ -7,7 +7,7 @@ import PublicEarFiCore
 enum ListenerPageSelfTest {
   static func run() -> Int32 {
     let title = "RoomCast Broadcast"
-    let html = ListenerPage.html(title: title)
+    let html = ListenerPage.html(title: title, host: "Test Mac")
     if !html.contains("<title>\(title)</title>") {
       return fail("listener page is missing its title")
     }
@@ -26,11 +26,21 @@ enum ListenerPageSelfTest {
     if !html.contains("Tap to listen") || !html.contains("createMediaStreamSource") {
       return fail("listener page is missing audible unlock / VU meter")
     }
+    if !html.contains("<audio") || html.contains("<video") {
+      return fail("listener page should use a hidden audio element")
+    }
+    if !html.contains("from Test Mac") || !html.contains("Keep this screen open") {
+      return fail("listener page is missing host line or tip")
+    }
+    if !html.contains("id=\"playBtn\"") || !html.contains("#8b5cf6") {
+      return fail("listener page is missing the custom play button")
+    }
     let server = ListenerHTTPServer(
       port: 0,
       upstreamPort: 9,
       title: title,
       streamName: "live",
+      host: "Test Mac",
       bindAddress: "127.0.0.1"
     )
     do {

@@ -32,6 +32,19 @@ enum InterfaceEnumerator {
     return ListenerLink.normalizeLocalHostname(ProcessInfo.processInfo.hostName)
   }
 
+  /// Friendly Mac name for "from <host>" on the listener page.
+  static func computerName() -> String {
+    if let copied = SCDynamicStoreCopyComputerName(nil, nil) as String? {
+      let name = copied.trimmingCharacters(in: .whitespacesAndNewlines)
+      if !name.isEmpty { return name }
+    }
+    let host = localHostname()
+    if host.lowercased().hasSuffix(".local") {
+      return String(host.dropLast(6))
+    }
+    return host
+  }
+
   static func currentSSID() -> String? {
     guard let data = CWWiFiClient.shared().interface()?.ssidData() else { return nil }
     return String(data: data, encoding: .utf8)

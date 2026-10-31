@@ -23,6 +23,9 @@ enum CoreResources {
       "poweredBy": "Powered by RoomCast",
       "tapToListen": "Tap to listen",
       "waiting": "Waiting for the host to start…",
+      "keepOpen": "Keep this screen open. Earbuds work best.",
+      "play": "Play",
+      "pause": "Pause",
     ]
     guard let url = file(name: "ListenerPage.en", extension: "json", searching: root),
       let data = try? Data(contentsOf: url),

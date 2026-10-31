@@ -62,16 +62,22 @@ final class ListenerPageTests: XCTestCase {
   }
 
   func testPageShowsTheBroadcastTitleInTheTabAndMediaSession() {
-    let plain = ListenerPage.html(title: "RoomCast Broadcast")
+    let plain = ListenerPage.html(title: "RoomCast Broadcast", host: "What Computer")
     XCTAssertTrue(plain.contains("<title>RoomCast Broadcast</title>"))
     XCTAssertFalse(plain.contains("playerTitle"))
     XCTAssertFalse(plain.contains("status-label"))
-    XCTAssertTrue(plain.contains("title=\"RoomCast Broadcast\""))
     XCTAssertTrue(plain.contains("new MediaMetadata({title:title})"))
     XCTAssertFalse(plain.contains("get(\"title\")"))
     XCTAssertTrue(plain.contains("new URL(\"/whep\""))
     XCTAssertTrue(plain.contains("The listener page could not load."))
-    XCTAssertTrue(plain.contains("background:#161a42"))
+    XCTAssertTrue(plain.contains("#2e2670"))
+    XCTAssertTrue(plain.contains("#8b5cf6"))
+    XCTAssertTrue(plain.contains("<audio"))
+    XCTAssertFalse(plain.contains("<video"))
+    XCTAssertTrue(plain.contains("id=\"playBtn\""))
+    XCTAssertTrue(plain.contains("from What Computer"))
+    XCTAssertTrue(plain.contains("Keep this screen open. Earbuds work best."))
+    XCTAssertTrue(plain.contains("-apple-system-body"))
     XCTAssertTrue(plain.contains("rel=\"icon\""))
     XCTAssertTrue(plain.contains("Powered by RoomCast"))
     XCTAssertTrue(plain.contains("https://roomcast.channel"))
@@ -85,16 +91,18 @@ final class ListenerPageTests: XCTestCase {
     XCTAssertTrue(plain.contains("createMediaStreamSource"))
     XCTAssertTrue(plain.contains("getByteFrequencyData"))
     XCTAssertTrue(plain.contains("params.get(\"muted\"),false"))
-    let bare = ListenerPage.creditMarkup(iconHref: "")
+    let bare = ListenerPage.creditMarkup(iconHref: "data:image/png;base64,xx")
     XCTAssertTrue(bare.contains("Powered by RoomCast"))
     XCTAssertFalse(bare.contains("<img"))
 
-    let awkward = ListenerPage.html(title: "A & B <live>")
+    let awkward = ListenerPage.html(title: "A & B <live>", host: "A & B")
     XCTAssertTrue(awkward.contains("<title>A &amp; B &lt;live&gt;</title>"))
+    XCTAssertTrue(awkward.contains("from A &amp; B"))
     XCTAssertFalse(awkward.contains("playerTitle"))
     XCTAssertFalse(awkward.contains("<live>"))
     XCTAssertTrue(ListenerPage.jsonForScript(title: "A & B <live>").contains("\\u003c"))
-    XCTAssertTrue(ListenerPage.json(title: "A & B").contains("\"title\":\"A & B\""))
+    XCTAssertTrue(ListenerPage.json(title: "A & B", host: "Mac").contains("\"title\":\"A & B\""))
+    XCTAssertTrue(ListenerPage.json(title: "A & B", host: "Mac").contains("\"host\":\"Mac\""))
   }
 
   func testMissingAppResourcesDoNotCrashAndLeaveTheFaviconOff() throws {
@@ -153,6 +161,13 @@ final class ListenerPageTests: XCTestCase {
       CoreResources.pageStrings(searching: root)["loadError"], "from the mac bundle")
   }
 
+  func testDumpListenerHTMLForScreenshot() throws {
+    let html = ListenerPage.html(title: "Sunday Dharma Talk", host: "Walter's Mac")
+    let url = URL(fileURLWithPath: "/tmp/rc-listen-real.html")
+    try html.write(to: url, atomically: true, encoding: .utf8)
+    XCTAssertTrue(html.contains("id=\"playBtn\""))
+  }
+
   func testDevelopmentBundleStillProvidesTheFaviconAndStrings() {
     XCTAssertTrue(CoreResources.faviconDataURI().hasPrefix("data:image/png;base64,"))
     XCTAssertEqual(
@@ -181,6 +196,7 @@ final class ListenerPageTests: XCTestCase {
       upstreamPort: upstream.port,
       title: "Hall A",
       streamName: "hall",
+      host: "Hall Mac",
       bindAddress: "127.0.0.1"
     )
     try server.start()
@@ -201,12 +217,14 @@ final class ListenerPageTests: XCTestCase {
 
     let json = exchange(
       port: server.boundPort, request: "GET /earfi.json HTTP/1.1\r\nHost: x\r\n\r\n")
-    XCTAssertTrue(json.contains("{\"title\":\"Hall A\"}"))
+    XCTAssertTrue(json.contains("\"title\":\"Hall A\""))
+    XCTAssertTrue(json.contains("\"host\":\"Hall Mac\""))
 
     server.update(title: "Hall B", streamName: "hall")
     let renamed = exchange(
       port: server.boundPort, request: "GET /earfi.json HTTP/1.1\r\nHost: x\r\n\r\n")
-    XCTAssertTrue(renamed.contains("{\"title\":\"Hall B\"}"))
+    XCTAssertTrue(renamed.contains("\"title\":\"Hall B\""))
+    XCTAssertTrue(renamed.contains("\"host\":\"Hall Mac\""))
 
     let whep = exchange(
       port: server.boundPort,

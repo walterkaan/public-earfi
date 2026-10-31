@@ -23,6 +23,7 @@ struct BroadcastLaunch {
   var home: URL
   var prepareAudio: () -> String?
   var pageTitle: String
+  var pageHost: String
 }
 
 final class BroadcastController {
@@ -78,6 +79,7 @@ final class BroadcastController {
   private var mediamtxLog: FileHandle?
   private var listenerServer: ListenerHTTPServer?
   private var pageTitle = "RoomCast Broadcast"
+  private var pageHost = ""
 
   init(logger: FileLogger) {
     self.logger = logger
@@ -92,7 +94,19 @@ final class BroadcastController {
     queue.async {
       self.pageTitle = title
       self.listenerServer?.update(
-        title: title, streamName: self.launch?.settings.streamName ?? "live")
+        title: title,
+        streamName: self.launch?.settings.streamName ?? "live",
+        host: self.pageHost)
+    }
+  }
+
+  func setPageHost(_ host: String) {
+    queue.async {
+      self.pageHost = host
+      self.listenerServer?.update(
+        title: self.pageTitle,
+        streamName: self.launch?.settings.streamName ?? "live",
+        host: host)
     }
   }
 
@@ -106,6 +120,7 @@ final class BroadcastController {
       self.pendingRestart?.cancel()
       self.launch = launch
       self.pageTitle = launch.pageTitle
+      self.pageHost = launch.pageHost
       self.helperPaths = [launch.helpers.mediamtx.path, launch.helpers.ffmpeg.path]
       self.desired = true
       self.stopping = false
@@ -404,7 +419,8 @@ final class BroadcastController {
       port: settings.listenerPort,
       upstreamPort: upstream,
       title: pageTitle,
-      streamName: settings.streamName
+      streamName: settings.streamName,
+      host: pageHost
     )
     do {
       try server.start()

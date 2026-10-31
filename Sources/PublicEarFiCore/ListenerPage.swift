@@ -40,17 +40,19 @@ public enum ListenerPage {
     return .notFound
   }
 
-  public static func json(title: String) -> String {
+  public static func json(title: String, host: String = "") -> String {
+    var object: [String: String] = ["title": title]
+    if !host.isEmpty { object["host"] = host }
     guard
-      let data = try? JSONSerialization.data(withJSONObject: ["title": title]),
+      let data = try? JSONSerialization.data(withJSONObject: object),
       let text = String(data: data, encoding: .utf8)
     else { return "{\"title\":\"\"}" }
     return text
   }
 
   /// JSON object safe to drop into a `<script>` block.
-  public static func jsonForScript(title: String) -> String {
-    json(title: title)
+  public static func jsonForScript(title: String, host: String = "") -> String {
+    json(title: title, host: host)
       .replacingOccurrences(of: "&", with: "\\u0026")
       .replacingOccurrences(of: "<", with: "\\u003c")
       .replacingOccurrences(of: ">", with: "\\u003e")
@@ -78,254 +80,369 @@ public enum ListenerPage {
   /// so the page still loads. This does not call `Bundle.module`.
   static let faviconHref: String = CoreResources.faviconDataURI()
 
-  public static func html(title: String) -> String {
+  public static func html(title: String, host: String = "") -> String {
     let safeTitle = htmlEscape(title)
-    let scriptTitle = jsonForScript(title: title)
+    let safeHost = htmlEscape(host)
+    let scriptSpec = jsonForScript(title: title, host: host)
     let waiting = htmlEscape(
       CoreResources.pageStrings()["waiting"] ?? "Waiting for the host to start…")
+    let tip = htmlEscape(
+      CoreResources.pageStrings()["keepOpen"] ?? "Keep this screen open. Earbuds work best.")
+    let playLabel = Self.pageCopy("play")
+    let pauseLabel = Self.pageCopy("pause")
+    let tapLabel = Self.pageCopy("tapToListen")
     let icon =
       faviconHref.isEmpty
       ? ""
       : "<link rel=\"icon\" type=\"image/png\" href=\"\(faviconHref)\">"
-    let credit = creditMarkup(iconHref: faviconHref)
+    let iconImg =
+      faviconHref.isEmpty
+      ? ""
+      : "<img class=\"icon\" width=\"56\" height=\"56\" alt=\"\" src=\"\(faviconHref)\">"
+    let hostLine =
+      safeHost.isEmpty
+      ? "<div class=\"sub\" id=\"host\" hidden></div>"
+      : "<div class=\"sub\" id=\"host\">from \(safeHost)</div>"
+    let credit = creditMarkup(iconHref: "")
     return """
       <!doctype html>
-      <html>
+      <html lang="en">
       <head>
       <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+      <meta name="apple-mobile-web-app-capable" content="yes">
       <title>\(safeTitle)</title>
       \(icon)
       <style>
-      html,body{margin:0;padding:0;height:100%;background:#161a42;font-family:Arial,sans-serif;color:#fff}
-      #video{position:absolute;top:0;left:0;width:100%;height:calc(100% - 44px);background:#161a42}
-      #message{position:absolute;left:0;top:0;right:0;bottom:44px;display:flex;align-items:center;text-align:center;justify-content:center;font-size:16px;font-weight:bold;color:#fff;pointer-events:none;padding:20px;box-sizing:border-box;text-shadow:0 0 5px #000;z-index:1}
-      #unlock{position:absolute;left:0;top:0;right:0;bottom:44px;display:none;align-items:center;justify-content:center;z-index:5;background:rgba(22,26,66,0.88);cursor:pointer;-webkit-tap-highlight-color:transparent}
-      #unlockBtn{border:0;border-radius:18px;padding:22px 36px;font-size:22px;font-weight:700;color:#161a42;background:#2fd0bd;box-shadow:0 8px 28px rgba(0,0,0,0.35);pointer-events:none}
-      #vu{position:absolute;left:16px;right:16px;bottom:56px;height:26px;z-index:3;pointer-events:none;opacity:0;transition:opacity .2s}
-      #vu.on{opacity:1}
-      #credit{position:absolute;left:0;right:0;bottom:0;height:44px;display:flex;align-items:center;justify-content:center;gap:8px;background:#161a42;border-top:1px solid rgba(47,208,189,0.35);z-index:2;font-size:13px}
-      #credit img{width:28px;height:28px;border-radius:7px;display:block}
-      #credit a{color:rgba(255,255,255,0.58);text-decoration:none}
+      :root{--navy:#1b1840;--violet:#8b5cf6;--teal:#5fe0c8;--muted:#b9b4e0;--dim:#6f6a9c}
+      *{box-sizing:border-box;margin:0}
+      html,body{min-height:100%;}
+      body{
+        font:-apple-system-body;
+        font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;
+        color:#fff;
+        min-height:100vh;min-height:100dvh;
+        background:radial-gradient(circle at 50% 35%,#2e2670 0,#1b1840 45%,#0d0b24 100%);
+        display:flex;flex-direction:column;align-items:center;
+        padding:max(28px,env(safe-area-inset-top)) 24px max(20px,env(safe-area-inset-bottom));
+        text-align:center;-webkit-tap-highlight-color:transparent;
+      }
+      .icon{width:56px;height:56px;border-radius:13px;display:block}
+      .live{
+        margin-top:22px;display:none;gap:8px;align-items:center;
+        background:rgba(95,224,200,.14);color:var(--teal);font-weight:700;
+        font-size:13px;letter-spacing:.12em;padding:6px 14px;border-radius:99px;
+      }
+      .live.on{display:inline-flex}
+      .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 4px rgba(95,224,200,.25)}
+      h1{font:-apple-system-title2;font-size:clamp(22px,7vw,30px);font-weight:700;margin-top:14px;line-height:1.15;padding:0 8px}
+      .sub{color:var(--muted);margin-top:6px;font-size:16px}
+      #message{
+        margin-top:14px;min-height:1.3em;color:#fff;font-weight:600;font-size:15px;
+        text-shadow:0 0 5px #000;padding:0 12px;
+      }
+      .stage{position:relative;margin:36px 0 22px;width:240px;height:240px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+      .ring{position:absolute;border-radius:50%;border:2px solid rgba(139,92,246,.35);pointer-events:none}
+      .r1{inset:0}.r2{inset:22px;border-color:rgba(139,92,246,.55)}
+      #playBtn{
+        width:150px;height:150px;border-radius:50%;border:0;padding:0;cursor:pointer;
+        background:var(--violet);box-shadow:0 12px 40px rgba(139,92,246,.55);
+        display:flex;align-items:center;justify-content:center;color:#fff;
+        -webkit-appearance:none;appearance:none;
+      }
+      #playBtn:disabled{opacity:.55;cursor:default}
+      #playBtn .pause{display:none;gap:14px;align-items:center}
+      #playBtn .pause i{display:block;width:16px;height:56px;background:#fff;border-radius:5px}
+      #playBtn .play{display:block;width:0;height:0;border-style:solid;border-width:28px 0 28px 46px;border-color:transparent transparent transparent #fff;margin-left:8px}
+      #playBtn.playing .pause{display:flex}
+      #playBtn.playing .play{display:none}
+      #meter{display:flex;gap:5px;align-items:center;justify-content:center;height:44px;opacity:0;transition:opacity .2s;margin-bottom:8px}
+      #meter.on{opacity:1}
+      #meter i{width:6px;border-radius:3px;background:var(--teal);height:8px;opacity:.5;display:block}
+      .tip{margin-top:auto;color:var(--muted);font-size:15px;padding-top:28px}
+      #credit{margin-top:16px;color:var(--dim);font-size:12px}
+      #credit a{color:var(--dim);text-decoration:none}
+      audio{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
       </style>
       <script defer src="\(readerPath)"></script>
       </head>
       <body>
-      <video id="video" title="\(safeTitle)" playsinline webkit-playsinline></video>
+      \(iconImg)
+      <div class="live" id="live"><span class="dot"></span><span id="liveLabel">LIVE · 0:00</span></div>
+      <h1 id="title">\(safeTitle)</h1>
+      \(hostLine)
       <div id="message">\(waiting)</div>
-      <div id="unlock" role="button" aria-label="\(Self.pageCopy("tapToListen"))"><span id="unlockBtn">\(Self.pageCopy("tapToListen"))</span></div>
-      <canvas id="vu" width="320" height="26" aria-hidden="true"></canvas>
+      <div class="stage">
+        <div class="ring r1"></div>
+        <div class="ring r2"></div>
+        <button type="button" id="playBtn" disabled aria-label="\(tapLabel)">
+          <span class="play" aria-hidden="true"></span>
+          <span class="pause" aria-hidden="true"><i></i><i></i></span>
+        </button>
+      </div>
+      <div id="meter" aria-hidden="true"></div>
+      <audio id="player" playsinline webkit-playsinline></audio>
+      <div class="tip">\(tip)</div>
+      \(credit)
       <script>
-      const video=document.getElementById("video");
+      const player=document.getElementById("player");
       const message=document.getElementById("message");
-      const unlock=document.getElementById("unlock");
-      const vu=document.getElementById("vu");
-      let defaultControls=false;
+      const playBtn=document.getElementById("playBtn");
+      const liveEl=document.getElementById("live");
+      const liveLabel=document.getElementById("liveLabel");
+      const titleEl=document.getElementById("title");
+      const hostEl=document.getElementById("host");
+      const meterEl=document.getElementById("meter");
+      const playLabel="\(playLabel)";
+      const pauseLabel="\(pauseLabel)";
+      const tapLabel="\(tapLabel)";
+      const waitingText="\(Self.pageCopy("waiting"))";
       let reader=null;
       let audioCtx=null;
       let analyser=null;
       let meterRAF=0;
       let audible=false;
       let trackStream=null;
-      const setMessage=(str)=>{video.controls=str!==""?false:defaultControls;message.innerText=str;};
-      const showUnlock=()=>{unlock.style.display="flex";};
-      const hideUnlock=()=>{unlock.style.display="none";};
-      const parseBoolString=(str,defaultVal)=>{
-      str=(str||"").toLowerCase();
-      if(["1","yes","true"].includes(str))return true;
-      if(["0","no","false"].includes(str))return false;
-      return defaultVal;
+      let connected=false;
+      let liveSince=0;
+      let timerID=0;
+      let retryTimer=null;
+      let generation=0;
+      const barCount=14;
+      const bars=[];
+      for(let i=0;i<barCount;i++){
+        const el=document.createElement("i");
+        meterEl.appendChild(el);
+        bars.push(el);
+      }
+      const setMessage=(str)=>{message.textContent=str||"";};
+      const setPlayingUI=(playing)=>{
+        playBtn.classList.toggle("playing",playing);
+        playBtn.setAttribute("aria-label",playing?pauseLabel:playLabel);
+      };
+      const formatElapsed=(ms)=>{
+        const sec=Math.max(0,Math.floor(ms/1000));
+        const m=Math.floor(sec/60);
+        const s=sec%60;
+        return m+":"+String(s).padStart(2,"0");
+      };
+      const paintLive=()=>{
+        if(!liveSince){liveLabel.textContent="LIVE · 0:00";return;}
+        liveLabel.textContent="LIVE · "+formatElapsed(Date.now()-liveSince);
+      };
+      const startTimer=()=>{
+        if(!liveSince)liveSince=Date.now();
+        liveEl.classList.add("on");
+        paintLive();
+        if(timerID)clearInterval(timerID);
+        timerID=setInterval(paintLive,1000);
+      };
+      const stopTimer=()=>{
+        if(timerID){clearInterval(timerID);timerID=0;}
       };
       const applyTitle=(title)=>{
-      if(!title)return;
-      document.title=title;
-      video.title=title;
-      video.setAttribute("title",title);
-      if(navigator.mediaSession&&typeof MediaMetadata==="function"){
-      navigator.mediaSession.metadata=new MediaMetadata({title:title});
-      try{navigator.mediaSession.playbackState="playing";}catch(err){}
-      }
+        if(!title)return;
+        document.title=title;
+        titleEl.textContent=title;
+        player.setAttribute("title",title);
+        if(navigator.mediaSession&&typeof MediaMetadata==="function"){
+          navigator.mediaSession.metadata=new MediaMetadata({title:title});
+          try{navigator.mediaSession.playbackState=player.paused?"paused":"playing";}catch(err){}
+        }
       };
-      const earfiSpec=\(scriptTitle);
+      const applyHost=(host)=>{
+        if(!hostEl)return;
+        if(!host){hostEl.hidden=true;hostEl.textContent="";return;}
+        hostEl.hidden=false;
+        hostEl.textContent="from "+host;
+      };
+      const earfiSpec=\(scriptSpec);
       applyTitle(earfiSpec.title);
+      applyHost(earfiSpec.host||"");
       const refreshTitle=()=>{
-      fetch("\(titlePath)").then((res)=>res.json()).then((data)=>applyTitle(data.title)).catch(()=>{});
+        fetch("\(titlePath)").then((res)=>res.json()).then((data)=>{
+          applyTitle(data.title);
+          if(typeof data.host==="string")applyHost(data.host);
+        }).catch(()=>{});
       };
       refreshTitle();
       document.addEventListener("visibilitychange",()=>{
-      if(document.visibilityState==="visible"){
-      refreshTitle();
-      if(audible)startMeter();
-      }else{
-      stopMeter();
-      }
+        if(document.visibilityState==="visible"){
+          refreshTitle();
+          if(audible)startMeter();
+        }else{
+          stopMeter();
+        }
       });
+      const parseBoolString=(str,defaultVal)=>{
+        str=(str||"").toLowerCase();
+        if(["1","yes","true"].includes(str))return true;
+        if(["0","no","false"].includes(str))return false;
+        return defaultVal;
+      };
       const loadAttributesFromQuery=()=>{
-      const params=new URLSearchParams(window.location.search);
-      video.controls=parseBoolString(params.get("controls"),true);
-      // Prefer unmuted; browsers that block audible autoplay get the Tap overlay.
-      video.muted=parseBoolString(params.get("muted"),false);
-      video.autoplay=parseBoolString(params.get("autoplay"),true);
-      video.playsInline=parseBoolString(params.get("playsinline"),true);
-      video.disablepictureinpicture=parseBoolString(params.get("disablepictureinpicture"),false);
-      defaultControls=video.controls;
+        const params=new URLSearchParams(window.location.search);
+        player.muted=parseBoolString(params.get("muted"),false);
+        player.autoplay=parseBoolString(params.get("autoplay"),true);
       };
       const ensureAudioGraph=()=>{
-      const AC=window.AudioContext||window.webkitAudioContext;
-      if(!AC||!trackStream)return;
-      if(!audioCtx)audioCtx=new AC();
-      if(!analyser){
-      try{
-      const src=audioCtx.createMediaStreamSource(trackStream);
-      analyser=audioCtx.createAnalyser();
-      analyser.fftSize=256;
-      analyser.smoothingTimeConstant=0.75;
-      src.connect(analyser);
-      }catch(err){analyser=null;}
-      }
+        const AC=window.AudioContext||window.webkitAudioContext;
+        if(!AC||!trackStream)return;
+        if(!audioCtx)audioCtx=new AC();
+        if(!analyser){
+          try{
+            const src=audioCtx.createMediaStreamSource(trackStream);
+            analyser=audioCtx.createAnalyser();
+            analyser.fftSize=256;
+            analyser.smoothingTimeConstant=0.75;
+            src.connect(analyser);
+          }catch(err){analyser=null;}
+        }
       };
       const stopMeter=()=>{
-      if(meterRAF){cancelAnimationFrame(meterRAF);meterRAF=0;}
+        if(meterRAF){cancelAnimationFrame(meterRAF);meterRAF=0;}
       };
       const startMeter=()=>{
-      if(!analyser||document.hidden)return;
-      stopMeter();
-      vu.classList.add("on");
-      const bins=new Uint8Array(analyser.frequencyBinCount);
-      const paint=()=>{
-      meterRAF=requestAnimationFrame(paint);
-      if(document.hidden||!analyser)return;
-      analyser.getByteFrequencyData(bins);
-      const w=vu.clientWidth||320;
-      const h=vu.clientHeight||26;
-      if(vu.width!==w)vu.width=w;
-      if(vu.height!==h)vu.height=h;
-      const ctx=vu.getContext("2d");
-      if(!ctx)return;
-      ctx.clearRect(0,0,w,h);
-      const bars=24;
-      const gap=2;
-      const bw=Math.max(2,(w-(bars-1)*gap)/bars);
-      for(let i=0;i<bars;i++){
-      const idx=Math.min(bins.length-1,Math.floor(i*bins.length/bars));
-      const level=bins[idx]/255;
-      const bh=Math.max(2,level*h);
-      const x=i*(bw+gap);
-      ctx.fillStyle="rgba(47,208,189,"+(0.35+level*0.65).toFixed(2)+")";
-      ctx.fillRect(x,h-bh,bw,bh);
-      }
-      };
-      paint();
+        if(!analyser||document.hidden){meterEl.classList.remove("on");return;}
+        stopMeter();
+        meterEl.classList.add("on");
+        const bins=new Uint8Array(analyser.frequencyBinCount);
+        const paint=()=>{
+          meterRAF=requestAnimationFrame(paint);
+          if(document.hidden||!analyser)return;
+          analyser.getByteFrequencyData(bins);
+          const half=barCount/2;
+          for(let i=0;i<half;i++){
+            const idx=Math.min(bins.length-1,Math.floor((i/(half-1||1))*(bins.length*0.45)));
+            const level=bins[idx]/255;
+            const h=Math.max(8,8+level*36);
+            const op=(0.5+level*0.45).toFixed(2);
+            const left=bars[half-1-i];
+            const right=bars[half+i];
+            left.style.height=h+"px";
+            left.style.opacity=op;
+            right.style.height=h+"px";
+            right.style.opacity=op;
+          }
+        };
+        paint();
       };
       const markAudible=()=>{
-      audible=true;
-      hideUnlock();
-      ensureAudioGraph();
-      if(audioCtx&&audioCtx.state==="suspended"){
-      audioCtx.resume().catch(()=>{});
-      }
-      startMeter();
+        audible=true;
+        playBtn.disabled=false;
+        setPlayingUI(true);
+        setMessage("");
+        ensureAudioGraph();
+        if(audioCtx&&audioCtx.state==="suspended"){
+          audioCtx.resume().catch(()=>{});
+        }
+        startMeter();
+        startTimer();
+        try{if(navigator.mediaSession)navigator.mediaSession.playbackState="playing";}catch(err){}
       };
       const tryAudiblePlay=()=>{
-      video.muted=false;
-      const p=video.play();
-      if(p&&typeof p.then==="function"){
-      return p.then(()=>{
-      if(video.muted){showUnlock();return false;}
-      markAudible();
-      return true;
-      }).catch(()=>{showUnlock();return false;});
-      }
-      if(video.paused||video.muted){showUnlock();return Promise.resolve(false);}
-      markAudible();
-      return Promise.resolve(true);
+        player.muted=false;
+        const p=player.play();
+        if(p&&typeof p.then==="function"){
+          return p.then(()=>{
+            if(player.muted){setPlayingUI(false);playBtn.setAttribute("aria-label",tapLabel);return false;}
+            markAudible();
+            return true;
+          }).catch(()=>{setPlayingUI(false);playBtn.setAttribute("aria-label",tapLabel);return false;});
+        }
+        if(player.paused||player.muted){setPlayingUI(false);playBtn.setAttribute("aria-label",tapLabel);return Promise.resolve(false);}
+        markAudible();
+        return Promise.resolve(true);
       };
-      // Safari iOS: create/resume AudioContext inside the gesture.
       const unlockFromGesture=()=>{
-      if(!trackStream)return;
-      ensureAudioGraph();
-      const resume=audioCtx?audioCtx.resume():Promise.resolve();
-      Promise.resolve(resume).catch(()=>{}).then(()=>{
-      video.muted=false;
-      const p=video.play();
-      if(p&&typeof p.then==="function"){
-      p.then(markAudible).catch(()=>{showUnlock();});
-      }else{
-      markAudible();
-      }
-      });
+        if(!trackStream)return;
+        ensureAudioGraph();
+        const resume=audioCtx?audioCtx.resume():Promise.resolve();
+        Promise.resolve(resume).catch(()=>{}).then(()=>{
+          player.muted=false;
+          const p=player.play();
+          if(p&&typeof p.then==="function"){
+            p.then(markAudible).catch(()=>{setPlayingUI(false);playBtn.setAttribute("aria-label",tapLabel);});
+          }else{
+            markAudible();
+          }
+        });
       };
-      const onFirstGesture=()=>{
-      if(audible)return;
-      if(!trackStream)return;
-      unlockFromGesture();
+      const togglePlayback=()=>{
+        if(!trackStream)return;
+        if(!audible||player.paused){
+          unlockFromGesture();
+          return;
+        }
+        player.pause();
+        setPlayingUI(false);
+        try{if(navigator.mediaSession)navigator.mediaSession.playbackState="paused";}catch(err){}
       };
-      ["pointerdown","touchstart","click"].forEach((type)=>{
-      document.addEventListener(type,onFirstGesture,{passive:true});
-      });
-      unlock.addEventListener("click",(evt)=>{evt.preventDefault();onFirstGesture();});
-      const waitingText="\(Self.pageCopy("waiting"))";
-      let retryTimer=null;
-      let connected=false;
-      let generation=0;
+      playBtn.addEventListener("click",(evt)=>{evt.preventDefault();togglePlayback();});
       const connect=()=>{
-      if(connected)return;
-      if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
-      const ticket=++generation;
-      if(reader!==null){try{reader.close();}catch(err){}reader=null;}
-      reader=new MediaMTXWebRTCReader({
-      url:new URL("\(whepPath)",window.location.href).toString(),
-      onError:(err)=>{
-      if(ticket!==generation||connected)return;
-      setMessage(waitingText);
-      hideUnlock();
-      if(retryTimer!==null)clearTimeout(retryTimer);
-      retryTimer=setTimeout(connect,1500);
-      },
-      onTrack:(evt)=>{
-      if(ticket!==generation)return;
-      connected=true;
-      if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
-      setMessage("");
-      trackStream=evt.streams[0];
-      video.srcObject=trackStream;
-      applyTitle(document.title);
-      tryAudiblePlay();
-      },
-      onDataChannel:(evt)=>{
-      evt.channel.binaryType="arraybuffer";
-      evt.channel.onmessage=(evt)=>{console.log("data channel message",evt.data);};
-      },
-      });
+        if(connected)return;
+        if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
+        const ticket=++generation;
+        if(reader!==null){try{reader.close();}catch(err){}reader=null;}
+        reader=new MediaMTXWebRTCReader({
+          url:new URL("\(whepPath)",window.location.href).toString(),
+          onError:(err)=>{
+            if(ticket!==generation||connected)return;
+            setMessage(waitingText);
+            playBtn.disabled=true;
+            liveEl.classList.remove("on");
+            if(retryTimer!==null)clearTimeout(retryTimer);
+            retryTimer=setTimeout(connect,1500);
+          },
+          onTrack:(evt)=>{
+            if(ticket!==generation)return;
+            connected=true;
+            if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
+            setMessage("");
+            trackStream=evt.streams[0];
+            player.srcObject=trackStream;
+            playBtn.disabled=false;
+            playBtn.setAttribute("aria-label",tapLabel);
+            applyTitle(document.title);
+            startTimer();
+            tryAudiblePlay();
+          },
+          onDataChannel:(evt)=>{
+            evt.channel.binaryType="arraybuffer";
+            evt.channel.onmessage=(evt)=>{console.log("data channel message",evt.data);};
+          },
+        });
       };
       window.addEventListener("load",()=>{
-      if(typeof MediaMTXWebRTCReader!=="function"){
-      setMessage("\(Self.pageCopy("loadError"))");
-      return;
-      }
-      loadAttributesFromQuery();
-      setMessage(waitingText);
-      connect();
+        if(typeof MediaMTXWebRTCReader!=="function"){
+          setMessage("\(Self.pageCopy("loadError"))");
+          return;
+        }
+        loadAttributesFromQuery();
+        setMessage(waitingText);
+        connect();
       });
-      video.addEventListener("play",()=>applyTitle(document.title));
-      window.addEventListener("beforeunload",()=>{if(reader!==null)reader.close();stopMeter();if(audioCtx){try{audioCtx.close();}catch(err){}}});
+      player.addEventListener("play",()=>applyTitle(document.title));
+      player.addEventListener("pause",()=>{if(audible)setPlayingUI(false);});
+      window.addEventListener("beforeunload",()=>{
+        if(reader!==null)reader.close();
+        stopMeter();
+        stopTimer();
+        if(audioCtx){try{audioCtx.close();}catch(err){}}
+      });
       </script>
-      \(credit)
       </body>
       </html>
       """
   }
 
-  /// Quiet line under the player. The icon is the favicon PNG. No icon when
-  /// that file is missing. The link needs a network; the page does not.
+  /// Quiet line under the player. The app icon already sits at the top, so
+  /// the footer is text-only. The link needs a network; the page does not.
   static func creditMarkup(iconHref: String) -> String {
     let label = htmlEscape(CoreResources.pageStrings()["poweredBy"] ?? "Powered by RoomCast")
-    let logo =
-      iconHref.isEmpty
-      ? ""
-      : "<img alt=\"\" width=\"28\" height=\"28\" src=\"\(iconHref)\">"
+    _ = iconHref
     return
-      "<footer id=\"credit\">\(logo)<a href=\"https://roomcast.channel\" target=\"_blank\" rel=\"noopener\">\(label)</a></footer>"
+      "<footer id=\"credit\"><a href=\"https://roomcast.channel\" target=\"_blank\" rel=\"noopener\">\(label)</a></footer>"
   }
 
   private static func htmlEscape(_ text: String) -> String {
