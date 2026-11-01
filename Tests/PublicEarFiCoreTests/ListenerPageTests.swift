@@ -83,6 +83,13 @@ final class ListenerPageTests: XCTestCase {
     XCTAssertTrue(plain.contains("clearSeekActions"))
     XCTAssertTrue(plain.contains("createMediaStreamSource(trackStream)"))
     XCTAssertTrue(plain.contains("resumeAudioGraph"))
+    XCTAssertTrue(plain.contains("userPaused"))
+    XCTAssertTrue(plain.contains("pausePlayback"))
+    XCTAssertTrue(plain.contains("flattenMeter"))
+    XCTAssertTrue(plain.contains("userPaused||player.paused"))
+    // Regression: a duplicated click listener pause→play in one tap on iOS Safari.
+    XCTAssertEqual(
+      plain.components(separatedBy: "playBtn.addEventListener(\"click\"").count - 1, 1)
     XCTAssertFalse(plain.contains("setPositionState"))
     XCTAssertFalse(plain.contains("mediaSession.setPositionState"))
     XCTAssertFalse(plain.contains("get(\"title\")"))

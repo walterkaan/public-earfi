@@ -241,6 +241,7 @@ public enum ListenerPage {
       let analyser=null;
       let meterRAF=0;
       let audible=false;
+      let userPaused=false;
       let trackStream=null;
       let connected=false;
       let liveSince=0;
@@ -310,15 +311,13 @@ public enum ListenerPage {
       const bindMediaSessionActions=()=>{
         if(!navigator.mediaSession||typeof navigator.mediaSession.setActionHandler!=="function")return;
         const set=(action,handler)=>{try{navigator.mediaSession.setActionHandler(action,handler);}catch(err){}};
-        set("play",()=>{if(!trackStream)return;unlockFromGesture();});
+        set("play",()=>{unlockFromGesture();});
         set("pause",()=>{
-          if(!audible||player.paused)return;
-          player.pause();
-          setPlayingUI(false);
-          setSessionPlayback("paused");
+          // iOS may pause <audio> before this runs; still freeze meter + flag.
+          pausePlayback();
         });
         set("stop",()=>{
-          if(audible&&!player.paused){player.pause();setPlayingUI(false);}
+          pausePlayback();
           setSessionPlayback("none");
         });
         clearSeekActions();
@@ -353,7 +352,7 @@ public enum ListenerPage {
       document.addEventListener("visibilitychange",()=>{
         if(document.visibilityState==="visible"){
           refreshTitle();
-          if(audible)startMeter();
+          if(audible&&!userPaused&&!player.paused)startMeter();
         }else{
           stopMeter();
         }
@@ -392,17 +391,35 @@ public enum ListenerPage {
         if(audioCtx.state==="suspended")return audioCtx.resume().catch(()=>{});
         return Promise.resolve();
       };
+      const flattenMeter=()=>{
+        for(let i=0;i<bars.length;i++){
+          bars[i].style.height="6px";
+          bars[i].style.opacity="0.5";
+        }
+      };
       const stopMeter=()=>{
         if(meterRAF){cancelAnimationFrame(meterRAF);meterRAF=0;}
+        meterEl.classList.remove("on");
+        flattenMeter();
       };
       const startMeter=()=>{
-        if(!analyser||document.hidden){meterEl.classList.remove("on");return;}
+        // MediaStream analyser keeps receiving live audio even when <audio> is
+        // paused — never paint while playback is paused from any control.
+        if(!analyser||document.hidden||userPaused||player.paused){
+          stopMeter();
+          return;
+        }
         stopMeter();
         meterEl.classList.add("on");
         const bins=new Uint8Array(analyser.frequencyBinCount);
         const paint=()=>{
           meterRAF=requestAnimationFrame(paint);
-          if(document.hidden||!analyser)return;
+          if(document.hidden||!analyser||userPaused||player.paused){
+            if(meterRAF){cancelAnimationFrame(meterRAF);meterRAF=0;}
+            meterEl.classList.remove("on");
+            flattenMeter();
+            return;
+          }
           analyser.getByteFrequencyData(bins);
           const half=barCount/2;
           for(let i=0;i<half;i++){
@@ -422,6 +439,7 @@ public enum ListenerPage {
       };
       const markAudible=()=>{
         audible=true;
+        userPaused=false;
         playBtn.disabled=false;
         setPlayingUI(true);
         setMessage("");
@@ -429,15 +447,33 @@ public enum ListenerPage {
         clearSeekActions();
         setSessionPlayback("playing");
         resumeAudioGraph().then(()=>{
+          if(userPaused||player.paused){stopMeter();return;}
           if(!analyser)ensureAudioGraph();
           startMeter();
         });
       };
+      const pausePlayback=()=>{
+        // Intentional pause: keep the WebRTC track; do not reconnect or auto-play.
+        userPaused=true;
+        try{player.pause();}catch(err){}
+        stopMeter();
+        setPlayingUI(false);
+        setSessionPlayback("paused");
+        clearSeekActions();
+      };
       const tryAudiblePlay=()=>{
+        if(userPaused){
+          playBtn.disabled=false;
+          setPlayingUI(false);
+          setSessionPlayback("paused");
+          stopMeter();
+          return Promise.resolve(false);
+        }
         player.muted=false;
         const p=player.play();
         if(p&&typeof p.then==="function"){
           return p.then(()=>{
+            if(userPaused){player.pause();setPlayingUI(false);setSessionPlayback("paused");return false;}
             if(player.muted){setPlayingUI(false);playBtn.setAttribute("aria-label",tapLabel);return false;}
             markAudible();
             return true;
@@ -449,31 +485,41 @@ public enum ListenerPage {
       };
       // Safari iOS: create/resume AudioContext inside the Play gesture.
       const unlockFromGesture=()=>{
-        if(!trackStream)return;
+        if(!trackStream){
+          // Stream not ready — ensure we are connecting, then play on onTrack.
+          userPaused=false;
+          if(!connected)connect();
+          return;
+        }
+        userPaused=false;
+        // Re-attach if the element lost its srcObject while paused.
+        if(player.srcObject!==trackStream)player.srcObject=trackStream;
         resumeAudioGraph().then(()=>{
+          if(userPaused)return;
           if(!analyser)ensureAudioGraph();
           player.muted=false;
           const p=player.play();
           if(p&&typeof p.then==="function"){
-            p.then(markAudible).catch(()=>{setPlayingUI(false);playBtn.setAttribute("aria-label",tapLabel);});
+            p.then(()=>{
+              if(userPaused){try{player.pause();}catch(err){}return;}
+              markAudible();
+            }).catch(()=>{setPlayingUI(false);playBtn.setAttribute("aria-label",tapLabel);});
           }else{
-            markAudible();
+            if(!userPaused)markAudible();
           }
         });
       };
       const togglePlayback=()=>{
-        if(!trackStream)return;
-        if(!audible||player.paused){
+        // Prefer userPaused so pause stays paused even if player.paused races.
+        // Play is allowed with no track yet (unlockFromGesture will connect).
+        if(userPaused||!audible||player.paused){
           unlockFromGesture();
           return;
         }
-        player.pause();
-        setPlayingUI(false);
-        setSessionPlayback("paused");
-        clearSeekActions();
+        if(!trackStream)return;
+        pausePlayback();
       };
-      playBtn.addEventListener("click",(evt)=>{evt.preventDefault();togglePlayback();});
-      playBtn.addEventListener("click",(evt)=>{evt.preventDefault();togglePlayback();});
+      playBtn.addEventListener("click",(evt)=>{evt.preventDefault();evt.stopPropagation();togglePlayback();});
       const connect=()=>{
         if(connected)return;
         if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
@@ -482,7 +528,21 @@ public enum ListenerPage {
         reader=new MediaMTXWebRTCReader({
           url:new URL("\(whepPath)",window.location.href).toString(),
           onError:(err)=>{
-            if(ticket!==generation||connected)return;
+            if(ticket!==generation)return;
+            // Drop the live pipe. Auto-retry only when the user has not paused;
+            // a paused listener keeps silence until they press Play (which calls connect).
+            connected=false;
+            trackStream=null;
+            try{player.srcObject=null;}catch(e){}
+            stopMeter();
+            if(userPaused){
+              setPlayingUI(false);
+              setSessionPlayback("paused");
+              playBtn.disabled=false;
+              playBtn.setAttribute("aria-label",playLabel);
+              if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
+              return;
+            }
             setMessage(waitingText);
             playBtn.disabled=true;
             liveEl.classList.remove("on");
@@ -497,9 +557,16 @@ public enum ListenerPage {
             trackStream=evt.streams[0];
             player.srcObject=trackStream;
             playBtn.disabled=false;
-            playBtn.setAttribute("aria-label",tapLabel);
             applyTitle(document.title);
             startTimer();
+            // Reconnect / new track: leave the stream alone while the user is paused.
+            if(userPaused){
+              setPlayingUI(false);
+              setSessionPlayback("paused");
+              playBtn.setAttribute("aria-label",playLabel);
+              return;
+            }
+            playBtn.setAttribute("aria-label",tapLabel);
             tryAudiblePlay();
           },
           onDataChannel:(evt)=>{
@@ -517,8 +584,23 @@ public enum ListenerPage {
         setMessage(waitingText);
         connect();
       });
-      player.addEventListener("play",()=>applyTitle(document.title));
-      player.addEventListener("pause",()=>{if(audible)setPlayingUI(false);});
+      player.addEventListener("play",()=>{
+        applyTitle(document.title);
+        if(!userPaused&&!player.paused){
+          resumeAudioGraph().then(()=>{
+            if(userPaused||player.paused){stopMeter();return;}
+            if(!analyser)ensureAudioGraph();
+            startMeter();
+          });
+        }
+      });
+      player.addEventListener("pause",()=>{
+        userPaused=true;
+        stopMeter();
+        if(audible)setPlayingUI(false);
+        setSessionPlayback("paused");
+        clearSeekActions();
+      });
       window.addEventListener("beforeunload",()=>{
         if(reader!==null)reader.close();
         stopMeter();
