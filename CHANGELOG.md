@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.2 — 2026-11-01
+
+Listener and Mac app polish for the public download.
+
+- Redesigned the phone listener page for WebRTC clients, and fitted it for short iPhone Safari viewports.
+- Lock-screen Media Session shows the RoomCast icon, title and computer name; the live meter freezes when paused.
+- Pause on the page stays paused (it no longer pause-then-play in one tap).
+- Removed user-visible Beta wording from the Mac app chrome. Window title is RoomCast.
+- Universal notarised DMG for Apple silicon and Intel (macOS 13+).
+
+
 ## 1.0.0 — 2026-10-20
 
 First MVP build of RoomCast.
