@@ -38,21 +38,46 @@ enum ListenerHostName {
 
 enum WifiDropNotifier {
     static let id = "channel.roomcast.go.wifi-dropped"
+    static let changedID = "channel.roomcast.go.wifi-changed"
 
     static func requestPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
     static func post() {
+        deliver(
+            id: id,
+            title: "Wi-Fi dropped",
+            body: "RoomCast Go lost the network. Listeners can’t hear you until Wi-Fi or Personal Hotspot is back."
+        )
+    }
+
+    static func postChanged() {
+        deliver(
+            id: changedID,
+            title: "Wi-Fi changed",
+            body: "The network changed. Listeners must rejoin with the new code."
+        )
+    }
+
+    static func clear() {
+        remove(id)
+    }
+
+    static func clearChanged() {
+        remove(changedID)
+    }
+
+    private static func deliver(id: String, title: String, body: String) {
         let content = UNMutableNotificationContent()
-        content.title = "Wi-Fi dropped"
-        content.body = "RoomCast Go lost the network. Listeners can’t hear you until Wi-Fi or Personal Hotspot is back."
+        content.title = title
+        content.body = body
         content.sound = .default
         let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }
 
-    static func clear() {
+    private static func remove(_ id: String) {
         let center = UNUserNotificationCenter.current()
         center.removeDeliveredNotifications(withIdentifiers: [id])
         center.removePendingNotificationRequests(withIdentifiers: [id])

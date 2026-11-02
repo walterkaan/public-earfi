@@ -13,6 +13,8 @@ final class AudioCapture {
     private var clipUntil = Date.distantPast
     private var clipShown = false
     var onInput: ((String) -> Void)?
+    /// Hardware channel label, then the channel count the port reports.
+    var onHardware: ((String, Int) -> Void)?
     var onInterrupted: ((Bool) -> Void)?
     var onUSB: ((Bool) -> Void)?
     var onProfile: ((String) -> Void)?
@@ -38,10 +40,17 @@ final class AudioCapture {
     private var pending: [Float] = []
     private var frame = [Float](repeating: 0, count: OpusEncoderBox.frameSamples * 2)
     private var channels = 1
+    /// Channels handed to Opus. 2 when stereo widen is turning a mono music input into a stereo packet.
+    private var encodeChannels = 1
     /// Main thread. Preference, including while USB is unplugged.
     private var musicPreferred = false
     /// Main thread. Music is on only for a USB input.
     private var musicActive = false
+    /// Main thread. Applied only for mono music. Default on.
+    private var stereoWiden = true
+    private var widener = StereoWidener()
+    private var wide = [Float](repeating: 0, count: OpusEncoderBox.frameSamples * 2)
+    private var routeMonitor: NSObjectProtocol?
     private var applying = false
     private var smoothed: Float = 0
     private var lastLevelAt = Date.distantPast
@@ -63,6 +72,34 @@ final class AudioCapture {
     /// Audio thread only. Smoothed makeup while AGC is off.
     private var levelerGain: Float = 1
     private var levelerWasOn = false
+
+    /// Lists inputs and prefers a USB or other external port over the built-in mic.
+    /// Safe to call before Start. Does not activate the microphone.
+    func startMonitoringRoutes() {
+        ensureCategory()
+        refreshRoute()
+        guard routeMonitor == nil else { return }
+        routeMonitor = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] note in
+            self?.ingestRouteChange(note)
+        }
+    }
+
+    func refreshRoute() {
+        ensureCategory()
+        applyPreferredInput()
+        reportInput()
+    }
+
+    func setStereoWiden(_ on: Bool) {
+        guard stereoWiden != on else { return }
+        stereoWiden = on
+        guard running else { return }
+        restartRunning()
+    }
 
     /// Music is remembered, and applied only while the input is USB.
     /// A change while running restarts capture. The WebRTC sessions stay up.
@@ -178,6 +215,7 @@ final class AudioCapture {
         try session.setPreferredSampleRate(48_000)
         try session.setPreferredIOBufferDuration(0.02)
         try session.setActive(true)
+        applyPreferredInput()
         if session.sampleRate == 0 {
             try session.setPreferredSampleRate(48_000)
             try session.setActive(true)
@@ -233,9 +271,12 @@ final class AudioCapture {
         }
         let captureChannels: AVAudioChannelCount = (musicActive && format.channelCount >= 2) ? 2 : 1
         channels = Int(captureChannels)
-        encoder = try OpusEncoderBox(music: musicActive, channels: channels)
-        let kbps = musicActive ? (channels >= 2 ? 128 : 96) : 32
-        let profile = "\(kbps) kbps \(channels >= 2 ? "stereo" : "mono")"
+        let widen = musicActive && channels < 2 && stereoWiden
+        encodeChannels = widen ? 2 : channels
+        widener.reset()
+        encoder = try OpusEncoderBox(music: musicActive, channels: encodeChannels)
+        let kbps = musicActive ? (encodeChannels >= 2 ? 128 : 96) : 32
+        let profile = Self.profileLabel(music: musicActive, kbps: kbps)
         DispatchQueue.main.async { [weak self] in self?.onProfile?(profile) }
         guard let target = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
@@ -479,10 +520,27 @@ final class AudioCapture {
                 onClip?(clipping)
             }
         }
-        guard let encoder, let packet = frame.withUnsafeBufferPointer({ buffer -> Data? in
-            guard let base = buffer.baseAddress else { return nil }
-            return encoder.encode(base)
-        }) else { return }
+        guard let encoder else { return }
+        let packet: Data?
+        if encodeChannels >= 2 && channels < 2 && !sendSilence {
+            widener.expand(frame, count: sampleCount, into: &wide)
+            packet = wide.withUnsafeBufferPointer { buffer -> Data? in
+                guard let base = buffer.baseAddress else { return nil }
+                return encoder.encode(base)
+            }
+        } else if encodeChannels >= 2 && sendSilence {
+            for index in wide.indices { wide[index] = 0 }
+            packet = wide.withUnsafeBufferPointer { buffer -> Data? in
+                guard let base = buffer.baseAddress else { return nil }
+                return encoder.encode(base)
+            }
+        } else {
+            packet = frame.withUnsafeBufferPointer { buffer -> Data? in
+                guard let base = buffer.baseAddress else { return nil }
+                return encoder.encode(base)
+            }
+        }
+        guard let packet else { return }
         onPacket?(packet)
     }
 
@@ -494,13 +552,6 @@ final class AudioCapture {
             queue: .main
         ) { [weak self] note in
             self?.handleInterruption(note)
-        })
-        observers.append(center.addObserver(
-            forName: AVAudioSession.routeChangeNotification,
-            object: AVAudioSession.sharedInstance(),
-            queue: .main
-        ) { [weak self] note in
-            self?.handleRouteChange(note)
         })
         observers.append(center.addObserver(
             forName: AVAudioSession.mediaServicesWereResetNotification,
@@ -576,24 +627,25 @@ final class AudioCapture {
         }
     }
 
-    private func handleRouteChange(_ note: Notification) {
-        guard running, !applying else { return }
+    private func ingestRouteChange(_ note: Notification) {
         let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt ?? 0
         let reason = AVAudioSession.RouteChangeReason(rawValue: raw) ?? .unknown
+        applyPreferredInput()
+        reportInput()
+        guard running, !applying else { return }
         switch reason {
         case .newDeviceAvailable, .oldDeviceUnavailable, .override:
             log.info("route changed: \(String(describing: reason), privacy: .public)")
             let active = musicPreferred && Self.routeIsUSB
             let profileChanged = active != musicActive
             musicActive = active
-            onUSB?(Self.routeIsUSB)
             if profileChanged {
                 restartRunning()
             } else {
                 rebuildEngine()
             }
         default:
-            reportInput()
+            break
         }
     }
 
@@ -657,12 +709,130 @@ final class AudioCapture {
         return tanhf(sample * drive) / tanhf(drive)
     }
 
+    private func ensureCategory() {
+        let session = AVAudioSession.sharedInstance()
+        if session.category != .playAndRecord {
+            try? session.setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
+            )
+        }
+    }
+
+    /// USB and wired inputs win over the built-in mic. The choice is stored
+    /// with `setPreferredInput` so the next session activation uses it.
+    private func applyPreferredInput() {
+        let session = AVAudioSession.sharedInstance()
+        guard let best = Self.bestInput(session.availableInputs) else { return }
+        if session.preferredInput?.uid != best.uid {
+            try? session.setPreferredInput(best)
+        }
+    }
+
     private func reportInput() {
-        let names = AVAudioSession.sharedInstance().currentRoute.inputs.map(\.portName)
-        let name = names.isEmpty ? "iPhone microphone" : names.joined(separator: ", ")
+        let session = AVAudioSession.sharedInstance()
+        let preferred = Self.bestInput(session.availableInputs)
+        let current = session.currentRoute.inputs.first
+        let port: AVAudioSessionPortDescription?
+        if let preferred, Self.isExternal(preferred) {
+            port = preferred
+        } else {
+            port = current ?? preferred
+        }
+        let name = port?.portName ?? "Internal Microphone"
+        let count = Self.hardwareChannels(port: port, session: session)
+        let label = Self.channelLabel(channels: count, port: port)
         log.info("input \(name, privacy: .public)")
         onInput?(name)
+        onHardware?(label, count)
         onUSB?(Self.routeIsUSB)
+    }
+
+    private static func bestInput(_ inputs: [AVAudioSessionPortDescription]?) -> AVAudioSessionPortDescription? {
+        inputs?.min { rank($0) < rank($1) }
+    }
+
+    private static func rank(_ port: AVAudioSessionPortDescription) -> Int {
+        switch port.portType {
+        case .usbAudio:
+            return 0
+        case .lineIn:
+            return 1
+        case .headsetMic:
+            return 2
+        case .builtInMic:
+            return 50
+        default:
+            if port.portName.localizedCaseInsensitiveContains("usb") { return 0 }
+            return 10
+        }
+    }
+
+    private static func isExternal(_ port: AVAudioSessionPortDescription?) -> Bool {
+        guard let port else { return false }
+        return port.portType != .builtInMic
+    }
+
+    /// Built-in ports list several mic positions. Those are not a stereo pair.
+    /// A USB or line input's channel list is the hardware width.
+    private static func hardwareChannels(port: AVAudioSessionPortDescription?, session: AVAudioSession) -> Int {
+        if port?.portType == .builtInMic { return 1 }
+        if let listed = port?.channels?.count, listed > 0 { return listed }
+        if session.maximumInputNumberOfChannels > 0 { return session.maximumInputNumberOfChannels }
+        return 1
+    }
+
+    private static func channelLabel(channels: Int, port: AVAudioSessionPortDescription?) -> String {
+        let kind = (port == nil || port?.portType == .builtInMic) ? "iPhone mic" : "sound card"
+        return channels >= 2 ? "Stereo (\(kind))" : "Mono (\(kind))"
+    }
+
+    private static func profileLabel(music: Bool, kbps: Int) -> String {
+        if music && kbps == 96 { return "96kbps Music quality" }
+        if music { return "\(kbps)kbps Music quality" }
+        return "\(kbps) kbps"
+    }
+}
+
+/// Mono-compatible widener. The mid is the dry sample, undelayed. A high-passed
+/// copy is delayed ~12 ms and added to the left and subtracted from the right,
+/// so (left + right) / 2 is the original with no comb filter. The delay is only
+/// on that side signal, so the packet clock stays on the existing 20 ms frame.
+private struct StereoWidener {
+    static let delaySamples = 12 * 48
+    private var line = [Float](repeating: 0, count: delaySamples)
+    private var cursor = 0
+    private var previous: Float = 0
+    private var highpass: Float = 0
+    /// One-pole highpass near 200 Hz at 48 kHz. Bass stays in the center.
+    private let pole: Float = 0.974
+
+    mutating func reset() {
+        line = [Float](repeating: 0, count: Self.delaySamples)
+        cursor = 0
+        previous = 0
+        highpass = 0
+    }
+
+    mutating func expand(_ mono: [Float], count: Int, into stereo: inout [Float]) {
+        let mid: Float = 0.85
+        let sideGain: Float = 0.4
+        let n = min(count, mono.count)
+        if stereo.count < n * 2 { return }
+        for index in 0..<n {
+            let sample = mono[index]
+            let filtered = pole * (highpass + sample - previous)
+            previous = sample
+            highpass = filtered
+            let delayed = line[cursor]
+            line[cursor] = filtered
+            cursor += 1
+            if cursor == Self.delaySamples { cursor = 0 }
+            let side = delayed * sideGain
+            stereo[index * 2] = mid * sample + side
+            stereo[index * 2 + 1] = mid * sample - side
+        }
     }
 }
 

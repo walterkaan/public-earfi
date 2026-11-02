@@ -72,6 +72,8 @@ struct BroadcastView: View {
             .padding(.bottom, 8)
             if model.wifiDown {
                 wifiDroppedOverlay
+            } else if model.networkChanged {
+                wifiChangedOverlay
             }
         }
         .preferredColorScheme(.dark)
@@ -234,7 +236,7 @@ struct BroadcastView: View {
                     .font(.body.weight(.semibold))
                     .frame(width: 44, height: 44)
                     .background(model.muted ? Color.roomPink : Color.white.opacity(0.12))
-                    .foregroundStyle(model.muted ? Color.roomNavy : .white)
+                    .foregroundStyle(micInk)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
@@ -266,8 +268,22 @@ struct BroadcastView: View {
                         .foregroundStyle(.white)
                         .accessibilityHidden(true)
                 }
+                if model.canWiden {
+                    Toggle("Stereo widen", isOn: Binding(
+                        get: { model.stereoWiden },
+                        set: { model.setStereoWiden($0) }
+                    ))
+                    .font(.caption.weight(.semibold))
+                    .tint(Color.roomTeal)
+                }
             }
         }
+    }
+
+    private var micInk: Color {
+        if model.muted { return .roomNavy }
+        if model.inputHeard { return Color(red: 0.28, green: 0.82, blue: 0.42) }
+        return Color.white.opacity(0.38)
     }
 
     private var musicPicker: some View {
@@ -341,7 +357,7 @@ struct BroadcastView: View {
     private var meter: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(model.muted ? "Sound Source · not sent" : (model.profileText.isEmpty || model.phase == .idle ? "Sound Source" : "Sound · \(model.profileText)"))
+                Text(soundLine)
                 Spacer()
                 if model.clipping && !model.muted {
                     Text("Too loud, turn the source down")
@@ -449,6 +465,63 @@ struct BroadcastView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
+    private var soundLine: String {
+        if model.muted { return "Sound Muted" }
+        guard model.isOnAir, !model.profileText.isEmpty else { return "Sound Source" }
+        if model.hardwareLabel.isEmpty {
+            return "Sound · \(model.profileText)"
+        }
+        return "Sound · \(model.profileText) · \(model.hardwareLabel)"
+    }
+
+    private var wifiChangedOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.62).ignoresSafeArea()
+            ScrollView {
+                VStack(spacing: 14) {
+                    Image(systemName: "wifi.exclamationmark")
+                        .font(.system(size: 56, weight: .bold))
+                        .foregroundStyle(Color.roomAmber)
+                    Text("Wi-Fi changed")
+                        .font(.largeTitle.weight(.bold))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                    Text("The network changed. Listeners must rejoin with this code.")
+                        .font(.title3.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(0.9))
+                    if let image = model.qrImage {
+                        Image(uiImage: image)
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFit()
+                            .padding(8)
+                            .background(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .frame(maxWidth: 220)
+                            .accessibilityLabel("New QR code for the listener page")
+                    }
+                    Text(model.url)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .textSelection(.enabled)
+                    Button("Dismiss") { model.dismissNetworkChange() }
+                        .buttonStyle(GateButtonStyle(fill: .roomTeal, ink: .roomNavy))
+                }
+                .padding(24)
+                .background(Color.roomNavy, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.roomAmber, lineWidth: 3)
+                )
+                .padding(20)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+    }
+
     private var wifiDroppedOverlay: some View {
         ZStack {
             Color.black.opacity(0.62).ignoresSafeArea()
@@ -517,6 +590,8 @@ private struct SetupSheet: View {
         NavigationStack {
             Form {
                 Section {
+                    Text("Current sound source: \(model.soundSourceName) - Plug in external mic or USB sound card now")
+                        .font(.subheadline)
                     TextField("Session name", text: $draft)
                         .textInputAutocapitalization(.words)
                         .onChange(of: draft) { _, value in
