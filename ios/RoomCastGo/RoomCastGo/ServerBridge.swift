@@ -2,9 +2,14 @@ import Foundation
 import Roomcast
 
 /// gobind writes C functions into Roomcast.objc.h, not throwing methods.
-/// Start is `BOOL RoomcastStart(long, long, NSString*, NSString*, NSString*, NSString*, int64_t, NSError**)`.
-/// The extra strings are the session title and the "from" device name.
+/// Start is eight parameters: httpPort, icePort, ip, iface, title, host,
+/// startedUnix, and the error pointer.
+/// `BOOL RoomcastStart(long, long, NSString*, NSString*, NSString*, NSString*, int64_t, NSError**)`.
+/// The fifth and sixth strings are the session title and the "from" device name.
 /// `startedUnix` is the broadcast clock in unix seconds.
+/// The previous framework only had six parameters (the error pointer was #6).
+/// Xcode then reports extra arguments at #7 and #8 until
+/// `ios/RoomCastGo/build/Roomcast.xcframework` is rebuilt.
 /// Swift leaves the error pointer as a real argument. Go `int` is `long`
 /// (Swift `Int`). Go `int64` is `int64_t` (Swift `Int64`). Go `[]byte` is
 /// `NSData*`, which `Data` bridges to.

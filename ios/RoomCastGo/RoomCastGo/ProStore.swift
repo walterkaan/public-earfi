@@ -19,14 +19,14 @@ enum ProLegal {
 final class ProStore: ObservableObject {
     static let productID = "channel.roomcast.go.pro.monthly"
 
-    @Published private(set) var product: Product?
+    @Published private(set) var product: StoreKit.Product?
     @Published private(set) var isPro = false
     @Published var purchaseError: String?
     @Published private(set) var isWorking = false
 
     init() {
         Task { [weak self] in
-            for await update in Transaction.updates {
+            for await update in StoreKit.Transaction.updates {
                 await self?.handle(update)
             }
         }
@@ -40,7 +40,7 @@ final class ProStore: ObservableObject {
 
     func loadProduct() async {
         do {
-            let products = try await Product.products(for: [Self.productID])
+            let products = try await StoreKit.Product.products(for: [Self.productID])
             product = products.first
             if products.isEmpty {
                 purchaseError = "The subscription isn’t available from the App Store yet."
@@ -54,7 +54,7 @@ final class ProStore: ObservableObject {
 
     func refreshEntitlement() async {
         var pro = false
-        for await result in Transaction.currentEntitlements {
+        for await result in StoreKit.Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
             guard transaction.productID == Self.productID else { continue }
             guard transaction.revocationDate == nil else { continue }
@@ -97,7 +97,7 @@ final class ProStore: ObservableObject {
         purchaseError = nil
         defer { isWorking = false }
         do {
-            try await AppStore.sync()
+            try await StoreKit.AppStore.sync()
             await refreshEntitlement()
             if !isPro {
                 purchaseError = "No active subscription was found for this Apple ID."
@@ -107,7 +107,7 @@ final class ProStore: ObservableObject {
         }
     }
 
-    func periodLabel(_ product: Product) -> String {
+    func periodLabel(_ product: StoreKit.Product) -> String {
         guard let period = product.subscription?.subscriptionPeriod else { return "period" }
         let count = period.value
         let unit: String
@@ -122,7 +122,7 @@ final class ProStore: ObservableObject {
         return "\(count) \(unit)"
     }
 
-    private func handle(_ update: VerificationResult<Transaction>) async {
+    private func handle(_ update: StoreKit.VerificationResult<StoreKit.Transaction>) async {
         guard case .verified(let transaction) = update else { return }
         await transaction.finish()
         await refreshEntitlement()
@@ -219,7 +219,7 @@ struct PaywallView: View {
         .foregroundStyle(Color.roomTeal)
     }
 
-    private func disclosure(_ product: Product) -> String {
+    private func disclosure(_ product: StoreKit.Product) -> String {
         let price = product.displayPrice
         let period = store.periodLabel(product)
         return """
@@ -235,7 +235,7 @@ struct PaywallView: View {
             .first(where: { $0.activationState == .foregroundActive })
             ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
         else { return }
-        Task { try? await AppStore.showManageSubscriptions(in: scene) }
+        Task { try? await StoreKit.AppStore.showManageSubscriptions(in: scene) }
     }
 }
 
