@@ -36,6 +36,8 @@ type server struct {
 	api      *webrtc.API
 	sessions map[string]*session
 	title    string
+	host     string
+	started  int64
 	closed   bool
 	cancel   context.CancelFunc
 	ctx      context.Context
@@ -46,7 +48,7 @@ type server struct {
 	tcpListener *net.TCPListener
 }
 
-func newServer(httpPort, icePort int, ip, iface, title string) (*server, error) {
+func newServer(httpPort, icePort int, ip, iface, title, host string, started int64) (*server, error) {
 	parsed := net.ParseIP(ip).To4()
 	if parsed == nil {
 		return nil, errors.New("the broadcast address is not an IPv4 address")
@@ -55,6 +57,10 @@ func newServer(httpPort, icePort int, ip, iface, title string) (*server, error) 
 		return nil, errors.New("RoomCast Go only broadcasts on Wi-Fi or Personal Hotspot")
 	}
 	title = sanitizeTitle(title)
+	host = sanitizeHost(host)
+	if started <= 0 {
+		started = time.Now().Unix()
+	}
 	iface = safeIfaceName(iface)
 
 	track, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{
@@ -111,6 +117,8 @@ func newServer(httpPort, icePort int, ip, iface, title string) (*server, error) 
 		api:         webrtc.NewAPI(webrtc.WithSettingEngine(setting)),
 		sessions:    map[string]*session{},
 		title:       title,
+		host:        host,
+		started:     started,
 		cancel:      cancel,
 		ctx:         ctx,
 		udpConn:     udpConn,

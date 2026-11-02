@@ -6,19 +6,27 @@ import (
 )
 
 func TestListenerPageMatchesMacContract(t *testing.T) {
-	html := listenerHTML(`Room <Cast> & "live"`)
+	html := listenerHTML(`Room <Cast> & "live"`, `Walt's <Phone>`, 1_700_000_000)
 	for _, needle := range []string{
 		"Powered by RoomCast",
 		"https://roomcast.channel",
+		"Keep this screen open. Earbuds work best.",
 		"/reader.js",
 		"/whep",
 		"/earfi.json",
 		"Waiting for the host to start",
+		"Tap to listen",
+		"video.play()",
 		"The listener page could not load.",
 		"This page needs JavaScript turned on.",
 		"MediaMTXWebRTCReader",
 		`readyState==="ended"`,
 		"Room &lt;Cast&gt; &amp; &#34;live&#34;",
+		"from Walt&#39;s &lt;Phone&gt;",
+		"LIVE",
+		"id=\"toggle\"",
+		"id=\"wave\"",
+		"1700000000",
 	} {
 		if !strings.Contains(html, needle) {
 			t.Fatalf("page missing %q", needle)

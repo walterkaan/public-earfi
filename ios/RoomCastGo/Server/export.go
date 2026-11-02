@@ -16,9 +16,12 @@ var (
 )
 
 // Start opens the listener page on httpPort and WebRTC media on icePort.
-// ip and iface come from SelectHost. title is the name on the phone page.
-func Start(httpPort int, icePort int, ip string, iface string, title string) error {
-	next, err := newServer(httpPort, icePort, ip, iface, title)
+// ip and iface come from SelectHost. title is the session name on the
+// listener page, host is the "from …" device name, and startedUnix is the
+// broadcast clock (unix seconds) so a rebind does not reset the timer.
+// startedUnix <= 0 means "now".
+func Start(httpPort int, icePort int, ip string, iface string, title string, host string, startedUnix int64) error {
+	next, err := newServer(httpPort, icePort, ip, iface, title, host, startedUnix)
 	if err != nil {
 		return err
 	}

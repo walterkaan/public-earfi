@@ -1,12 +1,15 @@
 import SwiftUI
+import UIKit
 
 struct BroadcastView: View {
     @State private var confirmStop = false
     @ObservedObject var model: BroadcastModel
+    @ObservedObject var store: ProStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var shareURL: String?
     @State private var showStats = false
-    @State private var liveSince: Date?
+    @State private var showSetup = false
+    @State private var showPaywall = false
 
     var body: some View {
         ZStack {
@@ -18,9 +21,22 @@ struct BroadcastView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 4)
                 mixRow
-                startButton
-                if model.isOnAir, let since = liveSince {
-                    liveLine(since: since)
+                if model.isOnAir || model.wifiReady {
+                    startRow
+                    if model.isOnAir, let since = model.startedAt {
+                        liveLine(since: since)
+                        if !store.isPro {
+                            freeCountdown(since: since)
+                        }
+                    } else if model.phase == .idle, !store.isPro {
+                        Button("Free sessions last 40 minutes. Upgrade") {
+                            showPaywall = true
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.roomTeal)
+                    }
+                } else {
+                    wifiCard
                 }
                 if let detail = detailText {
                     Text(detail)
@@ -28,7 +44,7 @@ struct BroadcastView: View {
                         .multilineTextAlignment(.center)
                         .foregroundStyle(model.failed ? Color.roomPink : Color.white.opacity(0.72))
                         .frame(maxWidth: .infinity)
-                        .lineLimit(4)
+                        .lineLimit(6)
                 }
                 if model.isOnAir {
                     qrCard
@@ -54,22 +70,30 @@ struct BroadcastView: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 8)
+            if model.wifiDown {
+                wifiDroppedOverlay
+            }
         }
         .preferredColorScheme(.dark)
         .onAppear {
             model.appear()
-            if model.isOnAir && liveSince == nil { liveSince = Date() }
-        }
-        .onChange(of: model.isOnAir) { _, onAir in
-            liveSince = onAir ? (liveSince ?? Date()) : nil
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 model.sceneBecameActive()
             }
         }
+        .onChange(of: model.freeLimitHit) { _, hit in
+            if hit { showPaywall = true }
+        }
         .sheet(isPresented: sharePresented) {
             ShareSheet(items: [shareURL ?? ""])
+        }
+        .sheet(isPresented: $showSetup) {
+            SetupSheet(model: model)
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(store: store)
         }
     }
 
@@ -89,7 +113,26 @@ struct BroadcastView: View {
         case .live:
             return model.status == "Live" ? nil : model.status
         case .idle:
-            return model.failed ? model.status : model.networkNote
+            if model.status != "Ready" { return model.status }
+            return model.wifiReady ? model.networkNote : nil
+        }
+    }
+
+    private var startRow: some View {
+        HStack(spacing: 10) {
+            startButton
+            Button {
+                showSetup = true
+            } label: {
+                Text("Setup")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 84, height: 52)
+                    .background(Color.white.opacity(0.12))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Setup")
         }
     }
 
@@ -131,9 +174,7 @@ struct BroadcastView: View {
     private func liveLine(since: Date) -> some View {
         TimelineView(.periodic(from: since, by: 1)) { context in
             let secs = max(0, Int(context.date.timeIntervalSince(since)))
-            let time = secs >= 3600
-                ? String(format: "%d:%02d:%02d", secs / 3600, (secs / 60) % 60, secs % 60)
-                : String(format: "%d:%02d", secs / 60, secs % 60)
+            let time = Self.clock(secs)
             HStack(spacing: 6) {
                 Circle().fill(Color.roomRed).frame(width: 8, height: 8)
                 Text(model.phase == .reconnecting ? "Reconnecting · \(time)" : "Live · \(time)")
@@ -200,7 +241,7 @@ struct BroadcastView: View {
             .accessibilityLabel(model.muted ? "Unmute, \(sourceName)" : "Mute, \(sourceName)")
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text("Gain")
+                    Text("Volume boost")
                     Spacer(minLength: 4)
                     Text(sourceName)
                         .lineLimit(1)
@@ -218,7 +259,7 @@ struct BroadcastView: View {
                         in: BroadcastGain.range(music: model.musicActive)
                     )
                     .tint(Color.roomTeal)
-                    .accessibilityLabel("Gain")
+                    .accessibilityLabel("Volume boost")
                     .accessibilityValue(BroadcastGain.label(model.gain))
                     Text(BroadcastGain.label(model.gain))
                         .font(.subheadline.weight(.semibold).monospacedDigit())
@@ -323,6 +364,124 @@ struct BroadcastView: View {
             .accessibilityValue("\(Int(model.level * 100)) percent")
         }
     }
+
+    private func freeCountdown(since: Date) -> some View {
+        TimelineView(.periodic(from: since, by: 1)) { context in
+            let left = max(0, Int(BroadcastLimits.freeSeconds - context.date.timeIntervalSince(since)))
+            VStack(spacing: 4) {
+                Text("Free · \(Self.clock(left)) left")
+                    .font(.title3.weight(.bold).monospacedDigit())
+                    .foregroundStyle(left <= 300 ? Color.roomAmber : Color.roomTeal)
+                Button("Upgrade for unlimited") { showPaywall = true }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.roomTeal)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private static func clock(_ secs: Int) -> String {
+        let secs = max(0, secs)
+        if secs >= 3600 {
+            return String(format: "%d:%02d:%02d", secs / 3600, (secs / 60) % 60, secs % 60)
+        }
+        return String(format: "%d:%02d", secs / 60, secs % 60)
+    }
+
+    private var wifiMessage: String {
+        switch model.wifiPrompt {
+        case .checking:
+            return "Checking Wi-Fi…"
+        case .ssid(let name):
+            return "RoomCast Go will use \(name) Wi-Fi. Change Wi-Fi if this is not right. Continue?"
+        case .hotspot:
+            return "RoomCast Go will use this iPhone’s Personal Hotspot. Listeners must join that hotspot. Change the network if this is not right. Continue?"
+        case .unnamed(let denied):
+            if denied {
+                return "RoomCast Go can’t read the Wi-Fi name without Location access. It will use the current Wi-Fi network. Change Wi-Fi if this is not right, or allow Location in Settings. Continue?"
+            }
+            return "RoomCast Go can’t see a Wi-Fi name. It will use the current Wi-Fi network. Change Wi-Fi if this is not right. Continue?"
+        case .noNetwork:
+            return "No Wi-Fi network. Join a Wi-Fi network, or turn on Personal Hotspot, then try again."
+        }
+    }
+
+    private var wifiCanContinue: Bool {
+        switch model.wifiPrompt {
+        case .ssid, .hotspot, .unnamed:
+            return true
+        case .checking, .noNetwork:
+            return false
+        }
+    }
+
+    private var wifiCard: some View {
+        VStack(spacing: 12) {
+            if model.wifiPrompt == .checking {
+                ProgressView()
+                    .tint(.white)
+            }
+            Text(wifiMessage)
+                .font(.body.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+            if wifiCanContinue {
+                Button("Continue") { model.confirmWifi() }
+                    .buttonStyle(GateButtonStyle(fill: .roomTeal, ink: .roomNavy))
+            }
+            if case .noNetwork = model.wifiPrompt {
+                Button("Check again") { model.recheckWifi() }
+                    .buttonStyle(GateButtonStyle(fill: .roomTeal, ink: .roomNavy))
+            } else if model.wifiPrompt != .checking {
+                Button("Check again") { model.recheckWifi() }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.roomTeal)
+            }
+            if case .unnamed(true) = model.wifiPrompt {
+                Button("Open Settings") { openAppSettings() }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.roomTeal)
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var wifiDroppedOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.62).ignoresSafeArea()
+            VStack(spacing: 16) {
+                Image(systemName: "wifi.slash")
+                    .font(.system(size: 64, weight: .bold))
+                    .foregroundStyle(Color.roomPink)
+                Text("Wi-Fi dropped")
+                    .font(.largeTitle.weight(.bold))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                Text("Listeners can’t hear you until this iPhone is back on Wi-Fi or Personal Hotspot.")
+                    .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            .padding(28)
+            .background(Color.roomNavy, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(Color.roomPink, lineWidth: 3)
+            )
+            .padding(20)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityLabel("Wi-Fi dropped. Listeners can’t hear you until this iPhone is back on Wi-Fi or Personal Hotspot.")
+    }
+
+    private func openAppSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
 }
 
 /// Keeps Starting… and Stopping… at full color. The plain style fades a disabled button.
@@ -330,6 +489,61 @@ private struct SteadyButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(configuration.isPressed ? 0.86 : 1)
+    }
+}
+
+private struct GateButtonStyle: ButtonStyle {
+    var fill: Color
+    var ink: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .frame(height: 48)
+            .background(fill)
+            .foregroundStyle(ink)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .opacity(configuration.isPressed ? 0.86 : 1)
+    }
+}
+
+private struct SetupSheet: View {
+    @ObservedObject var model: BroadcastModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var draft = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Session name", text: $draft)
+                        .textInputAutocapitalization(.words)
+                        .onChange(of: draft) { _, value in
+                            if value.count > SessionName.limit {
+                                draft = String(value.prefix(SessionName.limit))
+                            }
+                        }
+                } footer: {
+                    Text("Listeners see this name as the title on the join page. A change while you are live is used the next time the broadcast starts.")
+                }
+            }
+            .navigationTitle("Setup")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        model.setSessionName(draft)
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .onAppear { draft = model.sessionName }
     }
 }
 

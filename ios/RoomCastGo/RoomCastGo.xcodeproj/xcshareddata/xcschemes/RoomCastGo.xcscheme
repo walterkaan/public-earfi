@@ -64,6 +64,9 @@
             ReferencedContainer = "container:RoomCastGo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <StoreKitConfigurationFileReference
+         identifier = "Products.storekit">
+      </StoreKitConfigurationFileReference>
       <CommandLineArguments>
       </CommandLineArguments>
    </LaunchAction>
