@@ -28,6 +28,8 @@ targets:
           - "**/*.c"
       - path: Vendor/opus-bridge/opus_bridge.c
       - path: Shared
+      - path: Products.storekit
+        buildPhase: none
     dependencies:
       - framework: build/Roomcast.xcframework
         embed: true
@@ -102,7 +104,8 @@ targets:
           SWIFT_COMPILATION_MODE: wholemodule
           VALIDATE_PRODUCT: YES
           DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
-    scheme: {}
+    scheme:
+      storeKitConfiguration: Products.storekit
   RoomCastGoWidget:
     type: app-extension
     platform: iOS

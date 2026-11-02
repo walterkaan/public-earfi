@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"html"
+	"strconv"
 	"strings"
 )
 
@@ -14,85 +15,201 @@ var readerJS []byte
 //go:embed assets/favicon.png
 var faviconPNG []byte
 
-// listenerHTML is the Mac app's listener page (ListenerPage.swift at
-// commit 780ddc8) served from this phone. reader.js is MediaMTX v1.21.2,
+//go:embed assets/mark.png
+var markPNG []byte
+
+// listenerHTML is the phone's listener page. reader.js is MediaMTX v1.21.2,
 // unchanged. After the first connection the page keeps retrying WHEP, so a
 // restart on the same address reconnects. A new IP still needs the new URL.
-func listenerHTML(title string) string {
+//
+// The page calls video.play() unmuted as soon as audio arrives. iOS Safari
+// rejects that call when there has been no user gesture. The rejection is
+// caught and the same large play button becomes the one tap that starts
+// sound. There is no second unmute control.
+func listenerHTML(title, host string, started int64) string {
 	safeTitle := html.EscapeString(title)
-	scriptTitle := scriptJSON(title)
+	safeHost := html.EscapeString(host)
+	scriptSpec := scriptJSON(title, host, started)
 	icon := faviconDataURI()
+	hero := markDataURI()
+	if hero == "" {
+		hero = icon
+	}
 	iconLink := ""
 	if icon != "" {
 		iconLink = `<link rel="icon" type="image/png" href="` + icon + `">`
+	}
+	heroTag := ""
+	if hero != "" {
+		heroTag = `<img id="mark" alt="" width="84" height="84" src="` + hero + `">`
 	}
 	waiting := html.EscapeString("Waiting for the host to start…")
 	return `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#100c28">
 <title>` + safeTitle + `</title>
 ` + iconLink + `
 <style>
-html,body{margin:0;padding:0;height:100%;background:#161a42;font-family:Arial,sans-serif;color:#fff}
-#video{position:absolute;top:0;left:0;width:100%;height:calc(100% - 44px);background:#161a42}
-#message{position:absolute;left:0;top:0;right:0;bottom:44px;display:flex;align-items:center;text-align:center;justify-content:center;font-size:16px;font-weight:bold;color:#fff;pointer-events:none;padding:20px;box-sizing:border-box;text-shadow:0 0 5px #000}
-#credit{position:absolute;left:0;right:0;bottom:0;height:44px;display:flex;align-items:center;justify-content:center;gap:8px;background:#161a42;border-top:1px solid rgba(47,208,189,0.35);z-index:2;font-size:13px}
-#credit img{width:28px;height:28px;border-radius:7px;display:block}
-#credit a{color:rgba(255,255,255,0.58);text-decoration:none}
-.noscript{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:16px;font-weight:bold;padding:20px}
+html,body{margin:0;padding:0;min-height:100%;background:#100c28;color:#fff}
+body{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(120% 70% at 50% 8%, #2c245f 0%, #16143a 42%, #100c28 100%)}
+#video{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px 24px 8px;width:min(480px,100%);margin:0 auto;box-sizing:border-box}
+#mark{width:84px;height:84px;border-radius:20px;display:block;margin:0 auto 18px;box-shadow:0 10px 28px rgba(0,0,0,.35)}
+.pill{display:inline-flex;align-items:center;gap:8px;margin:0 auto 16px;padding:6px 14px;border-radius:999px;background:rgba(8,6,24,.45);color:#2ec5b5;font-size:15px;font-weight:700;letter-spacing:.04em}
+.dot{width:8px;height:8px;border-radius:50%;background:#2ec5b5;box-shadow:0 0 0 4px rgba(46,197,181,.18)}
+h1{margin:0;font-size:30px;line-height:1.15;font-weight:800;letter-spacing:-.02em}
+#from{margin:8px 0 0;font-size:17px;font-weight:500;color:rgba(255,255,255,.72)}
+#status{min-height:1.3em;margin:10px 0 0;font-size:16px;font-weight:700;color:rgba(255,255,255,.88)}
+.stage{position:relative;width:250px;height:250px;margin:18px auto 0;display:flex;align-items:center;justify-content:center}
+.stage::before,.stage::after{content:"";position:absolute;border-radius:50%;border:2px solid rgba(139,92,246,.42)}
+.stage::before{width:246px;height:246px}
+.stage::after{width:204px;height:204px}
+#toggle{position:relative;z-index:1;width:156px;height:156px;border:0;border-radius:50%;background:radial-gradient(circle at 38% 32%, #a78bfa 0%, #8b5cf6 46%, #6d46e6 100%);color:#fff;box-shadow:0 14px 40px rgba(109,70,230,.45);display:flex;align-items:center;justify-content:center;cursor:pointer}
+#toggle:active{transform:scale(.98)}
+#toggle svg{width:62px;height:62px;display:block}
+#wave{display:flex;align-items:center;justify-content:center;gap:5px;height:42px;margin:8px 0 12px}
+#wave span{width:5px;border-radius:4px;background:#2ec5b5;height:var(--h);transform-origin:center;transform:scaleY(.55)}
+#wave.playing span{animation:wave 1.05s ease-in-out infinite;animation-delay:var(--d)}
+@keyframes wave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1.15)}}
+footer{padding:8px 22px calc(22px + env(safe-area-inset-bottom));text-align:center}
+.hint{margin:0 0 6px;font-size:16px;font-weight:600;color:rgba(255,255,255,.82)}
+#credit{margin:0;font-size:14px}
+#credit a{color:rgba(255,255,255,.5);text-decoration:none}
+.noscript{margin:24px;text-align:center;font-size:16px;font-weight:700}
 </style>
 <script defer src="/reader.js"></script>
 </head>
 <body>
-<video id="video" title="` + safeTitle + `"></video>
+<video id="video" playsinline webkit-playsinline title="` + safeTitle + `"></video>
+<main>
+` + heroTag + `
+<div class="pill"><span class="dot"></span><span id="live-text">LIVE</span></div>
+<h1 id="session">` + safeTitle + `</h1>
+<p id="from">from ` + safeHost + `</p>
+<p id="status">` + waiting + `</p>
+<div class="stage">
+<button id="toggle" type="button" aria-label="Play">
+<svg id="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M8.2 5.4v13.2L19 12z"/></svg>
+<svg id="icon-pause" viewBox="0 0 24 24" aria-hidden="true" hidden><path fill="#fff" d="M6 5h4.2v14H6zm7.8 0H18v14h-4.2z"/></svg>
+</button>
+</div>
+<div id="wave" aria-hidden="true">` + waveformBars() + `</div>
+</main>
 <noscript><p class="noscript">This page needs JavaScript turned on.</p></noscript>
-<div id="message">` + waiting + `</div>
+<footer>
+<p class="hint">Keep this screen open. Earbuds work best.</p>
+<p id="credit"><a href="https://roomcast.channel" target="_blank" rel="noopener">Powered by RoomCast</a></p>
+</footer>
 <script>
 const video=document.getElementById("video");
-const message=document.getElementById("message");
-let defaultControls=false;
+const statusEl=document.getElementById("status");
+const toggle=document.getElementById("toggle");
+const iconPlay=document.getElementById("icon-play");
+const iconPause=document.getElementById("icon-pause");
+const wave=document.getElementById("wave");
+const liveText=document.getElementById("live-text");
 let reader=null;
-const setMessage=(str)=>{video.controls=str!==""?false:defaultControls;message.innerText=str;};
+let retryTimer=null;
+let connected=false;
+let generation=0;
+let playing=false;
+let userPaused=false;
+let autoplayBlocked=false;
+let startedAt=` + startedLiteral(started) + `;
+const waitingText="` + jsString("Waiting for the host to start…") + `";
+const tapText="` + jsString("Tap to listen") + `";
+const setMessage=(str)=>{statusEl.textContent=str||"";};
 const parseBoolString=(str,defaultVal)=>{
 str=(str||"").toLowerCase();
 if(["1","yes","true"].includes(str))return true;
 if(["0","no","false"].includes(str))return false;
 return defaultVal;
 };
-const applyTitle=(title)=>{
-if(!title)return;
-document.title=title;
-video.title=title;
-video.setAttribute("title",title);
+const fmt=(secs)=>{
+secs=Math.max(0,secs|0);
+const h=(secs/3600)|0;
+const m=((secs%3600)/60)|0;
+const s=secs%60;
+const p=(n)=>n<10?"0"+n:""+n;
+if(h>0)return h+":"+p(m)+":"+p(s);
+return m+":"+p(s);
+};
+const tick=()=>{
+if(!startedAt){liveText.textContent="LIVE";return;}
+const secs=Math.floor(Date.now()/1000-startedAt);
+liveText.textContent="LIVE · "+fmt(secs);
+};
+setInterval(tick,1000);
+tick();
+const setPlaying=(on)=>{
+playing=on;
+iconPlay.hidden=on;
+iconPause.hidden=!on;
+wave.classList.toggle("playing",on);
+toggle.setAttribute("aria-label",on?"Pause":(autoplayBlocked?"Tap to listen":"Play"));
+};
+const showHint=()=>{
+if(!connected){setMessage(waitingText);return;}
+if(autoplayBlocked&&!playing){setMessage(tapText);return;}
+setMessage("");
+};
+const applySpec=(data)=>{
+if(!data)return;
+if(data.title){
+document.title=data.title;
+const h=document.getElementById("session");
+if(h)h.textContent=data.title;
+video.title=data.title;
 if(navigator.mediaSession&&typeof MediaMetadata==="function"){
-navigator.mediaSession.metadata=new MediaMetadata({title:title});
-try{navigator.mediaSession.playbackState="playing";}catch(err){}
+try{navigator.mediaSession.metadata=new MediaMetadata({title:data.title});}catch(err){}
+try{navigator.mediaSession.playbackState=playing?"playing":"paused";}catch(err){}
 }
+}
+if(data.host){
+const s=document.getElementById("from");
+if(s)s.textContent="from "+data.host;
+}
+if(typeof data.started==="number"&&data.started>0){startedAt=data.started;tick();}
 };
-const earfiSpec=` + scriptTitle + `;
-applyTitle(earfiSpec.title);
-const refreshTitle=()=>{
-fetch("/earfi.json").then((res)=>res.json()).then((data)=>applyTitle(data.title)).catch(()=>{});
+const earfiSpec=` + scriptSpec + `;
+applySpec(earfiSpec);
+const refreshSpec=()=>{
+fetch("/earfi.json").then((res)=>res.json()).then(applySpec).catch(()=>{});
 };
-refreshTitle();
+refreshSpec();
+setInterval(refreshSpec,15000);
 document.addEventListener("visibilitychange",()=>{
-if(document.visibilityState==="visible")refreshTitle();
+if(document.visibilityState==="visible")refreshSpec();
 });
-const loadAttributesFromQuery=()=>{
 const params=new URLSearchParams(window.location.search);
-video.controls=parseBoolString(params.get("controls"),true);
-video.muted=parseBoolString(params.get("muted"),true);
-video.autoplay=parseBoolString(params.get("autoplay"),true);
-video.playsInline=parseBoolString(params.get("playsinline"),true);
-video.disablepictureinpicture=parseBoolString(params.get("disablepictureinpicture"),false);
-defaultControls=video.controls;
+const wantMuted=parseBoolString(params.get("muted"),false);
+video.muted=wantMuted;
+video.autoplay=true;
+video.playsInline=true;
+video.setAttribute("playsinline","");
+video.controls=false;
+const tryPlay=()=>{
+video.muted=wantMuted;
+const attempt=video.play();
+if(!attempt||!attempt.then){autoplayBlocked=false;setPlaying(true);showHint();return;}
+attempt.then(()=>{autoplayBlocked=false;setPlaying(true);showHint();}).catch(()=>{
+autoplayBlocked=true;
+setPlaying(false);
+showHint();
+});
 };
-const waitingText="` + jsString("Waiting for the host to start…") + `";
-let retryTimer=null;
-let connected=false;
-let generation=0;
+toggle.addEventListener("click",()=>{
+if(!connected)return;
+if(playing){userPaused=true;video.pause();setPlaying(false);showHint();return;}
+userPaused=false;
+tryPlay();
+});
+video.addEventListener("pause",()=>{
+if(userPaused){setPlaying(false);showHint();}
+});
 const connect=()=>{
 if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
 const ticket=++generation;
@@ -103,7 +220,8 @@ url:new URL("/whep",window.location.href).toString(),
 onError:()=>{
 if(ticket!==generation)return;
 connected=false;
-setMessage(waitingText);
+setPlaying(false);
+showHint();
 if(retryTimer!==null)clearTimeout(retryTimer);
 retryTimer=setTimeout(connect,1500);
 },
@@ -111,18 +229,20 @@ onTrack:(evt)=>{
 if(ticket!==generation)return;
 connected=true;
 if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
-setMessage("");
 video.srcObject=evt.streams[0];
 const stream=evt.streams[0];
 (stream?stream.getTracks():[]).forEach((track)=>{
 track.addEventListener("ended",()=>{
 if(ticket!==generation||!connected)return;
 connected=false;
-setMessage(waitingText);
+setPlaying(false);
+showHint();
 connect();
 });
 });
-applyTitle(document.title);
+applySpec(earfiSpec);
+if(!userPaused)tryPlay();
+else showHint();
 },
 onDataChannel:(evt)=>{
 evt.channel.binaryType="arraybuffer";
@@ -136,7 +256,8 @@ const stream=video.srcObject;
 const tracks=stream&&stream.getTracks?stream.getTracks():[];
 if(tracks.length>0&&tracks.every((track)=>track.readyState==="ended")){
 connected=false;
-setMessage(waitingText);
+setPlaying(false);
+showHint();
 connect();
 }
 },2000);
@@ -145,25 +266,41 @@ if(typeof MediaMTXWebRTCReader!=="function"){
 setMessage("` + jsString("The listener page could not load.") + `");
 return;
 }
-loadAttributesFromQuery();
 setMessage(waitingText);
 connect();
 });
-video.addEventListener("play",()=>applyTitle(document.title));
 window.addEventListener("beforeunload",()=>{if(reader!==null)reader.close();});
 </script>
-` + creditMarkup(icon) + `
 </body>
 </html>
 `
 }
 
-func creditMarkup(iconHref string) string {
-	logo := ""
-	if iconHref != "" {
-		logo = `<img alt="" width="28" height="28" src="` + iconHref + `">`
+func waveformBars() string {
+	heights := []int{10, 18, 28, 14, 34, 22, 12, 30, 18, 36, 16, 26, 12, 32, 20, 14, 24}
+	var b strings.Builder
+	for i, height := range heights {
+		b.WriteString(`<span style="--h:`)
+		b.WriteString(strconv.Itoa(height))
+		b.WriteString(`px;--d:`)
+		b.WriteString(strconv.Itoa(i * 70))
+		b.WriteString(`ms"></span>`)
 	}
-	return `<footer id="credit">` + logo + `<a href="https://roomcast.channel" target="_blank" rel="noopener">Powered by RoomCast</a></footer>`
+	return b.String()
+}
+
+func startedLiteral(started int64) string {
+	if started <= 0 {
+		return "0"
+	}
+	return strconv.FormatInt(started, 10)
+}
+
+func markDataURI() string {
+	if len(markPNG) == 0 {
+		return ""
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(markPNG)
 }
 
 func faviconDataURI() string {
@@ -173,10 +310,14 @@ func faviconDataURI() string {
 	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(faviconPNG)
 }
 
-func scriptJSON(title string) string {
-	payload, err := json.Marshal(map[string]string{"title": title})
+func scriptJSON(title, host string, started int64) string {
+	payload, err := json.Marshal(map[string]any{
+		"title":   title,
+		"host":    host,
+		"started": started,
+	})
 	if err != nil {
-		return `{"title":"RoomCast Broadcast"}`
+		return `{"title":"RoomCast Broadcast","host":"this iPhone","started":0}`
 	}
 	return strings.NewReplacer(
 		"<", `\u003c`,
@@ -200,7 +341,22 @@ func jsString(text string) string {
 }
 
 func sanitizeTitle(raw string) string {
-	const maximum = 80
+	title := collapseText(raw, 80)
+	if title == "" {
+		return "RoomCast Broadcast"
+	}
+	return title
+}
+
+func sanitizeHost(raw string) string {
+	host := collapseText(raw, 80)
+	if host == "" {
+		return "this iPhone"
+	}
+	return host
+}
+
+func collapseText(raw string, maximum int) string {
 	var b strings.Builder
 	pendingSpace := false
 	for _, character := range raw {
@@ -217,9 +373,5 @@ func sanitizeTitle(raw string) string {
 			break
 		}
 	}
-	title := strings.TrimSpace(b.String())
-	if title == "" {
-		return "RoomCast Broadcast"
-	}
-	return title
+	return strings.TrimSpace(b.String())
 }

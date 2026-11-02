@@ -33,6 +33,14 @@ final class BroadcastModel: ObservableObject {
     @Published var level: Float = 0
     @Published var clipping = false
     @Published var inputName = ""
+    @Published var hardwareLabel = "Mono (iPhone mic)"
+    @Published var hardwareChannels = 1
+    /// On for a mono music input until the host turns it off.
+    @Published var stereoWiden = UserDefaults.standard.object(forKey: "capture.stereoWiden") as? Bool ?? true
+    /// Mic icon goes green while the meter is above a small threshold.
+    @Published var inputHeard = false
+    /// The stream's address changed. The server has moved; listeners need the new code.
+    @Published var networkChanged = false
     @Published var qrImage: UIImage?
     @Published var muted = false
     @Published var gain = 1.0
@@ -43,9 +51,18 @@ final class BroadcastModel: ObservableObject {
     @Published var cpuPercent = 0.0
     @Published var thermal = ProcessInfo.processInfo.thermalState
     @Published var batteryLevel: Float = -1
+    @Published var sessionName = SessionName.stored
+    @Published var wifiPrompt: WifiPrompt = .checking
+    @Published var wifiReady = false
+    @Published var wifiDown = false
+    /// Set when a free session is stopped at 40 minutes, so the paywall opens.
+    @Published var freeLimitHit = false
+    let store = ProStore()
 
     var isOnAir: Bool { phase == .live || phase == .reconnecting }
     var musicActive: Bool { musicPreferred && usbInput }
+    var canWiden: Bool { musicActive && hardwareChannels < 2 }
+    var soundSourceName: String { inputName.isEmpty ? "Internal Microphone" : inputName }
 
     var listenerLabel: String {
         switch listeners {
@@ -92,7 +109,7 @@ final class BroadcastModel: ObservableObject {
     private var rebindRunning = false
     private var rebindAgain = false
     private var remoteInstalled = false
-    private var startedAt: Date?
+    @Published var startedAt: Date?
     private var cpuSampler = AppCPUSampler()
     private var usbObserver: NSObjectProtocol?
     private var nowPlayingKey = ""
@@ -100,6 +117,32 @@ final class BroadcastModel: ObservableObject {
         guard let image = UIImage(named: "Logo") else { return nil }
         return MPMediaItemArtwork(boundsSize: image.size) { _ in image }
     }()
+    private let wifiNames = WifiNameSource()
+    private var knownSSID: String?
+    private var ssidFetched = false
+    private var ssidTask: Task<Void, Never>?
+    private var ssidTicketIP = ""
+    private var acceptedWifi: WifiChoice?
+    private var limitTask: Task<Void, Never>?
+    private var stopNote: String?
+    private var wifiAlertSent = false
+    private var wifiDownTask: Task<Void, Never>?
+    private var networkChangeTask: Task<Void, Never>?
+    private var sawAddress = false
+    private var startedNetworkIP: String?
+    private var startedNetworkSSID: String?
+    private var announcedNetwork: String?
+    private var liveSSIDIP = ""
+    private var liveSSIDAt = Date.distantPast
+    private let heardThreshold: Float = 0.12
+    private let heardHold: TimeInterval = 0.5
+    private var heardUntil = Date.distantPast
+
+    private enum WifiChoice: Equatable {
+        case ssid(String)
+        case hotspot
+        case unnamed
+    }
 
     init() {
         BroadcastBus.start { [weak self] command in
@@ -107,6 +150,12 @@ final class BroadcastModel: ObservableObject {
                 self?.handle(command)
             }
         }
+        wifiNames.onAuthorizationChange = { [weak self] in
+            guard let self else { return }
+            self.ssidFetched = false
+            self.syncWifiPrompt()
+        }
+        activity.endOrphans()
     }
 
     func appear() {
@@ -116,6 +165,9 @@ final class BroadcastModel: ObservableObject {
             activity.endOrphans()
             refreshUSB()
         }
+        bindInputWatch()
+        capture.setStereoWiden(stereoWiden)
+        capture.startMonitoringRoutes()
         observeUSBWhileIdle()
         guard monitor == nil else { return }
         let monitor = NWPathMonitor()
@@ -130,7 +182,38 @@ final class BroadcastModel: ObservableObject {
     }
 
     func sceneBecameActive() {
+        ssidFetched = false
         Task { await self.refreshAfterActive() }
+    }
+
+    func setSessionName(_ raw: String) {
+        let name = SessionName.cleaned(raw)
+        sessionName = name
+        UserDefaults.standard.set(name, forKey: SessionName.key)
+    }
+
+    func confirmWifi() {
+        switch wifiPrompt {
+        case .ssid(let name):
+            acceptedWifi = .ssid(name)
+        case .hotspot:
+            acceptedWifi = .hotspot
+        case .unnamed:
+            acceptedWifi = .unnamed
+        case .checking, .noNetwork:
+            return
+        }
+        wifiReady = true
+    }
+
+    func recheckWifi() {
+        acceptedWifi = nil
+        wifiReady = false
+        ssidFetched = false
+        knownSSID = nil
+        ssidTicketIP = ""
+        wifiPrompt = .checking
+        Task { await self.updateAddress() }
     }
 
     func toggle() {
@@ -141,6 +224,32 @@ final class BroadcastModel: ObservableObject {
             beginStop()
         case .idle:
             beginStart()
+        }
+    }
+
+    func setStereoWiden(_ on: Bool) {
+        guard stereoWiden != on else { return }
+        stereoWiden = on
+        UserDefaults.standard.set(on, forKey: "capture.stereoWiden")
+        capture.setStereoWiden(on)
+    }
+
+    func dismissNetworkChange() {
+        networkChanged = false
+    }
+
+    func noteLevel(_ value: Float) {
+        level = value
+        guard isOnAir, !muted else {
+            if inputHeard { inputHeard = false }
+            return
+        }
+        let now = Date()
+        if !muted && value >= heardThreshold {
+            heardUntil = now.addingTimeInterval(heardHold)
+            if !inputHeard { inputHeard = true }
+        } else if inputHeard, now >= heardUntil {
+            inputHeard = false
         }
     }
 
@@ -201,6 +310,7 @@ final class BroadcastModel: ObservableObject {
         guard phase == .idle else { return }
         phase = .starting
         failed = false
+        freeLimitHit = false
         dropCount = 0
         status = "Starting…"
         switch AVAudioApplication.shared.recordPermission {
@@ -244,13 +354,21 @@ final class BroadcastModel: ObservableObject {
         probe.poke(ip: ip)
         wireCapture()
         refreshUSB()
+        capture.setStereoWiden(stereoWiden)
         capture.setMusicPreferred(musicPreferred)
         let range = BroadcastGain.range(music: musicActive)
         gain = min(range.upperBound, max(range.lowerBound, gain))
         capture.setMix(gain: Float(gain), muted: muted)
         let address = ip
         let interfaceName = iface
-        if let failure = await gate.start(ip: address, iface: interfaceName) {
+        let started = Date()
+        if let failure = await gate.start(
+            ip: address,
+            iface: interfaceName,
+            title: sessionName,
+            host: ListenerHostName.current,
+            started: started
+        ) {
             capture.stop()
             await gate.stop()
             guard phase == .starting else { return }
@@ -284,7 +402,7 @@ final class BroadcastModel: ObservableObject {
         }
         boundIP = address
         boundIface = interfaceName
-        startedAt = Date()
+        startedAt = started
         phase = .live
         failed = false
         level = 0
@@ -292,9 +410,15 @@ final class BroadcastModel: ObservableObject {
         cpuSampler.reset()
         sampleStats()
         status = liveStatus
+        startedNetworkIP = address
+        startedNetworkSSID = knownSSID
+        announcedNetwork = nil
+        networkChanged = false
         // Now Playing card dropped: the Live Activity has mute, gain and the meter.
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         activity.start(activityState())
+        WifiDropNotifier.requestPermission()
+        armFreeLimit()
         startPolling()
     }
 
@@ -304,7 +428,7 @@ final class BroadcastModel: ObservableObject {
         }
         capture.onLevel = { [weak self] level in
             Task { @MainActor in
-                self?.level = level
+                self?.noteLevel(level)
             }
         }
         capture.onClip = { [weak self] on in
@@ -316,6 +440,12 @@ final class BroadcastModel: ObservableObject {
         capture.onInput = { [weak self] name in
             Task { @MainActor in
                 self?.inputName = name
+            }
+        }
+        capture.onHardware = { [weak self] label, channels in
+            Task { @MainActor in
+                self?.hardwareLabel = label
+                self?.hardwareChannels = channels
             }
         }
         capture.onInterrupted = { [weak self] interrupted in
@@ -340,6 +470,18 @@ final class BroadcastModel: ObservableObject {
                 guard let self, self.isOnAir else { return }
                 self.failed = true
                 self.status = message
+            }
+        }
+    }
+
+    private func bindInputWatch() {
+        capture.onInput = { [weak self] name in
+            Task { @MainActor in self?.inputName = name }
+        }
+        capture.onHardware = { [weak self] label, channels in
+            Task { @MainActor in
+                self?.hardwareLabel = label
+                self?.hardwareChannels = channels
             }
         }
     }
@@ -385,6 +527,9 @@ final class BroadcastModel: ObservableObject {
     }
 
     private func beginStop() {
+        guard phase == .live || phase == .reconnecting else { return }
+        limitTask?.cancel()
+        limitTask = nil
         let duration = startedAt.map { Date().timeIntervalSince($0) }
         phase = .stopping
         status = "Stopping…"
@@ -403,18 +548,34 @@ final class BroadcastModel: ObservableObject {
         guard phase == .stopping else { return }
         phase = .idle
         level = 0
+        inputHeard = false
         listeners = 0
         cpuPercent = 0
-        inputName = ""
+        startedNetworkIP = nil
+        startedNetworkSSID = nil
+        announcedNetwork = nil
+        networkChanged = false
+        WifiDropNotifier.clearChanged()
         boundIP = nil
         boundIface = nil
         failed = false
         muted = false
         cpuSampler.reset()
-        status = "Ready"
+        let note = stopNote
+        stopNote = nil
+        status = note ?? "Ready"
+        wifiDownTask?.cancel()
+        wifiDownTask = nil
+        networkChangeTask?.cancel()
+        networkChangeTask = nil
+        wifiDown = false
+        wifiAlertSent = false
+        WifiDropNotifier.clear()
         activity.end()
         clearRemote()
-        if let duration {
+        capture.refreshRoute()
+        syncWifiPrompt()
+        if let duration, note == nil {
             requestReviewIfEarned(duration: duration)
         }
     }
@@ -455,6 +616,7 @@ final class BroadcastModel: ObservableObject {
         }
         updateNowPlaying()
         pushActivity(force: false)
+        enforceFreeLimit()
     }
 
     private func prepareAddress() async {
@@ -569,7 +731,13 @@ final class BroadcastModel: ObservableObject {
             status = "Reconnecting…"
             await gate.stop()
             guard generation == rebindGeneration, phase == .reconnecting else { return }
-            if let failure = await gate.start(ip: target, iface: interfaceName) {
+            if let failure = await gate.start(
+                ip: target,
+                iface: interfaceName,
+                title: sessionName,
+                host: ListenerHostName.current,
+                started: startedAt ?? Date()
+            ) {
                 await gate.stop()
                 guard generation == rebindGeneration, phase == .reconnecting else { return }
                 failed = true
@@ -628,11 +796,6 @@ final class BroadcastModel: ObservableObject {
                 url = nextURL
                 qrImage = QRCodeImage.make(nextURL)
             }
-            if ip == "172.20.10.1" || iface.hasPrefix("bridge") {
-                networkNote = "Personal Hotspot. Listeners join this iPhone’s hotspot, then scan."
-            } else {
-                networkNote = "Listeners join the same Wi-Fi, then scan."
-            }
         } else {
             iface = ""
             ip = ""
@@ -644,6 +807,224 @@ final class BroadcastModel: ObservableObject {
                 networkNote = "Join a Wi-Fi network, or turn on Personal Hotspot."
             }
         }
+        sawAddress = true
+        syncWifiPrompt()
+    }
+
+    private static func isPersonalHotspot(ip: String, iface: String) -> Bool {
+        ip == "172.20.10.1" || iface.hasPrefix("bridge")
+    }
+
+    private func refreshJoinNote() {
+        if ip.isEmpty {
+            if !isOnAir {
+                networkNote = "Join a Wi-Fi network, or turn on Personal Hotspot."
+            }
+            return
+        }
+        if Self.isPersonalHotspot(ip: ip, iface: iface) {
+            networkNote = "Connect to this iPhone’s Personal Hotspot, then scan QR Code or type the url in your browser."
+            return
+        }
+        if let knownSSID, !knownSSID.isEmpty {
+            networkNote = "Connect to WiFi \(knownSSID), then scan QR Code or type the url in your browser."
+        } else {
+            networkNote = "Connect to the same Wi-Fi, then scan QR Code or type the url in your browser."
+        }
+    }
+
+    /// The server already rebinds when `ip` moves. This flags a new address or
+    /// name so the host can show the new code. A short wait ignores a flap.
+    /// Same network again clears it.
+    private func noteNetworkIdentity() {
+        guard isOnAir, !ip.isEmpty else { return }
+        if !networkIdentityChanged() {
+            networkChangeTask?.cancel()
+            networkChangeTask = nil
+            announcedNetwork = nil
+            if networkChanged {
+                networkChanged = false
+                WifiDropNotifier.clearChanged()
+            }
+            return
+        }
+        let key = networkIdentityKey()
+        guard announcedNetwork != key, networkChangeTask == nil else { return }
+        networkChangeTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard !Task.isCancelled, let self else { return }
+            self.networkChangeTask = nil
+            guard self.isOnAir, !self.ip.isEmpty, self.networkIdentityChanged() else { return }
+            let confirmed = self.networkIdentityKey()
+            guard self.announcedNetwork != confirmed else { return }
+            self.announcedNetwork = confirmed
+            self.networkChanged = true
+            WifiDropNotifier.postChanged()
+            if let started = self.startedNetworkIP, self.ip != started {
+                self.scheduleRebind()
+            }
+        }
+    }
+
+    private func networkIdentityChanged() -> Bool {
+        let ssid = knownSSID ?? ""
+        if let startedNetworkIP, !startedNetworkIP.isEmpty, ip != startedNetworkIP {
+            return true
+        }
+        if let startedNetworkSSID, !startedNetworkSSID.isEmpty, !ssid.isEmpty, ssid != startedNetworkSSID {
+            return true
+        }
+        return false
+    }
+
+    private func networkIdentityKey() -> String {
+        let ssid = knownSSID ?? ""
+        if let startedNetworkIP, ip != startedNetworkIP {
+            return "ip:\(ip)"
+        }
+        return "ssid:\(ip)|\(ssid)"
+    }
+
+    private func considerLiveSSID() {
+        guard isOnAir, !ip.isEmpty, !Self.isPersonalHotspot(ip: ip, iface: iface) else { return }
+        guard ssidTask == nil else { return }
+        let moved = ip != liveSSIDIP
+        let due = Date().timeIntervalSince(liveSSIDAt) > 10
+        guard moved || due else { return }
+        liveSSIDIP = ip
+        liveSSIDAt = Date()
+        fetchSSIDIfNeeded()
+    }
+
+    private func syncWifiPrompt() {
+        noteNetworkPresence()
+        refreshJoinNote()
+        if isOnAir {
+            considerLiveSSID()
+            noteNetworkIdentity()
+            return
+        }
+        guard sawAddress else {
+            wifiPrompt = .checking
+            return
+        }
+        if ip != ssidTicketIP {
+            ssidTicketIP = ip
+            ssidFetched = false
+            knownSSID = nil
+            wifiReady = false
+            acceptedWifi = nil
+        }
+        if ip.isEmpty {
+            applyPrompt(.noNetwork)
+            return
+        }
+        if Self.isPersonalHotspot(ip: ip, iface: iface) {
+            applyPrompt(.hotspot)
+            return
+        }
+        let status = wifiNames.authorization
+        if status == .denied || status == .restricted {
+            ssidFetched = true
+            applyPrompt(.unnamed(locationDenied: true))
+            return
+        }
+        if !ssidFetched {
+            if !wifiReady { applyPrompt(.checking) }
+            fetchSSIDIfNeeded()
+            return
+        }
+        if let knownSSID, !knownSSID.isEmpty {
+            applyPrompt(.ssid(knownSSID))
+        } else {
+            applyPrompt(.unnamed(locationDenied: false))
+        }
+    }
+
+    private func applyPrompt(_ prompt: WifiPrompt) {
+        wifiPrompt = prompt
+        if isOnAir { return }
+        switch prompt {
+        case .ssid(let name):
+            wifiReady = acceptedWifi == .ssid(name)
+        case .hotspot:
+            wifiReady = acceptedWifi == .hotspot
+        case .unnamed:
+            wifiReady = acceptedWifi == .unnamed
+        case .checking:
+            break
+        case .noNetwork:
+            wifiReady = false
+        }
+    }
+
+    private func fetchSSIDIfNeeded() {
+        guard ssidTask == nil else { return }
+        let ticketIP = ip
+        ssidTask = Task { [weak self] in
+            guard let self else { return }
+            let name = await self.wifiNames.currentSSID()
+            self.ssidTask = nil
+            guard ticketIP == self.ip else {
+                self.ssidFetched = false
+                self.syncWifiPrompt()
+                return
+            }
+            self.ssidFetched = true
+            let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+            self.knownSSID = (trimmed?.isEmpty == false) ? trimmed : nil
+            self.syncWifiPrompt()
+        }
+    }
+
+    /// Waits a moment so a one-packet path flap does not cover the screen
+    /// or buzz the lock screen. A real drop still shows within about a second.
+    private func noteNetworkPresence() {
+        let down = isOnAir && ip.isEmpty
+        if down {
+            guard wifiDownTask == nil, !wifiDown else { return }
+            wifiDownTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled, let self else { return }
+                self.wifiDownTask = nil
+                guard self.isOnAir, self.ip.isEmpty else { return }
+                self.wifiDown = true
+                if !self.wifiAlertSent {
+                    self.wifiAlertSent = true
+                    WifiDropNotifier.post()
+                }
+            }
+        } else {
+            wifiDownTask?.cancel()
+            wifiDownTask = nil
+            if wifiDown {
+                wifiDown = false
+                wifiAlertSent = false
+                WifiDropNotifier.clear()
+            }
+        }
+    }
+
+    private func armFreeLimit() {
+        limitTask?.cancel()
+        guard !store.isPro, let startedAt else { return }
+        let remaining = BroadcastLimits.freeSeconds - Date().timeIntervalSince(startedAt)
+        limitTask = Task { [weak self] in
+            if remaining > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+            }
+            guard !Task.isCancelled else { return }
+            self?.enforceFreeLimit()
+        }
+    }
+
+    private func enforceFreeLimit() {
+        guard isOnAir, !store.isPro, let startedAt else { return }
+        guard Date().timeIntervalSince(startedAt) >= BroadcastLimits.freeSeconds - 0.5 else { return }
+        guard !freeLimitHit else { return }
+        freeLimitHit = true
+        stopNote = "The free 40 minutes are up. Upgrade to Pro for unlimited time."
+        beginStop()
     }
 
     private func sampleStats() {
@@ -774,12 +1155,22 @@ private struct AppCPUSampler {
 
 /// Local Live Activity. If the phone has Live Activities turned off, start
 /// fails quietly and the broadcast still runs.
+///
+/// `staleDate` is 30 seconds ahead and refreshed while the broadcast is up.
+/// If the process is killed without `applicationWillTerminate` (a SIGKILL),
+/// the system marks the activity stale instead of leaving a live card up
+/// indefinitely. The next launch ends anything still on screen.
 final class BroadcastActivityController {
+    private static let staleAfter: TimeInterval = 30
+    private static let refreshAfter: TimeInterval = 15
+
     private var current: Activity<BroadcastAttributes>?
     private var last: BroadcastAttributes.ContentState?
+    private var lastPush = Date.distantPast
 
     func start(_ state: BroadcastAttributes.ContentState) {
         last = state
+        lastPush = Date()
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
             current = nil
             return
@@ -787,7 +1178,7 @@ final class BroadcastActivityController {
         do {
             current = try Activity.request(
                 attributes: BroadcastAttributes(name: "RoomCast Go"),
-                content: ActivityContent(state: state, staleDate: nil),
+                content: content(state),
                 pushType: nil
             )
         } catch {
@@ -797,9 +1188,12 @@ final class BroadcastActivityController {
 
     func update(_ state: BroadcastAttributes.ContentState, force: Bool) {
         guard let current else { return }
-        if !force, state == last { return }
+        let due = Date().timeIntervalSince(lastPush) >= Self.refreshAfter
+        if !force, state == last, !due { return }
         last = state
-        Task { await current.update(ActivityContent(state: state, staleDate: nil)) }
+        lastPush = Date()
+        let next = content(state)
+        Task { await current.update(next) }
     }
 
     func end() {
@@ -810,13 +1204,37 @@ final class BroadcastActivityController {
         Task { await ending.end(nil, dismissalPolicy: .immediate) }
     }
 
+    /// Ends activities left by a previous process. The list is captured now
+    /// so a broadcast started a moment later is not included.
     func endOrphans() {
-        guard current == nil else { return }
+        let keep = current?.id
+        let existing = Activity<BroadcastAttributes>.activities.filter { $0.id != keep }
+        guard !existing.isEmpty else { return }
         Task {
-            for activity in Activity<BroadcastAttributes>.activities {
+            for activity in existing {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
         }
+    }
+
+    /// Called from `applicationWillTerminate`. `Activity.end` is async and
+    /// does not need the main actor. The wait gives ActivityKit time to
+    /// record the immediate dismissal before the process exits.
+    static func endAllOnTerminate() {
+        let existing = Activity<BroadcastAttributes>.activities
+        guard !existing.isEmpty else { return }
+        let semaphore = DispatchSemaphore(value: 0)
+        Task.detached {
+            for activity in existing {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+            semaphore.signal()
+        }
+        _ = semaphore.wait(timeout: .now() + 2)
+    }
+
+    private func content(_ state: BroadcastAttributes.ContentState) -> ActivityContent<BroadcastAttributes.ContentState> {
+        ActivityContent(state: state, staleDate: Date().addingTimeInterval(Self.staleAfter))
     }
 }
 

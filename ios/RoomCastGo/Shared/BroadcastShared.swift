@@ -127,7 +127,7 @@ struct SetMutedIntent: LiveActivityIntent {
 }
 
 struct AdjustGainIntent: LiveActivityIntent {
-    static var title: LocalizedStringResource = "Mic gain"
+    static var title: LocalizedStringResource = "Volume boost"
     static var openAppWhenRun: Bool { false }
     static var authenticationPolicy: IntentAuthenticationPolicy { .alwaysAllowed }
 

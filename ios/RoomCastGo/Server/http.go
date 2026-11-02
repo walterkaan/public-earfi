@@ -19,9 +19,11 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodOptions:
 		w.WriteHeader(http.StatusNoContent)
 	case (r.Method == http.MethodGet || r.Method == http.MethodHead) && path == "/":
-		s.writeBytes(w, http.StatusOK, "text/html; charset=utf-8", []byte(listenerHTML(s.currentTitle())), r.Method == http.MethodHead)
+		title, host, started := s.pageMeta()
+		s.writeBytes(w, http.StatusOK, "text/html; charset=utf-8", []byte(listenerHTML(title, host, started)), r.Method == http.MethodHead)
 	case (r.Method == http.MethodGet || r.Method == http.MethodHead) && path == "/earfi.json":
-		body, _ := json.Marshal(map[string]string{"title": s.currentTitle()})
+		title, host, started := s.pageMeta()
+		body, _ := json.Marshal(map[string]any{"title": title, "host": host, "started": started})
 		s.writeBytes(w, http.StatusOK, "application/json; charset=utf-8", body, r.Method == http.MethodHead)
 	case (r.Method == http.MethodGet || r.Method == http.MethodHead) && path == "/reader.js":
 		s.writeBytes(w, http.StatusOK, "text/javascript; charset=utf-8", readerJS, r.Method == http.MethodHead)
@@ -94,13 +96,18 @@ func (s *server) handleTrickle(w http.ResponseWriter, r *http.Request, path stri
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *server) currentTitle() string {
+func (s *server) pageMeta() (string, string, int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.title == "" {
-		return "RoomCast Broadcast"
+	title := s.title
+	if title == "" {
+		title = "RoomCast Broadcast"
 	}
-	return s.title
+	host := s.host
+	if host == "" {
+		host = "this iPhone"
+	}
+	return title, host, s.started
 }
 
 func (s *server) writeBytes(w http.ResponseWriter, status int, contentType string, body []byte, head bool) {
