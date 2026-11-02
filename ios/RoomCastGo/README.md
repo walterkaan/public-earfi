@@ -1,8 +1,8 @@
 # RoomCast Go
 
 iPhone-only proof that a phone can host a **voice-only** RoomCast broadcast.
-One screen: Start / Stop, a mute button, a mic-gain slider, and, while
-live, a QR code, Share, the listener URL, a listener count, and a live
+One screen: Start / Stop, a mute button, a volume boost slider, and, while
+live, a QR code, Share, the listener count, and a live
 microphone meter. Tap the listener count for CPU, heat, and battery.
 Voice is Opus mono at 32 kbps. A USB input can switch to Music. No input
 picker: iOS switches the mic on its own.
@@ -10,8 +10,7 @@ While a broadcast is running, a Live Activity on the lock screen and in
 the Dynamic Island shows the listener count, a level bar, and mute and
 gain buttons.
 
-Listeners open the same browser page as the Mac app, including the
-“Powered by RoomCast” footer, and play over WebRTC. The iPhone runs the
+Listeners open a browser page served by this phone and play over WebRTC. The iPhone runs the
 listener server inside the app. iOS will not let an app launch the MediaMTX
 helper the Mac uses. See [FINDINGS.md](FINDINGS.md) for why this build uses
 an in-process Pion WHEP server, and for latency, battery, and App Store notes.
@@ -50,26 +49,32 @@ by hand.
 5. Plug in the iPhone, select it as the run destination, and press Run.
    Xcode creates the App ID, the Apple Development certificate, and the
    development provisioning profile, and registers the phone’s UDID.
+   Enable **Access Wi-Fi Information** on the `channel.roomcast.go` App ID
+   (Signing & Capabilities, or the developer portal). Without that
+   entitlement the app cannot read the Wi-Fi name. The local StoreKit
+   file `RoomCastGo/RoomCastGo.storekit` is selected on the RoomCastGo
+   scheme so Pro can be tested before the App Store product exists.
 
-Do not add capabilities. This proof does not use Push Notifications,
-Associated Domains, Multicast Networking, iCloud, or Sign in with Apple.
-No `.p8` key is required.
+The broadcast does not use Push Notifications, Associated Domains,
+Multicast Networking, iCloud, or Sign in with Apple. No `.p8` key is required.
 
 If automatic signing fails, create these in
 [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources):
 
 | Thing | Exactly |
 | --- | --- |
-| App ID | Identifiers → App IDs → App. Description `RoomCast Go`. Explicit bundle ID `channel.roomcast.go`. Leave every capability unchecked. |
+| App ID | Identifiers → App IDs → App. Description `RoomCast Go`. Explicit bundle ID `channel.roomcast.go`. Enable **Access Wi-Fi Information** and App Groups (`group.channel.roomcast.go`). Leave the other capabilities unchecked. |
 | Device | Devices → add the iPhone. The UDID is in Xcode → Window → Devices and Simulators. |
 | Certificate | Certificates → Apple Development. Creating it from Xcode (the automatic path above) is enough. A certificate signing request is only needed if you make the certificate on the website. |
 | Profile | Profiles → iOS App Development. App ID `channel.roomcast.go`, that development certificate, that iPhone. Name it `RoomCast Go Development`. Download it and double-click it. Then switch the target to manual signing and pick that profile. |
 | App Group | Identifiers → App Groups → `group.channel.roomcast.go`. Then on both App IDs below, enable App Groups and select that group. |
 | Widget App ID | Identifiers → App IDs → App. Description `RoomCast Go Widget`. Explicit bundle ID `channel.roomcast.go.widget`. Enable only App Groups, and select `group.channel.roomcast.go`. |
 
-Nothing else. No APNs key, no push certificate, no Sign in with Apple key,
-no App Store Connect app record until you want TestFlight. The lock screen
-card is a local Live Activity, not a remote push.
+Nothing else. No APNs key, no push certificate, no Sign in with Apple key.
+The lock screen card is a local Live Activity, not a remote push. Pro is the
+auto-renewable subscription `channel.roomcast.go.pro.monthly`, created in
+App Store Connect when you are ready to sell it. Until that product exists,
+the RoomCastGo scheme’s StoreKit configuration supplies it for local testing.
 
 Press Run once before creating those by hand. Automatic signing often
 registers the widget App ID and the App Group. Create them in the portal

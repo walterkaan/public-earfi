@@ -36,7 +36,7 @@ struct BroadcastLiveActivity: Widget {
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    livePill(context.state)
+                    livePill(context.state, stale: context.isStale)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 8) {
@@ -48,7 +48,7 @@ struct BroadcastLiveActivity: Widget {
                     }
                 }
             } compactLeading: {
-                logo(size: 18)
+                glyph(size: 30)
             } compactTrailing: {
                 Text("\(context.state.listeners)")
                     .font(.caption2.weight(.bold).monospacedDigit())
@@ -65,16 +65,16 @@ struct BroadcastLiveActivity: Widget {
     private func lockScreen(_ context: ActivityViewContext<BroadcastAttributes>) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                logo(size: 36)
+                glyph(size: 48)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("RoomCast Go")
                         .font(.headline)
-                    Text(listenerText(context.state.listeners))
+                    Text(context.isStale ? "Ended" : listenerText(context.state.listeners))
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.82))
                 }
                 Spacer(minLength: 8)
-                livePill(context.state)
+                livePill(context.state, stale: context.isStale)
             }
             LevelBar(
                 level: context.state.level,
@@ -83,26 +83,26 @@ struct BroadcastLiveActivity: Widget {
             controls(context.state)
         }
         .foregroundStyle(.white)
+        .opacity(context.isStale ? 0.72 : 1)
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
     }
 
-    private func logo(size: CGFloat) -> some View {
-        Image("Logo")
+    private func glyph(size: CGFloat) -> some View {
+        Image("Glyph")
             .resizable()
-            .scaledToFill()
+            .scaledToFit()
             .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
             .accessibilityHidden(true)
     }
 
-    private func livePill(_ state: BroadcastAttributes.ContentState) -> some View {
-        Text(state.muted ? "Muted" : "Live")
+    private func livePill(_ state: BroadcastAttributes.ContentState, stale: Bool) -> some View {
+        Text(stale ? "Ended" : (state.muted ? "Muted" : "Live"))
             .font(.caption.weight(.bold))
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(state.muted ? pink : teal, in: Capsule())
-            .foregroundStyle(state.muted ? Color.white : navy)
+            .background(stale ? Color.white.opacity(0.28) : (state.muted ? pink : teal), in: Capsule())
+            .foregroundStyle(stale || state.muted ? Color.white : navy)
     }
 
     private func controls(_ state: BroadcastAttributes.ContentState) -> some View {

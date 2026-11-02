@@ -69,6 +69,8 @@
 		60A7223FB2DEFEFA7E3A1D97 /* decoder_set_fs.c in Sources */ = {isa = PBXBuildFile; fileRef = 9738DA1F6422E9600AB46596 /* decoder_set_fs.c */; };
 		63B8FB50215671EE003994C7 /* tables_NLSF_CB_NB_MB.c in Sources */ = {isa = PBXBuildFile; fileRef = A3173B85C0021B819429631D /* tables_NLSF_CB_NB_MB.c */; };
 		6465180DC61FF8DC912803F2 /* BroadcastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FE57E425FADCE8CEFE692B4 /* BroadcastView.swift */; };
+		F1A0E001A1B2C3D4E5F60002 /* ProStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A0E001A1B2C3D4E5F60001 /* ProStore.swift */; };
+		F1A0E001A1B2C3D4E5F60004 /* WiFiSSID.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A0E001A1B2C3D4E5F60003 /* WiFiSSID.swift */; };
 		64891CB9C0EEBD72006DACAC /* residual_energy_FLP.c in Sources */ = {isa = PBXBuildFile; fileRef = 2A000133D94E6F09F80D20A4 /* residual_energy_FLP.c */; };
 		65AA3F7B6E2566F0DA8B214D /* encode_pulses.c in Sources */ = {isa = PBXBuildFile; fileRef = 21376369C093C38926D07C1A /* encode_pulses.c */; };
 		66F5571802CB66B896C2F191 /* tables_NLSF_CB_WB.c in Sources */ = {isa = PBXBuildFile; fileRef = BE6323F64DA3F78934998D75 /* tables_NLSF_CB_WB.c */; };
@@ -265,6 +267,9 @@
 		6EDC3DF7A7F650DCBBA5ECD8 /* shell_coder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = shell_coder.c; sourceTree = "<group>"; };
 		6F59CE70C64387B57C1D76CE /* tables_pulses_per_block.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = tables_pulses_per_block.c; sourceTree = "<group>"; };
 		6FE57E425FADCE8CEFE692B4 /* BroadcastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastView.swift; sourceTree = "<group>"; };
+		F1A0E001A1B2C3D4E5F60001 /* ProStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProStore.swift; sourceTree = "<group>"; };
+		F1A0E001A1B2C3D4E5F60003 /* WiFiSSID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiSSID.swift; sourceTree = "<group>"; };
+		F1A0E001A1B2C3D4E5F60005 /* RoomCastGo.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = RoomCastGo.storekit; sourceTree = "<group>"; };
 		718A4A7C6F8772241B2F9C50 /* LTP_analysis_filter_FLP.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = LTP_analysis_filter_FLP.c; sourceTree = "<group>"; };
 		72DD38F6F2CA234BDFA64DED /* mapping_matrix.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = mapping_matrix.c; sourceTree = "<group>"; };
 		7346CC16B1B660EC37BB5592 /* enc_API.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = enc_API.c; sourceTree = "<group>"; };
@@ -616,10 +621,13 @@
 				1F8461D9EAB532A270611F67 /* LocalNetworkProbe.swift */,
 				2E03E76405E540CB5800DB8B /* OpusEncoder.swift */,
 				F1EF8C6D5F9FA02AEDD3B754 /* PrivacyInfo.xcprivacy */,
+				F1A0E001A1B2C3D4E5F60001 /* ProStore.swift */,
 				4FC1685867368C2B4855EDAE /* QRCodeImage.swift */,
 				EBF71B21E940D3B2C472B416 /* RoomCastGo-Bridging-Header.h */,
+				F1A0E001A1B2C3D4E5F60005 /* RoomCastGo.storekit */,
 				6E7E09AABDFCD07BB66C44ED /* RoomCastGoApp.swift */,
 				8D839C95D5F60647F16160BC /* ServerBridge.swift */,
+				F1A0E001A1B2C3D4E5F60003 /* WiFiSSID.swift */,
 			);
 			path = RoomCastGo;
 			sourceTree = "<group>";
@@ -777,6 +785,8 @@
 				C65579918674C9A46150199A /* BroadcastPorts.swift in Sources */,
 				37A9F16113A4224501869723 /* BroadcastShared.swift in Sources */,
 				6465180DC61FF8DC912803F2 /* BroadcastView.swift in Sources */,
+				F1A0E001A1B2C3D4E5F60002 /* ProStore.swift in Sources */,
+				F1A0E001A1B2C3D4E5F60004 /* WiFiSSID.swift in Sources */,
 				6DBE74842023FE019EE3CF6C /* CNG.c in Sources */,
 				4DEADF9EE2DAE8A0AE71EF86 /* HP_variable_cutoff.c in Sources */,
 				2A04ADEF30B506851C2A192E /* HostAddress.swift in Sources */,
