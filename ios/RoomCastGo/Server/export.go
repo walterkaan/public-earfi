@@ -16,9 +16,10 @@ var (
 )
 
 // Start opens the listener page on httpPort and WebRTC media on icePort.
-// ip and iface come from SelectHost. title is the name on the phone page.
-func Start(httpPort int, icePort int, ip string, iface string, title string) error {
-	next, err := newServer(httpPort, icePort, ip, iface, title)
+// ip and iface come from SelectHost. title is the session name on the
+// listener page. host is the device name in "from <host>".
+func Start(httpPort int, icePort int, ip string, iface string, title string, host string) error {
+	next, err := newServer(httpPort, icePort, ip, iface, title, host)
 	if err != nil {
 		return err
 	}
@@ -30,6 +31,17 @@ func Start(httpPort int, icePort int, ip string, iface string, title string) err
 	}
 	global = next
 	return nil
+}
+
+// SetTitle changes the name on the listener page of a running broadcast.
+func SetTitle(title string) {
+	title = sanitizeTitle(title)
+	globalMu.Lock()
+	current := global
+	globalMu.Unlock()
+	if current != nil {
+		current.setTitle(title)
+	}
 }
 
 // Stop closes the page, the listeners, and the sockets.

@@ -23,6 +23,9 @@ targets:
         excludes:
           - Info.plist
           - "*.entitlements"
+          - "*.storekit"
+      - path: RoomCastGo/RoomCastGo.storekit
+        buildPhase: none
       - path: Vendor/opus
         includes:
           - "**/*.c"
@@ -102,7 +105,8 @@ targets:
           SWIFT_COMPILATION_MODE: wholemodule
           VALIDATE_PRODUCT: YES
           DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
-    scheme: {}
+    scheme:
+      storeKitConfiguration: RoomCastGo/RoomCastGo.storekit
   RoomCastGoWidget:
     type: app-extension
     platform: iOS
