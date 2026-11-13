@@ -585,6 +585,7 @@ private struct SetupSheet: View {
     @ObservedObject var model: BroadcastModel
     @Environment(\.dismiss) private var dismiss
     @State private var draft = ""
+    @State private var backgroundMode = MusicBackdropPreference.stored
 
     var body: some View {
         NavigationStack {
@@ -602,6 +603,19 @@ private struct SetupSheet: View {
                 } footer: {
                     Text("Listeners see this name as the title on the join page. A change while you are live is used the next time the broadcast starts.")
                 }
+                Section("Background") {
+                    Picker("Background", selection: $backgroundMode) {
+                        ForEach(MusicBackdropPreference.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: backgroundMode) { _, mode in
+                        mode.save()
+                    }
+                } footer: {
+                    Text("Auto is gentle on battery and richer while charging. It moves with the sound while you are live.")
+                }
             }
             .navigationTitle("Setup")
             .navigationBarTitleDisplayMode(.inline)
@@ -618,7 +632,10 @@ private struct SetupSheet: View {
             }
         }
         .preferredColorScheme(.dark)
-        .onAppear { draft = model.sessionName }
+        .onAppear {
+            draft = model.sessionName
+            backgroundMode = MusicBackdropPreference.stored
+        }
     }
 }
 

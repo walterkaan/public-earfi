@@ -32,7 +32,7 @@ struct MusicReactiveBackground: View {
                     let sample = motion.step(
                         to: timeline.date,
                         running: moving,
-                        target: moving && live ? level : 0,
+                        target: moving && live ? drivenLevel : 0,
                         pace: pace(for: look)
                     )
                     Canvas { context, size in
@@ -46,9 +46,12 @@ struct MusicReactiveBackground: View {
                             high: moving ? sample.high : 0
                         )
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -64,8 +67,17 @@ struct MusicReactiveBackground: View {
         }
     }
 
+    /// The meter is already 0 at about −50 dB and 1 at 0 dB. A curve lifts
+    /// ordinary speech, which often sits around 0.3–0.6, so the field moves
+    /// with the sound instead of staying near the navy floor.
+    private var drivenLevel: Float {
+        let clamped = min(1, max(0, level))
+        return pow(clamped, 0.55)
+    }
+
     /// Auto follows the charger. A stopped broadcast stays on the idle
-    /// gradient even if the override asks for gentle or rich.
+    /// gradient even if the override asks for gentle or rich. Battery uses
+    /// gentle, which is still meant to be obvious while sound is coming in.
     private var resolvedLook: Look {
         switch preference {
         case .off:
@@ -99,9 +111,9 @@ struct MusicReactiveBackground: View {
         case .idle:
             return 0.16
         case .gentle:
-            return 0.72
+            return 1.15
         case .rich:
-            return 1
+            return 1.35
         }
     }
 
@@ -132,11 +144,22 @@ private enum Look {
     case rich
 }
 
-private enum MusicBackdropPreference: String {
+enum MusicBackdropPreference: String, CaseIterable, Identifiable {
     case auto
-    case off
     case gentle
     case rich
+    case off
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .auto: return "Auto"
+        case .gentle: return "Gentle"
+        case .rich: return "Rich"
+        case .off: return "Off"
+        }
+    }
 
     static let defaultsKey = "visualizer.mode"
 
@@ -144,6 +167,10 @@ private enum MusicBackdropPreference: String {
         guard let raw = UserDefaults.standard.string(forKey: defaultsKey) else { return .auto }
         let cleaned = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return MusicBackdropPreference(rawValue: cleaned) ?? .auto
+    }
+
+    func save() {
+        UserDefaults.standard.set(rawValue, forKey: Self.defaultsKey)
     }
 }
 
@@ -231,9 +258,9 @@ private enum BackdropField {
 
     /// Large, slow orbs. They read as one shifting gradient.
     private static let gentleBlobs: [Blob] = [
-        Blob(color: .roomTeal, speed: 0.13, phase: 0.4, ax: 0.32, ay: 0.30, ox: 0.08, oy: 0.06, radius: 0.72, band: 1, alpha: 0.24),
-        Blob(color: cyan, speed: 0.09, phase: 2.1, ax: 0.70, ay: 0.58, ox: 0.07, oy: 0.08, radius: 0.64, band: 0, alpha: 0.16),
-        Blob(color: purple, speed: 0.07, phase: 4.2, ax: 0.48, ay: 0.78, ox: 0.09, oy: 0.05, radius: 0.56, band: 1, alpha: 0.11),
+        Blob(color: .roomTeal, speed: 0.42, phase: 0.4, ax: 0.30, ay: 0.28, ox: 0.22, oy: 0.16, radius: 0.78, band: 1, alpha: 0.62),
+        Blob(color: cyan, speed: 0.33, phase: 2.1, ax: 0.72, ay: 0.55, ox: 0.18, oy: 0.20, radius: 0.70, band: 0, alpha: 0.48),
+        Blob(color: purple, speed: 0.28, phase: 4.2, ax: 0.48, ay: 0.78, ox: 0.20, oy: 0.14, radius: 0.62, band: 2, alpha: 0.42),
     ]
 
     private static let richBlobs: [Blob] = [
@@ -261,7 +288,7 @@ private enum BackdropField {
         context.fill(Path(rect), with: .color(.roomNavy))
 
         context.drawLayer { (layer: inout GraphicsContext) in
-            let pulse: CGFloat = idle ? 1 : (1 + energy * (rich ? 0.075 : 0.05))
+            let pulse: CGFloat = idle ? 1 : (1 + energy * (rich ? 0.16 : 0.12))
             let cx = size.width / 2
             let cy = size.height / 2
             layer.translateBy(x: cx, y: cy)
@@ -285,11 +312,21 @@ private enum BackdropField {
         }
 
         if !idle {
-            let breath = 0.025 + Double(energy) * (rich ? 0.07 : 0.04)
+            let breath = 0.06 + Double(energy) * (rich ? 0.28 : 0.22)
             context.fill(Path(rect), with: .color(Color.roomTeal.opacity(breath)))
         }
 
-        let veil: Double = rich ? 0.48 : (idle ? 0.70 : 0.58)
+        // A heavy navy sheet used to hide the blobs, so a live broadcast on
+        // battery looked like the old flat background. Gentle stays see-through
+        // and opens further when the meter rises.
+        let veil: Double
+        if idle {
+            veil = 0.62
+        } else if rich {
+            veil = max(0.04, 0.16 - Double(energy) * 0.10)
+        } else {
+            veil = max(0.08, 0.28 - Double(energy) * 0.16)
+        }
         context.fill(Path(rect), with: .color(Color.roomNavy.opacity(veil)))
         paintVignette(&context, size: size)
     }
@@ -302,20 +339,20 @@ private enum BackdropField {
         rich: Bool,
         idle: Bool
     ) {
-        let turn = phase * (rich ? 0.20 : 0.08)
+        let turn = phase * (rich ? 0.34 : idle ? 0.08 : 0.22)
         let reach = min(size.width, size.height) * 0.65
         let cx = size.width / 2
         let cy = size.height / 2
         let dx = CGFloat(cos(turn)) * reach
         let dy = CGFloat(sin(turn)) * reach
-        let lift = idle ? 0 : Double(energy) * (rich ? 0.10 : 0.06)
+        let lift = idle ? 0 : Double(energy) * (rich ? 0.34 : 0.28)
         context.fill(
             Path(CGRect(origin: .zero, size: size)),
             with: .linearGradient(
                 Gradient(colors: [
-                    Color.roomTeal.opacity(0.15 + lift),
+                    Color.roomTeal.opacity((idle ? 0.10 : 0.28) + lift),
                     Color.roomNavy.opacity(0.02),
-                    purple.opacity(0.11 + lift * 0.55),
+                    purple.opacity((idle ? 0.08 : 0.22) + lift * 0.7),
                 ]),
                 startPoint: CGPoint(x: cx + dx, y: cy + dy),
                 endPoint: CGPoint(x: cx - dx, y: cy - dy)
@@ -341,8 +378,8 @@ private enum BackdropField {
         default: band = mid
         }
         let amount = CGFloat(min(1, max(0, band)))
-        let swell = idle ? 1 : (1 + amount * (blob.band == 2 ? 0.70 : 0.38))
-        let alpha = idle ? blob.alpha * 0.72 : blob.alpha * (0.70 + amount * (rich ? 0.50 : 0.30))
+        let swell = idle ? 1 : (1 + amount * (blob.band == 2 ? 1.15 : (rich ? 0.85 : 0.70)))
+        let alpha = idle ? blob.alpha * 0.55 : blob.alpha * (0.85 + amount * (rich ? 0.9 : 0.75))
         let center = CGPoint(
             x: (blob.ax + blob.ox * CGFloat(sin(phase * blob.speed + blob.phase))) * size.width,
             y: (blob.ay + blob.oy * CGFloat(cos(phase * blob.speed * 0.81 + blob.phase))) * size.height
