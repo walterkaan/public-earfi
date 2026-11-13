@@ -143,6 +143,7 @@
 		D599F8A8832D76898C8643C6 /* opus_multistream_encoder.c in Sources */ = {isa = PBXBuildFile; fileRef = 76B9A7975BDC1DCADDB13E33 /* opus_multistream_encoder.c */; };
 		D6F55ABEC884C5FA3A4F1807 /* LPC_fit.c in Sources */ = {isa = PBXBuildFile; fileRef = 450585DE684DB5C448BC6C05 /* LPC_fit.c */; };
 		D78F1F8DFF13204D7C08D3F0 /* LocalNetworkProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F8461D9EAB532A270611F67 /* LocalNetworkProbe.swift */; };
+		E7C0FFEEA11CE001BACC0002 /* MusicReactiveBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7C0FFEEA11CE001BACC0001 /* MusicReactiveBackground.swift */; };
 		D97095523BA472EBE80EFBF7 /* gain_quant.c in Sources */ = {isa = PBXBuildFile; fileRef = 9D82B8F7CF330AE71088EE42 /* gain_quant.c */; };
 		DC27EB9A847DE768D63129A4 /* entcode.c in Sources */ = {isa = PBXBuildFile; fileRef = 47CA2E6C027E76E7DA17F824 /* entcode.c */; };
 		DC2B6BB85AF1A940AB1AD79C /* LPC_analysis_filter.c in Sources */ = {isa = PBXBuildFile; fileRef = 5CCEEB35D95BA24BB82E8FAE /* LPC_analysis_filter.c */; };
@@ -217,6 +218,7 @@
 		1ADE7B311C550F4CC52BF603 /* stereo_LR_to_MS.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = stereo_LR_to_MS.c; sourceTree = "<group>"; };
 		1D8615915F22600A0993485F /* opus_multistream.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = opus_multistream.c; sourceTree = "<group>"; };
 		1F8461D9EAB532A270611F67 /* LocalNetworkProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalNetworkProbe.swift; sourceTree = "<group>"; };
+		E7C0FFEEA11CE001BACC0001 /* MusicReactiveBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicReactiveBackground.swift; sourceTree = "<group>"; };
 		1FB34920ACC1F48EBD9D5A4B /* sort.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sort.c; sourceTree = "<group>"; };
 		2046C313CCFA4D47D902E9CA /* encode_indices.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = encode_indices.c; sourceTree = "<group>"; };
 		20DE02381227425F9E662E33 /* mdct.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = mdct.c; sourceTree = "<group>"; };
@@ -621,6 +623,7 @@
 				957394814D12E7D9C9381E04 /* HostAddress.swift */,
 				B1F0A11CE003B1F0A11CE003 /* ProStore.swift */,
 				1F8461D9EAB532A270611F67 /* LocalNetworkProbe.swift */,
+				E7C0FFEEA11CE001BACC0001 /* MusicReactiveBackground.swift */,
 				2E03E76405E540CB5800DB8B /* OpusEncoder.swift */,
 				F1EF8C6D5F9FA02AEDD3B754 /* PrivacyInfo.xcprivacy */,
 				4FC1685867368C2B4855EDAE /* QRCodeImage.swift */,
@@ -799,6 +802,7 @@
 				36C4301D9FA6FFC63C3750F8 /* LTP_analysis_filter_FLP.c in Sources */,
 				952D7DB1DC723E55624B1AA9 /* LTP_scale_ctrl_FLP.c in Sources */,
 				D78F1F8DFF13204D7C08D3F0 /* LocalNetworkProbe.swift in Sources */,
+				E7C0FFEEA11CE001BACC0002 /* MusicReactiveBackground.swift in Sources */,
 				9E0A2EF1C6D0C42560650AF3 /* NLSF2A.c in Sources */,
 				C61D701B2D17B9D8F3A331A9 /* NLSF_VQ.c in Sources */,
 				CAADBF973BFC877D03059EDD /* NLSF_VQ_weights_laroia.c in Sources */,
