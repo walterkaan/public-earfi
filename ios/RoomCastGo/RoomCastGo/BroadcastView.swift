@@ -10,7 +10,7 @@ struct BroadcastView: View {
 
     var body: some View {
         ZStack {
-            Color.roomNavy.ignoresSafeArea()
+            MusicReactiveBackground(level: model.level, live: model.isOnAir)
             VStack(spacing: 10) {
                 Text("RoomCast Go")
                     .font(.title.weight(.bold))
