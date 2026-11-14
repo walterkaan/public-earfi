@@ -89,9 +89,7 @@ struct BroadcastView: View {
             model.appear()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                model.sceneBecameActive()
-            }
+            model.noteSceneActive(phase == .active)
         }
         .onChange(of: model.freeLimitHit) { _, hit in
             if hit { showPaywall = true }

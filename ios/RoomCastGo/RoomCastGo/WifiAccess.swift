@@ -90,24 +90,23 @@ enum WifiDropNotifier {
 final class WifiNameSource: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private var authContinuation: CheckedContinuation<CLAuthorizationStatus, Never>?
-    private var fixContinuation: CheckedContinuation<Void, Never>?
     var onAuthorizationChange: (() -> Void)?
 
     override init() {
         super.init()
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
     }
 
     var authorization: CLAuthorizationStatus {
         manager.authorizationStatus
     }
 
+    /// One SSID read. Asks for When In Use only if the user has not chosen yet.
+    /// Does not watch location: `fetchCurrent` is the only location use.
     func currentSSID() async -> String? {
         let status = await ensureAuthorization()
         guard status == .authorizedWhenInUse || status == .authorizedAlways else { return nil }
         await ensurePrecise()
-        await waitForFix()
         return await fetchSSID()
     }
 
@@ -133,17 +132,6 @@ final class WifiNameSource: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    private func waitForFix() async {
-        await withCheckedContinuation { continuation in
-            self.fixContinuation = continuation
-            self.manager.requestLocation()
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 8_000_000_000)
-                self.resumeFix()
-            }
-        }
-    }
-
     private func fetchSSID() async -> String? {
         await withCheckedContinuation { continuation in
             let once = ResumeOnce<String?> { continuation.resume(returning: $0) }
@@ -164,12 +152,6 @@ final class WifiNameSource: NSObject, CLLocationManagerDelegate {
         continuation?.resume(returning: status)
     }
 
-    private func resumeFix() {
-        let continuation = fixContinuation
-        fixContinuation = nil
-        continuation?.resume()
-    }
-
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
         Task { @MainActor in
@@ -178,14 +160,6 @@ final class WifiNameSource: NSObject, CLLocationManagerDelegate {
                 self.onAuthorizationChange?()
             }
         }
-    }
-
-    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        Task { @MainActor in self.resumeFix() }
-    }
-
-    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        Task { @MainActor in self.resumeFix() }
     }
 }
 

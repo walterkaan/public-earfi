@@ -121,9 +121,13 @@ final class BroadcastModel: ObservableObject {
     }()
     private let wifiNames = WifiNameSource()
     private var knownSSID: String?
-    private var ssidFetched = false
+    /// IP the cached SSID was read for. Empty means the confirm dialog still needs a read.
+    private var ssidFetchedForIP = ""
     private var ssidTask: Task<Void, Never>?
-    private var ssidTicketIP = ""
+    /// False while the app is not the active scene, so a timer or a resume does not read the SSID.
+    private var foreground = true
+    /// Set when NWPathMonitor reports a new Wi-Fi path. One SSID read consumes it.
+    private var pathSSIDDirty = false
     private var acceptedWifi: WifiChoice?
     private var limitTask: Task<Void, Never>?
     private var stopNote: String?
@@ -134,8 +138,6 @@ final class BroadcastModel: ObservableObject {
     private var startedNetworkIP: String?
     private var startedNetworkSSID: String?
     private var announcedNetwork: String?
-    private var liveSSIDIP = ""
-    private var liveSSIDAt = Date.distantPast
     /// −60 dBFS is 0 and 0 dBFS is 1, same scale as `level`. −55 dBFS is the quiet line.
     private let audibleLevel: Float = 5.0 / 60.0
     private let silentAfter: TimeInterval = 3
@@ -158,9 +160,7 @@ final class BroadcastModel: ObservableObject {
             }
         }
         wifiNames.onAuthorizationChange = { [weak self] in
-            guard let self else { return }
-            self.ssidFetched = false
-            self.syncWifiPrompt()
+            self?.syncWifiPrompt()
         }
         activity.endOrphans()
     }
@@ -188,8 +188,9 @@ final class BroadcastModel: ObservableObject {
         self.monitor = monitor
     }
 
-    func sceneBecameActive() {
-        ssidFetched = false
+    func noteSceneActive(_ active: Bool) {
+        foreground = active
+        guard active else { return }
         Task { await self.refreshAfterActive() }
     }
 
@@ -216,9 +217,7 @@ final class BroadcastModel: ObservableObject {
     func recheckWifi() {
         acceptedWifi = nil
         wifiReady = false
-        ssidFetched = false
-        knownSSID = nil
-        ssidTicketIP = ""
+        ssidFetchedForIP = ""
         wifiPrompt = .checking
         Task { await self.updateAddress() }
     }
@@ -377,6 +376,12 @@ final class BroadcastModel: ObservableObject {
         await Task.yield()
         guard phase == .starting else { return }
         await updateAddress()
+        guard phase == .starting else { return }
+        if let pending = ssidTask {
+            await pending.value
+        }
+        guard phase == .starting else { return }
+        await fetchSSIDAndWait()
         guard phase == .starting else { return }
         guard !ip.isEmpty else {
             failed = true
@@ -677,6 +682,9 @@ final class BroadcastModel: ObservableObject {
         let changed = sawPath && key != lastPathKey
         sawPath = true
         lastPathKey = key
+        if changed {
+            pathSSIDDirty = true
+        }
         if changed, isOnAir {
             scheduleRebind()
         }
@@ -917,35 +925,18 @@ final class BroadcastModel: ObservableObject {
         return "ssid:\(ip)|\(ssid)"
     }
 
-    private func considerLiveSSID() {
-        guard isOnAir, !ip.isEmpty, !Self.isPersonalHotspot(ip: ip, iface: iface) else { return }
-        guard ssidTask == nil else { return }
-        let moved = ip != liveSSIDIP
-        let due = Date().timeIntervalSince(liveSSIDAt) > 10
-        guard moved || due else { return }
-        liveSSIDIP = ip
-        liveSSIDAt = Date()
-        fetchSSIDIfNeeded()
-    }
-
     private func syncWifiPrompt() {
         noteNetworkPresence()
         refreshJoinNote()
+        if phase == .starting { return }
         if isOnAir {
-            considerLiveSSID()
             noteNetworkIdentity()
+            refreshLiveSSID()
             return
         }
         guard sawAddress else {
             wifiPrompt = .checking
             return
-        }
-        if ip != ssidTicketIP {
-            ssidTicketIP = ip
-            ssidFetched = false
-            knownSSID = nil
-            wifiReady = false
-            acceptedWifi = nil
         }
         if ip.isEmpty {
             applyPrompt(.noNetwork)
@@ -957,18 +948,39 @@ final class BroadcastModel: ObservableObject {
         }
         let status = wifiNames.authorization
         if status == .denied || status == .restricted {
-            ssidFetched = true
             applyPrompt(.unnamed(locationDenied: true))
             return
         }
-        if !ssidFetched {
-            if !wifiReady { applyPrompt(.checking) }
-            fetchSSIDIfNeeded()
+        // One read when the confirm dialog first has a network, and again only
+        // if that network's address changes. Coming back to the app reuses the cache.
+        if foreground, ip != ssidFetchedForIP {
+            if !ssidFetchedForIP.isEmpty {
+                wifiReady = false
+                acceptedWifi = nil
+            }
+            if knownSSID == nil {
+                applyPrompt(.checking)
+            }
+            fetchSSIDIfNeeded(force: true)
             return
         }
+        showCachedSSIDPrompt()
+    }
+
+    /// While live, read the SSID only after the path or the local address actually changes.
+    private func refreshLiveSSID() {
+        guard !ip.isEmpty, !Self.isPersonalHotspot(ip: ip, iface: iface) else { return }
+        let ipMoved = ip != ssidFetchedForIP
+        guard pathSSIDDirty || (ipMoved && foreground) else { return }
+        guard ssidTask == nil else { return }
+        pathSSIDDirty = false
+        fetchSSIDIfNeeded(force: true)
+    }
+
+    private func showCachedSSIDPrompt() {
         if let knownSSID, !knownSSID.isEmpty {
             applyPrompt(.ssid(knownSSID))
-        } else {
+        } else if ssidFetchedForIP == ip {
             applyPrompt(.unnamed(locationDenied: false))
         }
     }
@@ -990,23 +1002,36 @@ final class BroadcastModel: ObservableObject {
         }
     }
 
-    private func fetchSSIDIfNeeded() {
+    private func fetchSSIDIfNeeded(force: Bool) {
         guard ssidTask == nil else { return }
-        let ticketIP = ip
+        guard !ip.isEmpty, !Self.isPersonalHotspot(ip: ip, iface: iface) else { return }
+        if !force, ssidFetchedForIP == ip { return }
         ssidTask = Task { [weak self] in
             guard let self else { return }
-            let name = await self.wifiNames.currentSSID()
+            await self.fetchSSIDAndWait()
             self.ssidTask = nil
-            guard ticketIP == self.ip else {
-                self.ssidFetched = false
-                self.syncWifiPrompt()
-                return
-            }
-            self.ssidFetched = true
-            let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
-            self.knownSSID = (trimmed?.isEmpty == false) ? trimmed : nil
+            guard self.phase != .starting else { return }
             self.syncWifiPrompt()
         }
+    }
+
+    /// Reads the joined network name once. A miss keeps the previous name.
+    private func fetchSSIDAndWait() async {
+        if ip.isEmpty || Self.isPersonalHotspot(ip: ip, iface: iface) {
+            ssidFetchedForIP = ip
+            return
+        }
+        let ticketIP = ip
+        let name = await wifiNames.currentSSID()
+        guard ticketIP == ip else { return }
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trimmed.isEmpty {
+            knownSSID = trimmed
+        } else if ssidFetchedForIP != ticketIP {
+            knownSSID = nil
+        }
+        ssidFetchedForIP = ticketIP
+        refreshJoinNote()
     }
 
     /// Waits a moment so a one-packet path flap does not cover the screen
