@@ -82,9 +82,10 @@ final class AudioCapture {
     private var pullScratch: AVAudioPCMBuffer?
     private var convertOut: AVAudioPCMBuffer?
     private let paceQueue = DispatchQueue(label: "channel.roomcast.go.pace")
-    private var paced: [Data] = []
-    private var paceArmed = false
-    private var nextSend = Date.distantPast
+    private let paceLock = NSLock()
+    private var outbound: [Data] = []
+    private var sendScheduled = false
+    private var paceStopped = false
     private var framesIn = 0
     private var framesOut = 0
     private var framesQueued = 0
@@ -193,6 +194,9 @@ final class AudioCapture {
             try startEngine()
             reapplyBoost()
             running = true
+            paceLock.lock()
+            paceStopped = false
+            paceLock.unlock()
             reportInput()
             log.info("capture started")
         } catch {
@@ -234,11 +238,11 @@ final class AudioCapture {
         pendingRebuild = nil
         rebuildAgain = false
         running = false
-        paceQueue.sync {
-            self.paced.removeAll()
-            self.paceArmed = false
-            self.nextSend = .distantPast
-        }
+        paceLock.lock()
+        outbound.removeAll()
+        sendScheduled = false
+        paceStopped = true
+        paceLock.unlock()
         for observer in observers {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -666,41 +670,40 @@ final class AudioCapture {
         handoff(packet)
     }
 
-    /// One Opus packet every 20 ms. A tap can emit several frames at once;
-    /// dumping them back-to-back is a UDP burst home routers drop. The hotspot
-    /// path is one hop and hides that.
+    /// Send each 20 ms packet as soon as it is encoded. A timer that emits one
+    /// packet per tick runs slow and the drop-oldest cap then throws audio away.
+    /// The serial queue keeps order. Packets are dropped only if more than a
+    /// second is already waiting.
     private func handoff(_ packet: Data) {
+        paceLock.lock()
+        outbound.append(packet)
+        let overflow = outbound.count - 50
+        if overflow > 0 {
+            outbound.removeFirst(overflow)
+            packetsDropped += overflow
+        }
+        let kick = !sendScheduled && !paceStopped
+        if kick { sendScheduled = true }
+        paceLock.unlock()
+        guard kick else { return }
         paceQueue.async { [weak self] in
-            guard let self else { return }
-            if self.paced.count >= 25 {
-                self.paced.removeFirst()
-                self.packetsDropped += 1
-            }
-            self.paced.append(packet)
-            self.pumpPace()
+            self?.drainOutbound()
         }
     }
 
-    private func pumpPace() {
-        let now = Date()
-        if now < nextSend {
-            guard !paceArmed else { return }
-            paceArmed = true
-            let delay = nextSend.timeIntervalSince(now)
-            paceQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
-                guard let self else { return }
-                self.paceArmed = false
-                self.pumpPace()
+    private func drainOutbound() {
+        while true {
+            paceLock.lock()
+            if paceStopped || outbound.isEmpty {
+                outbound.removeAll(keepingCapacity: true)
+                sendScheduled = false
+                paceLock.unlock()
+                return
             }
-            return
-        }
-        guard !paced.isEmpty else { return }
-        let packet = paced.removeFirst()
-        packetsSent += 1
-        onPacket?(packet)
-        nextSend = Date().addingTimeInterval(0.02)
-        if !paced.isEmpty {
-            pumpPace()
+            let packet = outbound.removeFirst()
+            packetsSent += 1
+            paceLock.unlock()
+            onPacket?(packet)
         }
     }
 
@@ -708,7 +711,11 @@ final class AudioCapture {
         let now = Date()
         guard now.timeIntervalSince(lastReport) >= 5 else { return }
         lastReport = now
-        log.info("RoomCast audio in=\(self.framesIn, privacy: .public) converted=\(self.framesOut, privacy: .public) queued=\(self.framesQueued, privacy: .public) discarded=\(self.framesDiscarded, privacy: .public) sent=\(self.packetsSent, privacy: .public) droppedPkts=\(self.packetsDropped, privacy: .public)")
+        paceLock.lock()
+        let sent = packetsSent
+        let dropped = packetsDropped
+        paceLock.unlock()
+        log.info("RoomCast audio in=\(self.framesIn, privacy: .public) converted=\(self.framesOut, privacy: .public) queued=\(self.framesQueued, privacy: .public) discarded=\(self.framesDiscarded, privacy: .public) sent=\(sent, privacy: .public) droppedPkts=\(dropped, privacy: .public)")
     }
 
     private func observeSession() {
