@@ -347,7 +347,12 @@ final class BroadcastModel: ObservableObject {
         status = "Starting…"
         switch AVAudioApplication.shared.recordPermission {
         case .granted:
-            Task { await self.startGranted() }
+            // Paint Starting… on this frame. The next turn does the slow work.
+            DispatchQueue.main.async { [weak self] in
+                Task { @MainActor in
+                    await self?.startGranted()
+                }
+            }
         case .denied:
             failStart("Microphone access is off. Turn it on in Settings → Privacy & Security → Microphone.")
         case .undetermined:

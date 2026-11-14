@@ -107,7 +107,7 @@ final class WifiNameSource: NSObject, CLLocationManagerDelegate {
         let status = await ensureAuthorization()
         guard status == .authorizedWhenInUse || status == .authorizedAlways else { return nil }
         await ensurePrecise()
-        return await fetchSSID()
+        return await Self.readSSIDOffMain()
     }
 
     private func ensureAuthorization() async -> CLAuthorizationStatus {
@@ -132,15 +132,18 @@ final class WifiNameSource: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    private func fetchSSID() async -> String? {
+    /// `fetchCurrent` can block for several seconds. Keep that off the main thread
+    /// so Start can paint before the name comes back.
+    nonisolated private static func readSSIDOffMain() async -> String? {
         await withCheckedContinuation { continuation in
             let once = ResumeOnce<String?> { continuation.resume(returning: $0) }
-            NEHotspotNetwork.fetchCurrent { network in
-                once.call(network?.ssid)
-            }
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
-                once.call(nil)
+            DispatchQueue.global(qos: .userInitiated).async {
+                NEHotspotNetwork.fetchCurrent { network in
+                    once.call(network?.ssid)
+                }
+                DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 5) {
+                    once.call(nil)
+                }
             }
         }
     }

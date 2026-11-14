@@ -22,9 +22,6 @@ final class AudioCapture {
 
     static var routeIsUSB: Bool {
         let session = AVAudioSession.sharedInstance()
-        if session.category != .playAndRecord {
-            try? session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
-        }
         func isUSB(_ port: AVAudioSessionPortDescription) -> Bool {
             port.portType == .usbAudio || port.portName.localizedCaseInsensitiveContains("usb")
         }
@@ -51,7 +48,6 @@ final class AudioCapture {
     private var widener = StereoWidener()
     private var wide = [Float](repeating: 0, count: OpusEncoderBox.frameSamples * 2)
     private var routeMonitor: NSObjectProtocol?
-    private var applying = false
     private var lastLevelAt = Date.distantPast
     private var running = false
     private var observers: [NSObjectProtocol] = []
@@ -66,49 +62,74 @@ final class AudioCapture {
     private var voiceProcessing = false
     /// Silence for the voice-processing output bus. Nil unless that bus is on.
     private var silenceNode: AVAudioSourceNode?
-    /// Main thread. Coalesces a graph rebuild after a format change.
-    private var rebuildQueued = false
-    /// Audio thread only. Smoothed makeup while AGC is off.
     private var levelerGain: Float = 1
     private var levelerWasOn = false
+    /// Every session and engine mutation. Never the main thread.
+    private static let queueKey = DispatchSpecificKey<UInt8>()
+    private let audioQueue: DispatchQueue = {
+        let queue = DispatchQueue(label: "channel.roomcast.go.audio", qos: .userInitiated)
+        queue.setSpecific(key: AudioCapture.queueKey, value: 1)
+        return queue
+    }()
+    private var pendingRebuild: DispatchWorkItem?
+    private var rebuilding = false
+    private var rebuildAgain = false
+    private var suppressRoute = false
+    private var failedRebuilds = 0
+    private var mismatchPosted = false
+    private var rebuildForce = false
+    private var clearInterruption = false
 
     /// Lists inputs and prefers a USB or other external port over the built-in mic.
     /// Safe to call before Start. Does not activate the microphone.
+    /// Session changes run on `audioQueue`, not the main thread.
     func startMonitoringRoutes() {
-        ensureCategory()
-        refreshRoute()
-        guard routeMonitor == nil else { return }
-        routeMonitor = NotificationCenter.default.addObserver(
-            forName: AVAudioSession.routeChangeNotification,
-            object: AVAudioSession.sharedInstance(),
-            queue: .main
-        ) { [weak self] note in
-            self?.ingestRouteChange(note)
+        audioQueue.async { [weak self] in
+            guard let self else { return }
+            self.ensureCategory()
+            self.applyPreferredInput()
+            self.reportInput()
+            guard self.routeMonitor == nil else { return }
+            self.routeMonitor = NotificationCenter.default.addObserver(
+                forName: AVAudioSession.routeChangeNotification,
+                object: AVAudioSession.sharedInstance(),
+                queue: nil
+            ) { [weak self] note in
+                self?.ingestRouteChange(note)
+            }
         }
     }
 
     func refreshRoute() {
-        ensureCategory()
-        applyPreferredInput()
-        reportInput()
+        audioQueue.async { [weak self] in
+            guard let self else { return }
+            self.ensureCategory()
+            self.applyPreferredInput()
+            self.reportInput()
+        }
     }
 
     func setStereoWiden(_ on: Bool) {
-        guard stereoWiden != on else { return }
-        stereoWiden = on
-        guard running else { return }
-        restartRunning()
+        audioQueue.async { [weak self] in
+            guard let self, self.stereoWiden != on else { return }
+            self.stereoWiden = on
+            guard self.running else { return }
+            self.enqueueRebuild(force: true)
+        }
     }
 
     /// Music is remembered, and applied only while the input is USB.
-    /// A change while running restarts capture. The WebRTC sessions stay up.
+    /// A change while running rebuilds capture on the audio queue. The WebRTC sessions stay up.
     func setMusicPreferred(_ preferred: Bool) {
-        musicPreferred = preferred
-        let active = preferred && Self.routeIsUSB
-        let changed = active != musicActive
-        musicActive = active
-        if changed, running {
-            restartRunning()
+        audioQueue.async { [weak self] in
+            guard let self else { return }
+            self.musicPreferred = preferred
+            let active = preferred && Self.routeIsUSB
+            let changed = active != self.musicActive
+            self.musicActive = active
+            if changed, self.running {
+                self.enqueueRebuild(force: true)
+            }
         }
     }
 
@@ -142,6 +163,12 @@ final class AudioCapture {
     }
 
     func start() throws {
+        try runOnAudioQueue {
+            try self.startOnQueue()
+        }
+    }
+
+    private func startOnQueue() throws {
         if running { return }
         do {
             // Voice keeps `.default` plus voice processing on the built-in mic.
@@ -156,7 +183,7 @@ final class AudioCapture {
             reportInput()
             log.info("capture started")
         } catch {
-            teardown()
+            tearDownOnQueue()
             throw error
         }
     }
@@ -181,12 +208,18 @@ final class AudioCapture {
     }
 
     func stop() {
-        guard running || encoder != nil else { return }
-        teardown()
-        log.info("capture stopped")
+        audioQueue.sync { [weak self] in
+            guard let self else { return }
+            guard self.running || self.encoder != nil else { return }
+            self.tearDownOnQueue()
+            self.log.info("capture stopped")
+        }
     }
 
-    private func teardown() {
+    private func tearDownOnQueue() {
+        pendingRebuild?.cancel()
+        pendingRebuild = nil
+        rebuildAgain = false
         running = false
         for observer in observers {
             NotificationCenter.default.removeObserver(observer)
@@ -227,19 +260,6 @@ final class AudioCapture {
         }
     }
 
-    private func restartRunning() {
-        guard running, !applying else { return }
-        applying = true
-        defer { applying = false }
-        teardown()
-        do {
-            try start()
-        } catch {
-            log.error("capture restart failed: \(error.localizedDescription, privacy: .public)")
-            onCaptureFailure?(error.localizedDescription)
-        }
-    }
-
     private func installTap() throws {
         let input = engine.inputNode
         let session = AVAudioSession.sharedInstance()
@@ -264,11 +284,31 @@ final class AudioCapture {
             engine.prepare()
         }
 
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
+        // Hardware rate, read after the route has been applied. A cached 48 kHz
+        // format crashes installTap when USB unplugs and the mic is 16 or 24 kHz.
+        let hardware = input.inputFormat(forBus: 0)
+        guard hardware.sampleRate > 0, hardware.channelCount > 0 else {
             throw CaptureError(message: "The microphone has no audio format yet. Plug it in and tap Start again.")
         }
-        let captureChannels: AVAudioChannelCount = (musicActive && format.channelCount >= 2) ? 2 : 1
+        let output = input.outputFormat(forBus: 0)
+        let tapFormat: AVAudioFormat?
+        let sourceFormat: AVAudioFormat
+        if output.sampleRate == hardware.sampleRate, output.channelCount > 0 {
+            tapFormat = nil
+            sourceFormat = output
+        } else {
+            guard let requested = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: hardware.sampleRate,
+                channels: hardware.channelCount,
+                interleaved: false
+            ), requested.sampleRate == hardware.sampleRate, requested.channelCount > 0 else {
+                throw CaptureError(message: "The microphone has no audio format yet. Plug it in and tap Start again.")
+            }
+            tapFormat = requested
+            sourceFormat = requested
+        }
+        let captureChannels: AVAudioChannelCount = (musicActive && sourceFormat.channelCount >= 2) ? 2 : 1
         channels = Int(captureChannels)
         let widen = musicActive && channels < 2 && stereoWiden
         encodeChannels = widen ? 2 : channels
@@ -282,15 +322,17 @@ final class AudioCapture {
             sampleRate: 48_000,
             channels: captureChannels,
             interleaved: false
-        ), let converter = AVAudioConverter(from: format, to: target) else {
+        ), let converter = AVAudioConverter(from: sourceFormat, to: target) else {
             throw CaptureError(message: "Could not convert the input to 48 kHz.")
         }
         self.converter = converter
         self.targetFormat = target
         pending.removeAll(keepingCapacity: true)
         input.removeTap(onBus: 0)
-        let bufferSize = sliceFrames(format: format, session: session, unit: input.audioUnit)
-        input.installTap(onBus: 0, bufferSize: bufferSize, format: format) { [weak self] buffer, _ in
+        let bufferSize = sliceFrames(format: sourceFormat, session: session, unit: input.audioUnit)
+        // nil uses the node's format when it already matches the hardware rate.
+        // Otherwise the requested format's sample rate is the hardware rate, never a cached one.
+        input.installTap(onBus: 0, bufferSize: bufferSize, format: tapFormat) { [weak self] buffer, _ in
             self?.consume(buffer)
         }
         engine.prepare()
@@ -395,9 +437,7 @@ final class AudioCapture {
         guard running, let converter, let targetFormat else { return }
         if abs(buffer.format.sampleRate - converter.inputFormat.sampleRate) > 1
             || buffer.format.channelCount != converter.inputFormat.channelCount {
-            DispatchQueue.main.async { [weak self] in
-                self?.scheduleRebuild()
-            }
+            noteFormatMismatch()
             return
         }
         let ratio = targetFormat.sampleRate / buffer.format.sampleRate
@@ -553,47 +593,67 @@ final class AudioCapture {
         observers.append(center.addObserver(
             forName: AVAudioSession.interruptionNotification,
             object: AVAudioSession.sharedInstance(),
-            queue: .main
+            queue: nil
         ) { [weak self] note in
-            self?.handleInterruption(note)
+            self?.audioQueue.async { self?.handleInterruption(note) }
         })
         observers.append(center.addObserver(
             forName: AVAudioSession.mediaServicesWereResetNotification,
             object: AVAudioSession.sharedInstance(),
-            queue: .main
+            queue: nil
         ) { [weak self] _ in
-            self?.rebuildEngine()
+            self?.enqueueRebuild(force: true)
         })
         observers.append(center.addObserver(
             forName: .AVAudioEngineConfigurationChange,
             object: engine,
-            queue: .main
+            queue: nil
         ) { [weak self] _ in
-            self?.scheduleRebuild()
+            self?.enqueueRebuild()
         })
     }
 
-    /// The engine stops itself when the built-in route changes sample rate
-    /// (48 kHz requested, 24 kHz or 16 kHz hardware). Rebuild on the next
-    /// turn so this is not inside `engine.start`.
-    private func scheduleRebuild() {
-        guard running, !applying, !rebuildQueued else { return }
-        rebuildQueued = true
-        DispatchQueue.main.async { [weak self] in
+    /// Coalesce plug and unplug bursts, then rebuild off the main thread.
+    /// `force` is a real route or interruption. A configuration ping can no-op
+    /// when the hardware rate already matches the converter.
+    private func enqueueRebuild(force: Bool = false) {
+        let schedule = { [weak self] in
+            guard let self, self.running else { return }
+            if force { self.rebuildForce = true }
+            if self.rebuilding {
+                self.rebuildAgain = true
+                return
+            }
+            self.pendingRebuild?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                self?.performRebuild()
+            }
+            self.pendingRebuild = work
+            self.audioQueue.asyncAfter(deadline: .now() + 0.3, execute: work)
+        }
+        if DispatchQueue.getSpecific(key: Self.queueKey) != nil {
+            schedule()
+        } else {
+            audioQueue.async(execute: schedule)
+        }
+    }
+
+    private func noteFormatMismatch() {
+        if mismatchPosted { return }
+        mismatchPosted = true
+        audioQueue.async { [weak self] in
             guard let self else { return }
-            self.rebuildQueued = false
-            guard self.running, !self.applying else { return }
-            if self.engine.isRunning, self.graphMatchesInput() { return }
-            self.rebuildEngine()
+            self.mismatchPosted = false
+            self.enqueueRebuild()
         }
     }
 
     private func graphMatchesInput() -> Bool {
         guard let converter else { return false }
-        let format = engine.inputNode.outputFormat(forBus: 0)
-        return format.sampleRate > 0
-            && format.sampleRate == converter.inputFormat.sampleRate
-            && format.channelCount == converter.inputFormat.channelCount
+        let hardware = engine.inputNode.inputFormat(forBus: 0)
+        return hardware.sampleRate > 0
+            && hardware.channelCount > 0
+            && hardware.sampleRate == converter.inputFormat.sampleRate
     }
 
     private func handleInterruption(_ note: Notification) {
@@ -603,72 +663,97 @@ final class AudioCapture {
         switch type {
         case .began:
             log.info("audio interrupted")
-            onInterrupted?(true)
+            DispatchQueue.main.async { [weak self] in self?.onInterrupted?(true) }
         case .ended:
             let optionRaw = note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
             let options = AVAudioSession.InterruptionOptions(rawValue: optionRaw)
             log.info("interruption ended, should resume \(options.contains(.shouldResume), privacy: .public)")
-            resumeAfterInterruption()
+            clearInterruption = true
+            enqueueRebuild(force: true)
         @unknown default:
             break
-        }
-    }
-
-    private func resumeAfterInterruption() {
-        guard running else { return }
-        do {
-            try AVAudioSession.sharedInstance().setActive(true)
-            if !engine.isRunning {
-                try installTap()
-                try startEngine()
-                reapplyBoost()
-            }
-            reportInput()
-            onInterrupted?(false)
-        } catch {
-            log.error("resume failed: \(error.localizedDescription, privacy: .public)")
-            onInterrupted?(true)
         }
     }
 
     private func ingestRouteChange(_ note: Notification) {
         let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt ?? 0
         let reason = AVAudioSession.RouteChangeReason(rawValue: raw) ?? .unknown
-        applyPreferredInput()
-        reportInput()
-        guard running, !applying else { return }
-        switch reason {
-        case .newDeviceAvailable, .oldDeviceUnavailable, .override:
-            log.info("route changed: \(String(describing: reason), privacy: .public)")
-            let active = musicPreferred && Self.routeIsUSB
-            let profileChanged = active != musicActive
-            musicActive = active
-            if profileChanged {
-                restartRunning()
-            } else {
-                rebuildEngine()
+        audioQueue.async { [weak self] in
+            guard let self else { return }
+            if self.suppressRoute { return }
+            self.applyPreferredInput()
+            self.reportInput()
+            guard self.running else { return }
+            switch reason {
+            case .newDeviceAvailable, .oldDeviceUnavailable, .override:
+                self.log.info("route changed: \(String(describing: reason), privacy: .public)")
+                self.musicActive = self.musicPreferred && Self.routeIsUSB
+                self.enqueueRebuild(force: true)
+            default:
+                break
             }
-        default:
-            break
         }
     }
 
-    private func rebuildEngine() {
-        guard running, !applying else { return }
-        applying = true
-        defer { applying = false }
-        engine.inputNode.removeTap(onBus: 0)
+    /// Stop, drop the tap, reset, then install against the hardware rate that exists now.
+    private func performRebuild() {
+        guard running else { return }
+        if rebuilding {
+            rebuildAgain = true
+            return
+        }
+        let force = rebuildForce
+        rebuildForce = false
+        if !force, engine.isRunning, graphMatchesInput() {
+            return
+        }
+        rebuilding = true
+        suppressRoute = true
+        defer {
+            suppressRoute = false
+            rebuilding = false
+            if rebuildAgain {
+                rebuildAgain = false
+                enqueueRebuild()
+            }
+        }
         engine.stop()
+        engine.inputNode.removeTap(onBus: 0)
         detachSilence()
+        engine.reset()
         do {
+            musicActive = musicPreferred && Self.routeIsUSB
             try configureSession()
             try installTap()
             try startEngine()
+            failedRebuilds = 0
             reapplyBoost()
             reportInput()
+            if clearInterruption {
+                clearInterruption = false
+                DispatchQueue.main.async { [weak self] in self?.onInterrupted?(false) }
+            }
         } catch {
+            failedRebuilds += 1
             log.error("route restart failed: \(error.localizedDescription, privacy: .public)")
-            onCaptureFailure?(error.localizedDescription)
+            if failedRebuilds < 3 {
+                enqueueRebuild(force: true)
+                return
+            }
+            failedRebuilds = 0
+            running = false
+            let message = error.localizedDescription
+            DispatchQueue.main.async { [weak self] in
+                self?.onCaptureFailure?(message)
+            }
+        }
+    }
+
+    private func runOnAudioQueue(_ body: () throws -> Void) throws {
+        if DispatchQueue.getSpecific(key: Self.queueKey) != nil {
+            try body()
+        } else {
+            try audioQueue.sync(execute: body)
         }
     }
 
