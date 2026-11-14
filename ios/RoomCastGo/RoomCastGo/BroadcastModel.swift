@@ -1251,7 +1251,12 @@ final class BroadcastActivityController {
     func update(_ state: BroadcastAttributes.ContentState, force: Bool) {
         guard let current else { return }
         let due = Date().timeIntervalSince(lastPush) >= Self.refreshAfter
-        if !force, state == last, !due { return }
+        let signalChanged = last.map {
+            $0.listeners != state.listeners || $0.muted != state.muted || $0.gain != state.gain
+        } ?? true
+        // The meter moves constantly. Push it with listener, mute, or gain changes,
+        // or at most every 15 seconds, so ActivityKit is not woken several times a second.
+        if !force, !due, !signalChanged { return }
         last = state
         lastPush = Date()
         let next = content(state)

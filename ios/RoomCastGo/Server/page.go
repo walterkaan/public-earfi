@@ -189,6 +189,47 @@ document.addEventListener("visibilitychange",()=>{
 if(document.visibilityState==="visible")refreshSpec();
 });
 const params=new URLSearchParams(window.location.search);
+const debugOn=params.get("debug")==="1";
+let audioReceiver=null;
+let debugBox=null;
+function armReceiver(recv){
+if(!recv)return;
+audioReceiver=recv;
+try{if(typeof recv.jitterBufferTarget!=="undefined")recv.jitterBufferTarget=500;}catch(e){}
+try{if(typeof recv.playoutDelayHint!=="undefined")recv.playoutDelayHint=0.5;}catch(e){}
+}
+function ensureDebug(){
+if(!debugOn||debugBox)return;
+debugBox=document.createElement("pre");
+debugBox.id="rtc-debug";
+debugBox.setAttribute("style","position:fixed;left:8px;right:8px;bottom:8px;margin:0;padding:8px;background:rgba(0,0,0,.75);color:#d7fff4;font:12px/1.35 ui-monospace,monospace;white-space:pre-wrap;z-index:20;border-radius:8px");
+document.body.appendChild(debugBox);
+}
+function statText(v){return v==null?"-":String(v);}
+function showStats(){
+if(!debugOn||!audioReceiver||typeof audioReceiver.getStats!=="function")return;
+ensureDebug();
+audioReceiver.getStats().then(function(report){
+let line="no inbound-rtp audio";
+report.forEach(function(stat){
+if(stat.type==="inbound-rtp"&&(stat.kind==="audio"||stat.mediaType==="audio")){
+const emitted=stat.jitterBufferEmittedCount||0;
+const avg=emitted&&stat.jitterBufferDelay!=null?stat.jitterBufferDelay/emitted:0;
+line="packetsLost "+statText(stat.packetsLost)+"\n"
++"jitter "+statText(stat.jitter)+"\n"
++"jitterBufferDelay "+statText(stat.jitterBufferDelay)+"\n"
++"jitterBufferEmittedCount "+statText(stat.jitterBufferEmittedCount)+"\n"
++"avgJitterBufferDelay "+avg.toFixed(4)+"\n"
++"concealedSamples "+statText(stat.concealedSamples)+"\n"
++"concealmentEvents "+statText(stat.concealmentEvents)+"\n"
++"insertedSamplesForDeceleration "+statText(stat.insertedSamplesForDeceleration)+"\n"
++"removedSamplesForAcceleration "+statText(stat.removedSamplesForAcceleration);
+}
+});
+if(debugBox)debugBox.textContent=line;
+}).catch(function(){});
+}
+if(debugOn)setInterval(showStats,1000);
 const wantMuted=parseBoolString(params.get("muted"),false);
 video.muted=wantMuted;
 video.autoplay=true;
@@ -234,13 +275,7 @@ if(ticket!==generation)return;
 connected=true;
 if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
 video.srcObject=evt.streams[0];
-try{
-const recv=evt.receiver||(evt.transceiver&&evt.transceiver.receiver);
-if(recv){
-if("jitterBufferTarget" in recv)recv.jitterBufferTarget=500;
-if("playoutDelayHint" in recv)recv.playoutDelayHint=0.5;
-}
-}catch(e){}
+try{armReceiver(evt.receiver||(evt.transceiver&&evt.transceiver.receiver));}catch(e){}
 const stream=evt.streams[0];
 (stream?stream.getTracks():[]).forEach((track)=>{
 track.addEventListener("ended",()=>{
