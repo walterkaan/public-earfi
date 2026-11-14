@@ -6,7 +6,6 @@ struct BroadcastView: View {
     @ObservedObject var model: BroadcastModel
     @ObservedObject var store: ProStore
     @Environment(\.scenePhase) private var scenePhase
-    @State private var shareURL: String?
     @State private var showStats = false
     @State private var showSetup = false
     @State private var showPaywall = false
@@ -44,14 +43,18 @@ struct BroadcastView: View {
                             .lineLimit(6)
                     }
                     if model.isOnAir {
+                        if !model.networkNote.isEmpty {
+                            Text(model.networkNote)
+                                .font(.footnote.weight(.medium))
+                                .multilineTextAlignment(.center)
+                                .foregroundStyle(Color.white.opacity(0.72))
+                                .frame(maxWidth: .infinity)
+                        }
                         qrCard(prominent: false)
-                        Text(model.url)
-                            .font(.system(.caption2, design: .monospaced))
-                            .textSelection(.enabled)
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-                        shareButton
+                        joinLink
+                        if !store.isPro {
+                            upgradeButton
+                        }
                         listenerBlock
                         meter
                     }
@@ -93,22 +96,12 @@ struct BroadcastView: View {
         .onChange(of: model.freeLimitHit) { _, hit in
             if hit { showPaywall = true }
         }
-        .sheet(isPresented: sharePresented) {
-            ShareSheet(items: [shareURL ?? ""])
-        }
         .sheet(isPresented: $showSetup) {
             SetupSheet(model: model)
         }
         .sheet(isPresented: $showPaywall) {
             PaywallView(store: store)
         }
-    }
-
-    private var sharePresented: Binding<Bool> {
-        Binding(
-            get: { shareURL != nil },
-            set: { if !$0 { shareURL = nil } }
-        )
     }
 
     private var detailText: String? {
@@ -121,7 +114,7 @@ struct BroadcastView: View {
             return model.status == "Live" ? nil : model.status
         case .idle:
             if model.status != "Ready" { return model.status }
-            return model.wifiReady ? model.networkNote : nil
+            return nil
         }
     }
 
@@ -329,20 +322,38 @@ struct BroadcastView: View {
         return min(300, width * 0.74) * 2 / 3
     }
 
-    private var shareButton: some View {
+    private var joinLink: some View {
+        Group {
+            if let link = URL(string: model.url), !model.url.isEmpty {
+                ShareLink(item: link) {
+                    Text(model.url)
+                        .font(.system(.caption2, design: .monospaced))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(Color.roomTeal)
+                        .underline()
+                        .lineLimit(2)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Share \(model.url)")
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var upgradeButton: some View {
         Button {
-            shareURL = model.url
+            showPaywall = true
         } label: {
-            Text("Share")
+            Text("Upgrade to Pro")
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .frame(height: 40)
-                .background(Color.white.opacity(0.12))
-                .foregroundStyle(.white)
+                .background(Color.roomTeal)
+                .foregroundStyle(Color.roomNavy)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
-        .disabled(model.url.isEmpty)
+        .accessibilityLabel("Upgrade to Pro")
     }
 
     private var listenerBlock: some View {
@@ -363,12 +374,7 @@ struct BroadcastView: View {
             }
             .frame(maxWidth: .infinity)
             if !store.isPro, let since = model.startedAt {
-                HStack(spacing: 8) {
-                    freeMinutes(since: since)
-                    Button("Upgrade") { showPaywall = true }
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.roomTeal)
-                }
+                freeMinutes(since: since)
             }
             if showStats {
                 Text(model.statsText)
@@ -714,16 +720,6 @@ private struct SetupSheet: View {
             backgroundMode = MusicBackdropPreference.stored
         }
     }
-}
-
-private struct ShareSheet: UIViewControllerRepresentable {
-    var items: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 enum AppStoreListing {
