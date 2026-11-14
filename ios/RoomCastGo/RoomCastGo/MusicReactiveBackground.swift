@@ -98,9 +98,9 @@ struct MusicReactiveBackground: View {
         case .off, .idle:
             return 0.5
         case .gentle:
-            return 1.0 / 30.0
+            return 1.0 / 25.0
         case .rich:
-            return 1.0 / 60.0
+            return 1.0 / 45.0
         }
     }
 
@@ -112,9 +112,9 @@ struct MusicReactiveBackground: View {
         case .idle:
             return 0.16
         case .gentle:
-            return 2.1
+            return 1.63
         case .rich:
-            return 3.2
+            return 2.28
         }
     }
 
@@ -216,19 +216,19 @@ private final class BackdropMotion: ObservableObject {
         lastRunning = running
         if running, elapsed > 0 {
             phase += elapsed * pace
-            let dt = Float(min(elapsed, 1.0 / 30.0))
+            let dt = Float(min(elapsed, 1.0 / 24.0))
             let aim = min(1, max(0, target))
             let previous = mid
-            // Fast attack, slow release. Quiet hangs, a new peak arrives quickly.
-            low = follow(low, toward: aim, dt: dt, attack: 0.20, release: 1.50)
-            mid = follow(mid, toward: aim, dt: dt, attack: 0.05, release: 0.90)
+            // Halfway between the older symmetric follow and the snappier envelope.
+            low = follow(low, toward: aim, dt: dt, attack: 0.55, release: 1.20)
+            mid = follow(mid, toward: aim, dt: dt, attack: 0.20, release: 0.63)
             let onset = max(0, aim - previous)
             if onset > 0.02 {
-                high = min(1, max(high, onset * 4))
-                kick = min(1, max(kick, onset * 6))
+                high = min(1, max(high, onset * 2))
+                kick = min(1, max(kick, onset * 3))
             }
-            high = follow(high, toward: 0, dt: dt, attack: 0.04, release: 0.48)
-            kick = follow(kick, toward: 0, dt: dt, attack: 0.02, release: 0.13)
+            high = follow(high, toward: 0, dt: dt, attack: 0.04, release: 0.33)
+            kick = follow(kick, toward: 0, dt: dt, attack: 0.02, release: 0.16)
         } else if !running {
             low = 0
             mid = 0
@@ -278,11 +278,11 @@ private enum BackdropField {
     ]
 
     private static let richBlobs: [Blob] = [
-        Blob(color: .roomTeal, speed: 0.55, phase: 0.3, ax: 0.26, ay: 0.28, ox: 0.28, oy: 0.22, radius: 0.52, band: 0, alpha: 0.30),
-        Blob(color: purple, speed: 0.42, phase: 2.4, ax: 0.70, ay: 0.74, ox: 0.24, oy: 0.20, radius: 0.48, band: 0, alpha: 0.20),
-        Blob(color: cyan, speed: 0.72, phase: 1.5, ax: 0.78, ay: 0.30, ox: 0.22, oy: 0.26, radius: 0.40, band: 1, alpha: 0.26),
-        Blob(color: .roomTeal, speed: 0.64, phase: 5.0, ax: 0.42, ay: 0.58, ox: 0.26, oy: 0.22, radius: 0.36, band: 1, alpha: 0.18),
-        Blob(color: cyan, speed: 0.96, phase: 3.7, ax: 0.34, ay: 0.40, ox: 0.20, oy: 0.24, radius: 0.26, band: 2, alpha: 0.22),
+        Blob(color: .roomTeal, speed: 0.40, phase: 0.3, ax: 0.27, ay: 0.29, ox: 0.21, oy: 0.16, radius: 0.52, band: 0, alpha: 0.30),
+        Blob(color: purple, speed: 0.30, phase: 2.4, ax: 0.66, ay: 0.73, ox: 0.18, oy: 0.15, radius: 0.48, band: 0, alpha: 0.20),
+        Blob(color: cyan, speed: 0.53, phase: 1.5, ax: 0.76, ay: 0.32, ox: 0.17, oy: 0.20, radius: 0.40, band: 1, alpha: 0.26),
+        Blob(color: .roomTeal, speed: 0.46, phase: 5.0, ax: 0.44, ay: 0.55, ox: 0.18, oy: 0.17, radius: 0.36, band: 1, alpha: 0.18),
+        Blob(color: cyan, speed: 0.71, phase: 3.7, ax: 0.36, ay: 0.41, ox: 0.16, oy: 0.19, radius: 0.26, band: 2, alpha: 0.22),
     ]
 
     static func paint(
@@ -305,8 +305,8 @@ private enum BackdropField {
 
         context.drawLayer { (layer: inout GraphicsContext) in
             // Sustained scale stays small. The peak is a short jolt, not a brighter hold.
-            let pulse: CGFloat = idle ? 1 : (1 + energy * (rich ? 0.05 : 0.035) + hit * (rich ? 0.22 : 0.14))
-            let nudge = idle ? 0 : hit * (rich ? 18 : 10)
+            let pulse: CGFloat = idle ? 1 : (1 + energy * (rich ? 0.105 : 0.078) + hit * (rich ? 0.11 : 0.07))
+            let nudge = idle ? 0 : hit * (rich ? 9 : 5)
             let cx = size.width / 2
             let cy = size.height / 2
             layer.translateBy(x: cx + nudge * CGFloat(sin(phase * 11)), y: cy + nudge * CGFloat(cos(phase * 8)))
@@ -342,9 +342,9 @@ private enum BackdropField {
         if idle {
             veil = 0.62
         } else if rich {
-            veil = max(0.06, 0.34 - Double(energy) * 0.28)
+            veil = max(0.06, 0.25 - Double(energy) * 0.19)
         } else {
-            veil = max(0.12, 0.46 - Double(energy) * 0.34)
+            veil = max(0.12, 0.37 - Double(energy) * 0.25)
         }
         context.fill(Path(rect), with: .color(Color.roomNavy.opacity(veil)))
         paintVignette(&context, size: size)
@@ -358,21 +358,21 @@ private enum BackdropField {
         rich: Bool,
         idle: Bool
     ) {
-        let turn = phase * (rich ? 0.85 : idle ? 0.08 : 0.55) * (idle ? 1 : (0.55 + Double(energy) * 1.6))
+        let turn = phase * (rich ? 0.60 : idle ? 0.08 : 0.39) * (idle ? 1 : (0.78 + Double(energy) * 0.8))
         let reach = min(size.width, size.height) * 0.65
         let cx = size.width / 2
         let cy = size.height / 2
         let dx = CGFloat(cos(turn)) * reach
         let dy = CGFloat(sin(turn)) * reach
         // Quiet starts darker. Loud reaches the same peak opacity as before, not past it.
-        let lift = idle ? 0 : Double(energy) * (rich ? 0.50 : 0.44)
+        let lift = idle ? 0 : Double(energy) * (rich ? 0.42 : 0.36)
         context.fill(
             Path(CGRect(origin: .zero, size: size)),
             with: .linearGradient(
                 Gradient(colors: [
-                    Color.roomTeal.opacity((idle ? 0.08 : 0.12) + lift),
+                    Color.roomTeal.opacity((idle ? 0.09 : 0.20) + lift),
                     Color.roomNavy.opacity(0.02),
-                    purple.opacity((idle ? 0.06 : 0.08) + lift * 0.75),
+                    purple.opacity((idle ? 0.07 : 0.15) + lift * 0.725),
                 ]),
                 startPoint: CGPoint(x: cx + dx, y: cy + dy),
                 endPoint: CGPoint(x: cx - dx, y: cy - dy)
@@ -400,17 +400,17 @@ private enum BackdropField {
         }
         let amount = CGFloat(min(1, max(0, band)))
         let drive = idle ? 0 : (0.2 + amount * 0.8)
-        let travel = idle ? 0.4 : (0.22 + drive * (rich ? 2.15 : 1.45))
-        let tempo = idle ? 0.45 : ((rich ? 1.15 : 0.8) * (0.4 + Double(drive) * 2.1))
+        let travel = idle ? 0.7 : (0.61 + drive * (rich ? 1.08 : 0.73))
+        let tempo = idle ? 0.72 : (rich ? (0.73 + Double(drive) * 1.21) : (0.66 + Double(drive) * 0.84))
         let angle = phase * blob.speed * tempo + blob.phase
-        let jolt = idle ? 0 : kick * (rich ? 0.20 : 0.13)
+        let jolt = idle ? 0 : kick * (rich ? 0.10 : 0.065)
         var nx = blob.ax + blob.ox * travel * CGFloat(sin(angle)) + jolt * CGFloat(cos(angle * 2.4))
         var ny = blob.ay + blob.oy * travel * CGFloat(cos(angle * 0.81)) + jolt * CGFloat(sin(angle * 1.7))
         nx = min(0.94, max(0.06, nx))
         ny = min(0.94, max(0.06, ny))
-        let swell = idle ? 1 : (1 + amount * (rich ? 0.32 : 0.20) + kick * (blob.band == 2 ? (rich ? 1.05 : 0.72) : (rich ? 0.78 : 0.5)))
-        // Peak opacity matches the previous loud formula. Quiet sits lower, so the swing is wider.
-        let alpha = idle ? blob.alpha * 0.55 : blob.alpha * (rich ? (0.35 + amount * 1.40) : (0.40 + amount * 1.20))
+        let swell = idle ? 1 : (1 + amount * (blob.band == 2 ? (rich ? 0.74 : 0.68) : (rich ? 0.59 : 0.45)) + kick * (blob.band == 2 ? (rich ? 0.53 : 0.36) : (rich ? 0.39 : 0.25)))
+        // Loud opacity stays at the previous peak. The quiet floor is halfway back up.
+        let alpha = idle ? blob.alpha * 0.55 : blob.alpha * (rich ? (0.60 + amount * 1.15) : (0.625 + amount * 0.975))
         let swung = shifted(blob.color, phase: phase, energy: drive, rich: rich)
         let center = CGPoint(x: nx * size.width, y: ny * size.height)
         let radius = blob.radius * max(size.width, size.height) * swell
@@ -432,8 +432,8 @@ private enum BackdropField {
     /// Oscillates toward purple or navy. The unshifted color is the brightest this blob gets.
     private static func shifted(_ color: Color, phase: Double, energy: CGFloat, rich: Bool) -> Color {
         let swing = CGFloat(sin(phase * (rich ? 1.15 : 0.7)))
-        let towardPurple = max(0, swing) * (rich ? 0.62 : 0.42) * (0.3 + energy * 0.7)
-        let towardNavy = max(0, -swing) * (rich ? 0.28 : 0.18) * energy
+        let towardPurple = max(0, swing) * (rich ? 0.31 : 0.21) * (0.3 + energy * 0.7)
+        let towardNavy = max(0, -swing) * (rich ? 0.14 : 0.09) * energy
         var mixed = color
         if towardPurple > 0 { mixed = mix(mixed, purple, t: towardPurple) }
         if towardNavy > 0 { mixed = mix(mixed, .roomNavy, t: towardNavy) }

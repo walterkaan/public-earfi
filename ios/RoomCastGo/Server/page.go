@@ -69,7 +69,8 @@ h1{margin:0;font-size:30px;line-height:1.15;font-weight:800;letter-spacing:-.02e
 .stage::after{width:204px;height:204px}
 #toggle{position:relative;z-index:1;width:156px;height:156px;border:0;border-radius:50%;background:radial-gradient(circle at 38% 32%, #a78bfa 0%, #8b5cf6 46%, #6d46e6 100%);color:#fff;box-shadow:0 14px 40px rgba(109,70,230,.45);display:flex;align-items:center;justify-content:center;cursor:pointer}
 #toggle:active{transform:scale(.98)}
-#toggle svg{width:62px;height:62px;display:block}
+#toggle svg{width:62px;height:62px;display:none}
+#toggle svg.show{display:block}
 #wave{display:flex;align-items:center;justify-content:center;gap:5px;height:42px;margin:8px 0 12px}
 #wave span{width:5px;border-radius:4px;background:#2ec5b5;height:var(--h);transform-origin:center;transform:scaleY(.55)}
 #wave.playing span{animation:wave 1.05s ease-in-out infinite;animation-delay:var(--d)}
@@ -92,8 +93,8 @@ footer{padding:8px 22px calc(22px + env(safe-area-inset-bottom));text-align:cent
 <p id="status">` + waiting + `</p>
 <div class="stage">
 <button id="toggle" type="button" aria-label="Play">
-<svg id="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M8.2 5.4v13.2L19 12z"/></svg>
-<svg id="icon-pause" viewBox="0 0 24 24" aria-hidden="true" hidden><path fill="#fff" d="M6 5h4.2v14H6zm7.8 0H18v14h-4.2z"/></svg>
+<svg id="icon-play" class="show" viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M8.2 5.4v13.2L19 12z"/></svg>
+<svg id="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M6 5h4.2v14H6zm7.8 0H18v14h-4.2z"/></svg>
 </button>
 </div>
 <div id="wave" aria-hidden="true">` + waveformBars() + `</div>
@@ -146,11 +147,14 @@ setInterval(tick,1000);
 tick();
 const setPlaying=(on)=>{
 playing=on;
-iconPlay.hidden=on;
-iconPause.hidden=!on;
+iconPlay.classList.toggle("show",!on);
+iconPause.classList.toggle("show",on);
 wave.classList.toggle("playing",on);
 toggle.setAttribute("aria-label",on?"Pause":(autoplayBlocked?"Tap to listen":"Play"));
 };
+video.addEventListener("play",()=>setPlaying(true));
+video.addEventListener("playing",()=>setPlaying(true));
+video.addEventListener("pause",()=>setPlaying(false));
 const showHint=()=>{
 if(!connected){setMessage(waitingText);return;}
 if(autoplayBlocked&&!playing){setMessage(tapText);return;}
