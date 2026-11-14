@@ -28,7 +28,6 @@ var markPNG []byte
 // sound. There is no second unmute control.
 func listenerHTML(title, host string, started int64) string {
 	safeTitle := html.EscapeString(title)
-	safeHost := html.EscapeString(host)
 	scriptSpec := scriptJSON(title, host, started)
 	icon := faviconDataURI()
 	hero := markDataURI()
@@ -54,29 +53,31 @@ func listenerHTML(title, host string, started int64) string {
 ` + iconLink + `
 <style>
 html,body{margin:0;padding:0;min-height:100%;background:#100c28;color:#fff}
-body{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(120% 70% at 50% 8%, #2c245f 0%, #16143a 42%, #100c28 100%)}
+body{min-height:100vh;min-height:100dvh;display:flex;align-items:safe center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(120% 70% at 50% 8%, #2c245f 0%, #16143a 42%, #100c28 100%)}
 #video{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px 24px 8px;width:min(480px,100%);margin:0 auto;box-sizing:border-box}
+.frame{width:min(480px,100%);max-height:760px;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box}
+main{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px 24px 8px;width:100%;margin:0 auto;box-sizing:border-box}
 #mark{width:84px;height:84px;border-radius:20px;display:block;margin:0 auto 18px;box-shadow:0 10px 28px rgba(0,0,0,.35)}
 .pill{display:inline-flex;align-items:center;gap:8px;margin:0 auto 16px;padding:6px 14px;border-radius:999px;background:rgba(8,6,24,.45);color:#2ec5b5;font-size:15px;font-weight:700;letter-spacing:.04em}
 .dot{width:8px;height:8px;border-radius:50%;background:#2ec5b5;box-shadow:0 0 0 4px rgba(46,197,181,.18)}
 h1{margin:0;font-size:30px;line-height:1.15;font-weight:800;letter-spacing:-.02em}
-#from{margin:8px 0 0;font-size:17px;font-weight:500;color:rgba(255,255,255,.72)}
 #status{min-height:1.3em;margin:10px 0 0;font-size:16px;font-weight:700;color:rgba(255,255,255,.88)}
 .stage{position:relative;width:250px;height:250px;margin:18px auto 0;display:flex;align-items:center;justify-content:center}
 .stage::before,.stage::after{content:"";position:absolute;border-radius:50%;border:2px solid rgba(139,92,246,.42)}
-.stage::before{width:246px;height:246px}
+.stage::before{width:246px;height:246px;animation:ring 18s linear infinite}
+.stage.live::before{animation-duration:6s}
 .stage::after{width:204px;height:204px}
 #toggle{position:relative;z-index:1;width:156px;height:156px;border:0;border-radius:50%;background:radial-gradient(circle at 38% 32%, #a78bfa 0%, #8b5cf6 46%, #6d46e6 100%);color:#fff;box-shadow:0 14px 40px rgba(109,70,230,.45);display:flex;align-items:center;justify-content:center;cursor:pointer}
 #toggle:active{transform:scale(.98)}
 #toggle svg{width:62px;height:62px;display:none}
 #toggle svg.show{display:block}
 #wave{display:flex;align-items:center;justify-content:center;gap:5px;height:42px;margin:8px 0 12px}
-#wave span{width:5px;border-radius:4px;background:#2ec5b5;height:var(--h);transform-origin:center;transform:scaleY(.55)}
-#wave.playing span{animation:wave 1.05s ease-in-out infinite;animation-delay:var(--d)}
+#wave span{width:5px;border-radius:4px;background:#9a93b0;height:var(--h);transform-origin:center;transform:scaleY(.45);opacity:.55}
+#wave.playing span{background:#2ec5b5;opacity:1;animation:wave 1.05s ease-in-out infinite;animation-delay:var(--d)}
 @keyframes wave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1.15)}}
-footer{padding:8px 22px calc(22px + env(safe-area-inset-bottom));text-align:center}
-.hint{margin:0 0 6px;font-size:16px;font-weight:600;color:rgba(255,255,255,.82)}
+@keyframes ring{to{transform:rotate(360deg)}}
+footer{padding:8px 22px 22px;text-align:center}
+.hint{margin:0 0 6px;font-size:16px;font-weight:400;color:rgba(255,255,255,.72)}
 #credit{margin:0;font-size:14px}
 #credit a{color:rgba(255,255,255,.5);text-decoration:none}
 .noscript{margin:24px;text-align:center;font-size:16px;font-weight:700}
@@ -85,13 +86,13 @@ footer{padding:8px 22px calc(22px + env(safe-area-inset-bottom));text-align:cent
 </head>
 <body>
 <video id="video" playsinline webkit-playsinline title="` + safeTitle + `"></video>
+<div class="frame">
 <main>
 ` + heroTag + `
 <div class="pill"><span class="dot"></span><span id="live-text">LIVE</span></div>
 <h1 id="session">` + safeTitle + `</h1>
-<p id="from">from ` + safeHost + `</p>
 <p id="status">` + waiting + `</p>
-<div class="stage">
+<div class="stage" id="stage">
 <button id="toggle" type="button" aria-label="Play">
 <svg id="icon-play" class="show" viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M8.2 5.4v13.2L19 12z"/></svg>
 <svg id="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M6 5h4.2v14H6zm7.8 0H18v14h-4.2z"/></svg>
@@ -104,10 +105,12 @@ footer{padding:8px 22px calc(22px + env(safe-area-inset-bottom));text-align:cent
 <p class="hint">Keep this screen open. Earbuds work best.</p>
 <p id="credit"><a href="https://roomcast.channel" target="_blank" rel="noopener">Powered by RoomCast</a></p>
 </footer>
+</div>
 <script>
 const video=document.getElementById("video");
 const statusEl=document.getElementById("status");
 const toggle=document.getElementById("toggle");
+const stage=document.getElementById("stage");
 const iconPlay=document.getElementById("icon-play");
 const iconPause=document.getElementById("icon-pause");
 const wave=document.getElementById("wave");
@@ -150,6 +153,7 @@ playing=on;
 iconPlay.classList.toggle("show",!on);
 iconPause.classList.toggle("show",on);
 wave.classList.toggle("playing",on);
+if(stage)stage.classList.toggle("live",on);
 toggle.setAttribute("aria-label",on?"Pause":(autoplayBlocked?"Tap to listen":"Play"));
 };
 video.addEventListener("play",()=>setPlaying(true));
@@ -171,10 +175,6 @@ if(navigator.mediaSession&&typeof MediaMetadata==="function"){
 try{navigator.mediaSession.metadata=new MediaMetadata({title:data.title});}catch(err){}
 try{navigator.mediaSession.playbackState=playing?"playing":"paused";}catch(err){}
 }
-}
-if(data.host){
-const s=document.getElementById("from");
-if(s)s.textContent="from "+data.host;
 }
 if(typeof data.started==="number"&&data.started>0){startedAt=data.started;tick();}
 };

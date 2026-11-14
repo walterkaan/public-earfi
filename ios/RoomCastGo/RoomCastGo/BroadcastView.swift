@@ -23,12 +23,7 @@ struct BroadcastView: View {
                 mixRow
                 if model.isOnAir || model.wifiReady {
                     startRow
-                    if model.isOnAir, let since = model.startedAt {
-                        liveLine(since: since)
-                        if !store.isPro {
-                            freeCountdown(since: since)
-                        }
-                    } else if model.phase == .idle, !store.isPro {
+                    if !model.isOnAir, model.phase == .idle, !store.isPro {
                         Button("Free sessions last 40 minutes. Upgrade") {
                             showPaywall = true
                         }
@@ -47,7 +42,7 @@ struct BroadcastView: View {
                         .lineLimit(6)
                 }
                 if model.isOnAir {
-                    qrCard
+                    qrCard(prominent: false)
                     Text(model.url)
                         .font(.system(.caption2, design: .monospaced))
                         .textSelection(.enabled)
@@ -177,14 +172,10 @@ struct BroadcastView: View {
         TimelineView(.periodic(from: since, by: 1)) { context in
             let secs = max(0, Int(context.date.timeIntervalSince(since)))
             let time = Self.clock(secs)
-            HStack(spacing: 6) {
-                Circle().fill(Color.roomRed).frame(width: 8, height: 8)
-                Text(model.phase == .reconnecting ? "Reconnecting · \(time)" : "Live · \(time)")
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.white)
-            }
-            .frame(maxWidth: .infinity)
-            .accessibilityElement(children: .combine)
+            Text(model.phase == .reconnecting ? "Reconnecting \(time)" : time)
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.75))
+                .accessibilityLabel(model.phase == .reconnecting ? "Reconnecting \(time)" : "Elapsed \(time)")
         }
     }
 
@@ -300,20 +291,31 @@ struct BroadcastView: View {
         .accessibilityLabel("Voice or music")
     }
 
-    private var qrCard: some View {
-        Group {
+    private func qrCard(prominent: Bool) -> some View {
+        let side = Self.qrSide(prominent: prominent)
+        return Group {
             if let image = model.qrImage {
                 Image(uiImage: image)
                     .interpolation(.none)
                     .resizable()
-                    .scaledToFit()
-                    .padding(8)
+                    .frame(width: side, height: side)
+                    .padding(10)
                     .background(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .containerRelativeFrame(.horizontal) { width, _ in width * 0.60 }
-                    .accessibilityLabel("QR code for the listener page")
+                    .accessibilityLabel(prominent ? "New QR code for the listener page" : "QR code for the listener page")
             }
         }
+        .frame(width: side + 20, height: side + 20)
+        .layoutPriority(1)
+    }
+
+    /// A fixed square, not a fitted image, so a shorter layout cannot shrink the code.
+    private static func qrSide(prominent: Bool) -> CGFloat {
+        let width = UIScreen.main.bounds.width
+        if prominent {
+            return min(380, width - 36)
+        }
+        return min(300, width * 0.74)
     }
 
     private var shareButton: some View {
@@ -333,17 +335,30 @@ struct BroadcastView: View {
     }
 
     private var listenerBlock: some View {
-        VStack(spacing: 2) {
-            Button {
-                showStats.toggle()
-            } label: {
-                Text(model.listenerLabel)
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
+        VStack(spacing: 4) {
+            HStack(spacing: 10) {
+                Button {
+                    showStats.toggle()
+                } label: {
+                    Text(model.listenerLabel)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(showStats ? "Hides CPU, heat, and battery" : "Shows CPU, heat, and battery")
+                if let since = model.startedAt {
+                    liveLine(since: since)
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityHint(showStats ? "Hides CPU, heat, and battery" : "Shows CPU, heat, and battery")
+            .frame(maxWidth: .infinity)
+            if !store.isPro, let since = model.startedAt {
+                HStack(spacing: 8) {
+                    freeMinutes(since: since)
+                    Button("Upgrade") { showPaywall = true }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.roomTeal)
+                }
+            }
             if showStats {
                 Text(model.statsText)
                     .font(.caption2.monospacedDigit())
@@ -356,17 +371,20 @@ struct BroadcastView: View {
 
     private var meter: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(soundLine)
-                Spacer()
-                if model.clipping && !model.muted {
-                    Text("Too loud, turn the source down")
-                        .lineLimit(1)
-                        .foregroundStyle(Color.red)
-                }
+            Text(soundLine)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.8))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Level")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.white.opacity(0.55))
+            if model.clipping && !model.muted {
+                Text("Too loud, turn the source down")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(Color.red)
+                    .lineLimit(1)
             }
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(.white.opacity(0.7))
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.12))
@@ -376,23 +394,18 @@ struct BroadcastView: View {
                 }
             }
             .frame(height: 10)
-            .accessibilityLabel("Microphone level")
+            .accessibilityLabel("Level")
             .accessibilityValue("\(Int(model.level * 100)) percent")
         }
     }
 
-    private func freeCountdown(since: Date) -> some View {
-        TimelineView(.periodic(from: since, by: 1)) { context in
-            let left = max(0, Int(BroadcastLimits.freeSeconds - context.date.timeIntervalSince(since)))
-            VStack(spacing: 4) {
-                Text("Free · \(Self.clock(left)) left")
-                    .font(.title3.weight(.bold).monospacedDigit())
-                    .foregroundStyle(left <= 300 ? Color.roomAmber : Color.roomTeal)
-                Button("Upgrade for unlimited") { showPaywall = true }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.roomTeal)
-            }
-            .frame(maxWidth: .infinity)
+    private func freeMinutes(since: Date) -> some View {
+        TimelineView(.periodic(from: since, by: 30)) { context in
+            let remaining = BroadcastLimits.freeSeconds - context.date.timeIntervalSince(since)
+            let minutes = remaining <= 0 ? 0 : Int((remaining / 60).rounded(.up))
+            Text("Free \(minutes) minutes")
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .foregroundStyle(minutes <= 5 ? Color.roomAmber : Color.roomTeal)
         }
     }
 
@@ -404,22 +417,79 @@ struct BroadcastView: View {
         return String(format: "%d:%02d", secs / 60, secs % 60)
     }
 
-    private var wifiMessage: String {
+    private var wifiTitle: String {
         switch model.wifiPrompt {
         case .checking:
             return "Checking Wi-Fi…"
         case .ssid(let name):
-            return "RoomCast Go will use \(name) Wi-Fi. Change Wi-Fi if this is not right. Continue?"
+            return "Broadcast on \(name) Wi-Fi?"
         case .hotspot:
-            return "RoomCast Go will use this iPhone’s Personal Hotspot. Listeners must join that hotspot. Change the network if this is not right. Continue?"
-        case .unnamed(let denied):
-            if denied {
-                return "RoomCast Go can’t read the Wi-Fi name without Location access. It will use the current Wi-Fi network. Change Wi-Fi if this is not right, or allow Location in Settings. Continue?"
-            }
-            return "RoomCast Go can’t see a Wi-Fi name. It will use the current Wi-Fi network. Change Wi-Fi if this is not right. Continue?"
+            return "Broadcast on Personal Hotspot?"
+        case .unnamed:
+            return "Broadcast on this Wi-Fi?"
         case .noNetwork:
-            return "No Wi-Fi network. Join a Wi-Fi network, or turn on Personal Hotspot, then try again."
+            return "No Wi-Fi network"
         }
+    }
+
+    private var wifiDetail: String? {
+        switch model.wifiPrompt {
+        case .hotspot:
+            return "Listeners must join this iPhone’s hotspot."
+        case .unnamed(true):
+            return "Location access is off, so the network name can’t be read."
+        case .unnamed(false):
+            return "The network name can’t be read."
+        case .noNetwork:
+            return "Join a Wi-Fi network, or turn on Personal Hotspot."
+        case .checking, .ssid:
+            return nil
+        }
+    }
+
+    private var wifiCard: some View {
+        VStack(spacing: 14) {
+            if model.wifiPrompt == .checking {
+                ProgressView()
+                    .tint(.white)
+            }
+            Text(wifiTitle)
+                .font(.title3.weight(.bold))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+            if let wifiDetail {
+                Text(wifiDetail)
+                    .font(.footnote)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white.opacity(0.72))
+            }
+            if wifiCanContinue {
+                Button("Continue") { model.confirmWifi() }
+                    .buttonStyle(GateButtonStyle(fill: .roomTeal, ink: .roomNavy))
+                Button("Change Wi-Fi") { openAppSettings() }
+                    .buttonStyle(GateButtonStyle(fill: Color.white.opacity(0.12), ink: .white))
+            }
+            if case .unnamed(true) = model.wifiPrompt {
+                Button("Open Settings") { openAppSettings() }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.roomTeal)
+            }
+            Button {
+                model.recheckWifi()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.roomTeal)
+            .accessibilityLabel("Refresh Wi-Fi")
+            .disabled(model.wifiPrompt == .checking)
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var wifiCanContinue: Bool {
@@ -431,47 +501,13 @@ struct BroadcastView: View {
         }
     }
 
-    private var wifiCard: some View {
-        VStack(spacing: 12) {
-            if model.wifiPrompt == .checking {
-                ProgressView()
-                    .tint(.white)
-            }
-            Text(wifiMessage)
-                .font(.body.weight(.semibold))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-            if wifiCanContinue {
-                Button("Continue") { model.confirmWifi() }
-                    .buttonStyle(GateButtonStyle(fill: .roomTeal, ink: .roomNavy))
-            }
-            if case .noNetwork = model.wifiPrompt {
-                Button("Check again") { model.recheckWifi() }
-                    .buttonStyle(GateButtonStyle(fill: .roomTeal, ink: .roomNavy))
-            } else if model.wifiPrompt != .checking {
-                Button("Check again") { model.recheckWifi() }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.roomTeal)
-            }
-            if case .unnamed(true) = model.wifiPrompt {
-                Button("Open Settings") { openAppSettings() }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.roomTeal)
-            }
-        }
-        .padding(16)
-        .background(Color.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
     private var soundLine: String {
         if model.muted { return "Sound Muted" }
-        guard model.isOnAir, !model.profileText.isEmpty else { return "Sound Source" }
-        if model.hardwareLabel.isEmpty {
-            return "Sound · \(model.profileText)"
-        }
-        return "Sound · \(model.profileText) · \(model.hardwareLabel)"
+        guard model.isOnAir else { return "Sound Source" }
+        let quality = model.musicActive ? "Music quality" : "Voice"
+        let width = model.hardwareChannels >= 2 ? "Stereo" : "Mono"
+        let device = model.hardwareLabel.localizedCaseInsensitiveContains("iPhone") ? "Mic" : "USB"
+        return "\(quality) · \(width) · \(device)"
     }
 
     private var wifiChangedOverlay: some View {
@@ -490,17 +526,7 @@ struct BroadcastView: View {
                         .font(.title3.weight(.semibold))
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.white.opacity(0.9))
-                    if let image = model.qrImage {
-                        Image(uiImage: image)
-                            .interpolation(.none)
-                            .resizable()
-                            .scaledToFit()
-                            .padding(8)
-                            .background(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .frame(maxWidth: 220)
-                            .accessibilityLabel("New QR code for the listener page")
-                    }
+                    qrCard(prominent: true)
                     Text(model.url)
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.white)
@@ -584,22 +610,46 @@ private struct GateButtonStyle: ButtonStyle {
 private struct SetupSheet: View {
     @ObservedObject var model: BroadcastModel
     @Environment(\.dismiss) private var dismiss
-    @State private var draft = ""
-    @State private var backgroundMode = MusicBackdropPreference.stored
+    @State private var draft: String
+    @State private var backgroundMode: MusicBackdropPreference
+
+    init(model: BroadcastModel) {
+        self.model = model
+        _draft = State(initialValue: model.sessionName)
+        _backgroundMode = State(initialValue: .stored)
+        let teal = UIColor(red: 47 / 255, green: 208 / 255, blue: 189 / 255, alpha: 1)
+        let navy = UIColor(red: 22 / 255, green: 26 / 255, blue: 66 / 255, alpha: 1)
+        UISegmentedControl.appearance().selectedSegmentTintColor = teal
+        UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: navy], for: .selected)
+        UISegmentedControl.appearance().setTitleTextAttributes(
+            [.foregroundColor: UIColor.white.withAlphaComponent(0.85)],
+            for: .normal
+        )
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Current sound source: \(model.soundSourceName) - Plug in external mic or USB sound card now")
+                    Text(model.soundSourceName)
+                        .font(.body)
+                    Text("Plug in external mic or USB sound card now")
                         .font(.subheadline)
-                    TextField("Session name", text: $draft)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Sound source")
+                }
+                Section {
+                    TextField("Broadcast title", text: $draft)
+                        .textFieldStyle(.roundedBorder)
                         .textInputAutocapitalization(.words)
                         .onChange(of: draft) { _, value in
                             if value.count > SessionName.limit {
                                 draft = String(value.prefix(SessionName.limit))
                             }
                         }
+                } header: {
+                    Text("Broadcast title")
                 } footer: {
                     Text("Listeners see this name as the title on the join page. A change while you are live is used the next time the broadcast starts.")
                 }
@@ -610,6 +660,7 @@ private struct SetupSheet: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    .tint(Color.roomTeal)
                     .onChange(of: backgroundMode) { _, mode in
                         mode.save()
                     }

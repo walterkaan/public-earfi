@@ -22,7 +22,6 @@ func TestListenerPageMatchesMacContract(t *testing.T) {
 		"MediaMTXWebRTCReader",
 		`readyState==="ended"`,
 		"Room &lt;Cast&gt; &amp; &#34;live&#34;",
-		"from Walt&#39;s &lt;Phone&gt;",
 		"LIVE",
 		"id=\"toggle\"",
 		"id=\"wave\"",
