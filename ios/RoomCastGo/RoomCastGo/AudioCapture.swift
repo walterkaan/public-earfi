@@ -52,7 +52,6 @@ final class AudioCapture {
     private var wide = [Float](repeating: 0, count: OpusEncoderBox.frameSamples * 2)
     private var routeMonitor: NSObjectProtocol?
     private var applying = false
-    private var smoothed: Float = 0
     private var lastLevelAt = Date.distantPast
     private var running = false
     private var observers: [NSObjectProtocol] = []
@@ -113,9 +112,9 @@ final class AudioCapture {
         }
     }
 
-    /// Gain is applied before the encoder. The meter reads the input before
-    /// gain, mute, and stereo widen, then the encoder sends silence while muted
-    /// so the WebRTC session stays up.
+    /// Gain is applied before the encoder and the meter, so the bar follows
+    /// what listeners hear, including Volume boost. Mute still measures that
+    /// signal, then encodes silence so the WebRTC session stays up.
     ///
     /// At 1× and below, the built-in mic keeps Apple's voice-processing AGC
     /// (the sensitive, clean sound). Above 1× that AGC is switched off,
@@ -203,7 +202,6 @@ final class AudioCapture {
         targetFormat = nil
         encoder = nil
         pending.removeAll(keepingCapacity: true)
-        smoothed = 0
     }
 
     private func configureSession() throws {
@@ -485,11 +483,10 @@ final class AudioCapture {
             levelerGain = 1
         }
 
-        var rawSum: Float = 0
+        var heardSum: Float = 0
         var hot = 0
         for index in 0..<sampleCount {
             let sample = frame[index]
-            rawSum += sample * sample
             if abs(sample) >= 0.98 { hot += 1 }
             let driven = sample * gain
             let heard: Float
@@ -502,26 +499,26 @@ final class AudioCapture {
             } else {
                 heard = min(1, max(-1, driven))
             }
+            heardSum += heard * heard
             frame[index] = sendSilence ? 0 : heard
         }
-        // Raw input, not the gained, muted, or widened samples listeners hear.
-        let rms = sqrt(rawSum / Float(max(sampleCount, 1)))
+        // Same 0...1 the background reads: −60 dBFS is 0, full scale is 1,
+        // after Volume boost. Speech near the mic lands around 0.4–0.7.
+        let rms = sqrt(heardSum / Float(max(sampleCount, 1)))
         let db = 20 * log10(max(rms, 1e-8))
-        let level = min(1, max(0, (db + 50) / 50))
-        smoothed = smoothed * 0.65 + level * 0.35
+        let level = min(1, max(0, (db + 60) / 60))
         let now = Date()
         if hot >= 3 || (!leveler && gain <= 1 && hot >= 1 && hot >= sampleCount / 200) {
             clipUntil = now.addingTimeInterval(1.0)
         }
-        if now.timeIntervalSince(lastLevelAt) > 0.08 {
+        if now.timeIntervalSince(lastLevelAt) >= 0.04 {
             lastLevelAt = now
-            let shown = smoothed
+            let shown = level
             let clipping = now < clipUntil
             let clipChanged = clipping != clipShown
             if clipChanged { clipShown = clipping }
-            // A Swift Task created on this audio thread does not reliably
-            // reach the main actor, so the bar stayed at 0 while packets
-            // still went out. The main queue is the same hop the profile uses.
+            // Stay off Swift tasks here. The audio thread posts to the main
+            // queue; the model smooths there at this ~25 Hz rate.
             DispatchQueue.main.async { [weak self] in
                 self?.onLevel?(shown)
                 if clipChanged { self?.onClip?(clipping) }

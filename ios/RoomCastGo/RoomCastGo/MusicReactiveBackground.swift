@@ -69,9 +69,9 @@ struct MusicReactiveBackground: View {
         }
     }
 
-    /// The meter is already 0 at about −50 dB and 1 at 0 dB. A curve lifts
-    /// ordinary speech, which often sits around 0.3–0.6, so the field moves
-    /// with the sound instead of staying near the navy floor.
+    /// The meter is 0 at about −60 dB and 1 at 0 dB, after Volume boost.
+    /// A curve lifts ordinary speech so the field moves with the sound
+    /// instead of staying near the navy floor.
     private var drivenLevel: Float {
         let clamped = min(1, max(0, level))
         return pow(clamped, 0.55)

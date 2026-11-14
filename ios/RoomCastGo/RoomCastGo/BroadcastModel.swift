@@ -136,12 +136,13 @@ final class BroadcastModel: ObservableObject {
     private var announcedNetwork: String?
     private var liveSSIDIP = ""
     private var liveSSIDAt = Date.distantPast
-    private let heardThreshold: Float = 0.12
-    private let heardHold: TimeInterval = 0.5
-    private var heardUntil = Date.distantPast
-    /// Below this the bar is only a sliver (about −48 dB). Held before "No sound".
-    private let silentThreshold: Float = 0.04
-    private let silentAfter: TimeInterval = 2
+    /// −60 dBFS is 0 and 0 dBFS is 1, same scale as `level`. −55 dBFS is the quiet line.
+    private let audibleLevel: Float = 5.0 / 60.0
+    private let silentAfter: TimeInterval = 3
+    private let attackSeconds: Float = 0.045
+    private let releaseSeconds: Float = 0.28
+    private var displayedLevel: Float = 0
+    private var lastLevelNote = Date.distantPast
     private var quietSince: Date?
 
     private enum WifiChoice: Equatable {
@@ -245,30 +246,44 @@ final class BroadcastModel: ObservableObject {
     }
 
     func noteLevel(_ value: Float) {
-        level = value
         let now = Date()
+        let aim = min(1, max(0, value))
+        let dt = Float(min(0.1, max(0, now.timeIntervalSince(lastLevelNote))))
+        lastLevelNote = now
+        let tau = aim >= displayedLevel ? attackSeconds : releaseSeconds
+        let follow = dt <= 0 ? Float(1) : (1 - exp(-dt / tau))
+        displayedLevel += (aim - displayedLevel) * follow
+        level = displayedLevel
+        let sounding = aim >= audibleLevel
         guard isOnAir, !muted else {
             if inputHeard { inputHeard = false }
             quietSince = nil
             if inputSilent { inputSilent = false }
             return
         }
-        if value >= heardThreshold {
-            heardUntil = now.addingTimeInterval(heardHold)
+        if sounding {
             if !inputHeard { inputHeard = true }
-        } else if inputHeard, now >= heardUntil {
-            inputHeard = false
-        }
-        if value >= silentThreshold {
             quietSince = nil
             if inputSilent { inputSilent = false }
-        } else if let quietSince {
-            if !inputSilent, now.timeIntervalSince(quietSince) >= silentAfter {
-                inputSilent = true
-            }
         } else {
-            quietSince = now
+            if inputHeard { inputHeard = false }
+            if let quietSince {
+                if !inputSilent, now.timeIntervalSince(quietSince) >= silentAfter {
+                    inputSilent = true
+                }
+            } else {
+                quietSince = now
+            }
         }
+    }
+
+    private func resetMeter() {
+        level = 0
+        displayedLevel = 0
+        lastLevelNote = .distantPast
+        quietSince = nil
+        inputSilent = false
+        inputHeard = false
     }
 
     func setMuted(_ value: Bool) {
@@ -423,7 +438,7 @@ final class BroadcastModel: ObservableObject {
         startedAt = started
         phase = .live
         failed = false
-        level = 0
+        resetMeter()
         listeners = 0
         cpuSampler.reset()
         sampleStats()
@@ -470,7 +485,7 @@ final class BroadcastModel: ObservableObject {
             Task { @MainActor in
                 guard let self, self.isOnAir else { return }
                 if interrupted {
-                    self.level = 0
+                    self.resetMeter()
                     self.failed = false
                     self.status = "Interrupted. It resumes when the call ends."
                 } else {
@@ -565,10 +580,7 @@ final class BroadcastModel: ObservableObject {
         await gate.stop()
         guard phase == .stopping else { return }
         phase = .idle
-        level = 0
-        inputHeard = false
-        inputSilent = false
-        quietSince = nil
+        resetMeter()
         listeners = 0
         cpuPercent = 0
         startedNetworkIP = nil

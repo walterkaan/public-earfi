@@ -403,20 +403,20 @@ struct BroadcastView: View {
                     .lineLimit(1)
             }
             HStack(spacing: 8) {
-                Capsule()
-                    .fill(Color.white.opacity(0.18))
-                    .frame(height: 10)
-                    .frame(maxWidth: .infinity)
-                    .overlay(alignment: .leading) {
-                        GeometryReader { geo in
-                            Capsule()
-                                .fill(model.muted ? Color.roomPink : (model.clipping ? Color.red : Color.roomTeal))
-                                .frame(width: max(0, geo.size.width * CGFloat(min(1, model.level))))
-                        }
+                GeometryReader { geo in
+                    let fraction = CGFloat(min(1, max(0, model.level)))
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.18))
+                        Capsule()
+                            .fill(model.muted ? Color.roomPink : (model.clipping ? Color.red : Color.roomTeal))
+                            .frame(width: geo.size.width * fraction)
                     }
-                    .clipShape(Capsule())
-                    .accessibilityLabel("Level")
-                    .accessibilityValue("\(Int(model.level * 100)) percent")
+                    .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 10)
+                .accessibilityLabel("Level")
+                .accessibilityValue("\(Int(min(1, max(0, model.level)) * 100)) percent")
                 if model.inputSilent && !model.muted {
                     Text("No sound")
                         .font(.caption2.weight(.semibold))
