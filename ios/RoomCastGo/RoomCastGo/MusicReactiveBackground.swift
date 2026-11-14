@@ -33,7 +33,8 @@ struct MusicReactiveBackground: View {
                         to: timeline.date,
                         running: moving,
                         target: moving && live ? drivenLevel : 0,
-                        pace: pace(for: look)
+                        pace: pace(for: look),
+                        gentle: look == .gentle
                     )
                     Canvas { context, size in
                         BackdropField.paint(
@@ -98,7 +99,7 @@ struct MusicReactiveBackground: View {
         case .off, .idle:
             return 0.5
         case .gentle:
-            return 1.0 / 25.0
+            return 1.0 / 20.0
         case .rich:
             return 1.0 / 45.0
         }
@@ -112,7 +113,7 @@ struct MusicReactiveBackground: View {
         case .idle:
             return 0.16
         case .gentle:
-            return 1.63
+            return 1.15
         case .rich:
             return 2.28
         }
@@ -199,7 +200,7 @@ private final class BackdropMotion: ObservableObject {
     private var lastRunning = false
     private var cached: Sample?
 
-    func step(to date: Date, running: Bool, target: Float, pace: Double) -> Sample {
+    func step(to date: Date, running: Bool, target: Float, pace: Double, gentle: Bool) -> Sample {
         if lastDate == date, lastRunning == running, let cached {
             return cached
         }
@@ -216,19 +217,29 @@ private final class BackdropMotion: ObservableObject {
         lastRunning = running
         if running, elapsed > 0 {
             phase += elapsed * pace
-            let dt = Float(min(elapsed, 1.0 / 24.0))
             let aim = min(1, max(0, target))
             let previous = mid
-            // Halfway between the older symmetric follow and the snappier envelope.
-            low = follow(low, toward: aim, dt: dt, attack: 0.55, release: 1.20)
-            mid = follow(mid, toward: aim, dt: dt, attack: 0.20, release: 0.63)
-            let onset = max(0, aim - previous)
-            if onset > 0.02 {
-                high = min(1, max(high, onset * 2))
-                kick = min(1, max(kick, onset * 3))
+            if gentle {
+                // The first visible gentle field: a slow symmetric follow, no kick.
+                let dt = Float(min(elapsed, 1.0 / 20.0))
+                low += (aim - low) * response(dt, seconds: 0.90)
+                mid += (aim - mid) * response(dt, seconds: 0.36)
+                let attack = max(0, aim - previous)
+                high += (attack - high) * response(dt, seconds: 0.18)
+                kick = 0
+            } else {
+                let dt = Float(min(elapsed, 1.0 / 24.0))
+                // Halfway between the older symmetric follow and the snappier envelope.
+                low = follow(low, toward: aim, dt: dt, attack: 0.55, release: 1.20)
+                mid = follow(mid, toward: aim, dt: dt, attack: 0.20, release: 0.63)
+                let onset = max(0, aim - previous)
+                if onset > 0.02 {
+                    high = min(1, max(high, onset * 2))
+                    kick = min(1, max(kick, onset * 3))
+                }
+                high = follow(high, toward: 0, dt: dt, attack: 0.04, release: 0.33)
+                kick = follow(kick, toward: 0, dt: dt, attack: 0.02, release: 0.16)
             }
-            high = follow(high, toward: 0, dt: dt, attack: 0.04, release: 0.33)
-            kick = follow(kick, toward: 0, dt: dt, attack: 0.02, release: 0.16)
         } else if !running {
             low = 0
             mid = 0
@@ -303,16 +314,28 @@ private enum BackdropField {
 
         context.fill(Path(rect), with: .color(.roomNavy))
 
+        let gentle = look == .gentle
         context.drawLayer { (layer: inout GraphicsContext) in
-            // Sustained scale stays small. The peak is a short jolt, not a brighter hold.
-            let pulse: CGFloat = idle ? 1 : (1 + energy * (rich ? 0.105 : 0.078) + hit * (rich ? 0.11 : 0.07))
-            let nudge = idle ? 0 : hit * (rich ? 9 : 5)
+            // Gentle is the first visible field: a small scale pulse, no position jolt.
+            // Rich keeps the shorter sustained scale plus a transient nudge.
+            let pulse: CGFloat
+            let nudge: CGFloat
+            if idle {
+                pulse = 1
+                nudge = 0
+            } else if gentle {
+                pulse = 1 + energy * 0.12
+                nudge = 0
+            } else {
+                pulse = 1 + energy * 0.105 + hit * 0.11
+                nudge = hit * 9
+            }
             let cx = size.width / 2
             let cy = size.height / 2
             layer.translateBy(x: cx + nudge * CGFloat(sin(phase * 11)), y: cy + nudge * CGFloat(cos(phase * 8)))
             layer.scaleBy(x: pulse, y: pulse)
             layer.translateBy(x: -cx, y: -cy)
-            paintWash(&layer, size: size, phase: phase, energy: energy, rich: rich, idle: idle)
+            paintWash(&layer, size: size, phase: phase, energy: energy, gentle: gentle, idle: idle)
             let blobs = rich ? richBlobs : gentleBlobs
             for blob in blobs {
                 paintBlob(
@@ -325,6 +348,7 @@ private enum BackdropField {
                     high: high,
                     kick: hit,
                     rich: rich,
+                    gentle: gentle,
                     idle: idle
                 )
             }
@@ -344,7 +368,8 @@ private enum BackdropField {
         } else if rich {
             veil = max(0.06, 0.25 - Double(energy) * 0.19)
         } else {
-            veil = max(0.12, 0.37 - Double(energy) * 0.25)
+            // Thinner than the old 58% sheet, which hid gentle entirely.
+            veil = max(0.08, 0.28 - Double(energy) * 0.16)
         }
         context.fill(Path(rect), with: .color(Color.roomNavy.opacity(veil)))
         paintVignette(&context, size: size)
@@ -355,24 +380,39 @@ private enum BackdropField {
         size: CGSize,
         phase: Double,
         energy: CGFloat,
-        rich: Bool,
+        gentle: Bool,
         idle: Bool
     ) {
-        let turn = phase * (rich ? 0.60 : idle ? 0.08 : 0.39) * (idle ? 1 : (0.78 + Double(energy) * 0.8))
+        let turn: Double
+        let teal: Double
+        let plum: Double
+        if idle {
+            turn = phase * 0.08
+            teal = 0.09
+            plum = 0.07
+        } else if gentle {
+            turn = phase * 0.22
+            let lift = Double(energy) * 0.28
+            teal = 0.28 + lift
+            plum = 0.22 + lift * 0.7
+        } else {
+            turn = phase * 0.60 * (0.78 + Double(energy) * 0.8)
+            let lift = Double(energy) * 0.42
+            teal = 0.20 + lift
+            plum = 0.15 + lift * 0.725
+        }
         let reach = min(size.width, size.height) * 0.65
         let cx = size.width / 2
         let cy = size.height / 2
         let dx = CGFloat(cos(turn)) * reach
         let dy = CGFloat(sin(turn)) * reach
-        // Quiet starts darker. Loud reaches the same peak opacity as before, not past it.
-        let lift = idle ? 0 : Double(energy) * (rich ? 0.42 : 0.36)
         context.fill(
             Path(CGRect(origin: .zero, size: size)),
             with: .linearGradient(
                 Gradient(colors: [
-                    Color.roomTeal.opacity((idle ? 0.09 : 0.20) + lift),
+                    Color.roomTeal.opacity(teal),
                     Color.roomNavy.opacity(0.02),
-                    purple.opacity((idle ? 0.07 : 0.15) + lift * 0.725),
+                    purple.opacity(plum),
                 ]),
                 startPoint: CGPoint(x: cx + dx, y: cy + dy),
                 endPoint: CGPoint(x: cx - dx, y: cy - dy)
@@ -390,6 +430,7 @@ private enum BackdropField {
         high: Float,
         kick: CGFloat,
         rich: Bool,
+        gentle: Bool,
         idle: Bool
     ) {
         let band: Float
@@ -399,28 +440,41 @@ private enum BackdropField {
         default: band = mid
         }
         let amount = CGFloat(min(1, max(0, band)))
-        let drive = idle ? 0 : (0.2 + amount * 0.8)
-        let travel = idle ? 0.7 : (0.61 + drive * (rich ? 1.08 : 0.73))
-        let tempo = idle ? 0.72 : (rich ? (0.73 + Double(drive) * 1.21) : (0.66 + Double(drive) * 0.84))
-        let angle = phase * blob.speed * tempo + blob.phase
-        let jolt = idle ? 0 : kick * (rich ? 0.10 : 0.065)
-        var nx = blob.ax + blob.ox * travel * CGFloat(sin(angle)) + jolt * CGFloat(cos(angle * 2.4))
-        var ny = blob.ay + blob.oy * travel * CGFloat(cos(angle * 0.81)) + jolt * CGFloat(sin(angle * 1.7))
-        nx = min(0.94, max(0.06, nx))
-        ny = min(0.94, max(0.06, ny))
-        let swell = idle ? 1 : (1 + amount * (blob.band == 2 ? (rich ? 0.74 : 0.68) : (rich ? 0.59 : 0.45)) + kick * (blob.band == 2 ? (rich ? 0.53 : 0.36) : (rich ? 0.39 : 0.25)))
-        // Loud opacity stays at the previous peak. The quiet floor is halfway back up.
-        let alpha = idle ? blob.alpha * 0.55 : blob.alpha * (rich ? (0.60 + amount * 1.15) : (0.625 + amount * 0.975))
-        let swung = shifted(blob.color, phase: phase, energy: drive, rich: rich)
-        let center = CGPoint(x: nx * size.width, y: ny * size.height)
+        let center: CGPoint
+        let swell: CGFloat
+        let alpha: CGFloat
+        let color: Color
+        if gentle {
+            swell = 1 + amount * (blob.band == 2 ? 1.15 : 0.70)
+            alpha = blob.alpha * (0.85 + amount * 0.75)
+            color = blob.color
+            center = CGPoint(
+                x: (blob.ax + blob.ox * CGFloat(sin(phase * blob.speed + blob.phase))) * size.width,
+                y: (blob.ay + blob.oy * CGFloat(cos(phase * blob.speed * 0.81 + blob.phase))) * size.height
+            )
+        } else {
+            let drive = idle ? 0 : (0.2 + amount * 0.8)
+            let travel = idle ? 0.7 : (0.61 + drive * 1.08)
+            let tempo = idle ? 0.72 : (0.73 + Double(drive) * 1.21)
+            let angle = phase * blob.speed * tempo + blob.phase
+            let jolt = idle ? 0 : kick * 0.10
+            var nx = blob.ax + blob.ox * travel * CGFloat(sin(angle)) + jolt * CGFloat(cos(angle * 2.4))
+            var ny = blob.ay + blob.oy * travel * CGFloat(cos(angle * 0.81)) + jolt * CGFloat(sin(angle * 1.7))
+            nx = min(0.94, max(0.06, nx))
+            ny = min(0.94, max(0.06, ny))
+            swell = idle ? 1 : (1 + amount * (blob.band == 2 ? 0.74 : 0.59) + kick * (blob.band == 2 ? 0.53 : 0.39))
+            alpha = idle ? blob.alpha * 0.55 : blob.alpha * (0.60 + amount * 1.15)
+            color = shifted(blob.color, phase: phase, energy: drive, rich: rich)
+            center = CGPoint(x: nx * size.width, y: ny * size.height)
+        }
         let radius = blob.radius * max(size.width, size.height) * swell
         context.fill(
             Path(CGRect(origin: .zero, size: size)),
             with: .radialGradient(
                 Gradient(stops: [
-                    .init(color: swung.opacity(Double(alpha)), location: 0),
-                    .init(color: swung.opacity(Double(alpha) * 0.32), location: 0.45),
-                    .init(color: swung.opacity(0), location: 1),
+                    .init(color: color.opacity(Double(alpha)), location: 0),
+                    .init(color: color.opacity(Double(alpha) * 0.32), location: 0.45),
+                    .init(color: color.opacity(0), location: 1),
                 ]),
                 center: center,
                 startRadius: 0,

@@ -12,59 +12,69 @@ struct BroadcastView: View {
     @State private var showPaywall = false
 
     var body: some View {
-        ZStack {
-            MusicReactiveBackground(level: model.level, live: model.isOnAir)
-            VStack(spacing: 10) {
-                Text("RoomCast Go")
-                    .font(.title.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 4)
-                mixRow
-                if model.isOnAir || model.wifiReady {
-                    startRow
-                    if !model.isOnAir, model.phase == .idle, !store.isPro {
-                        Button("Free sessions last 40 minutes. Upgrade") {
-                            showPaywall = true
+        VStack(spacing: 0) {
+            Text("RoomCast Go")
+                .font(.title.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 8)
+                .padding(.bottom, 6)
+                .padding(.horizontal, 20)
+            ScrollView {
+                VStack(spacing: 10) {
+                    mixRow
+                    if model.isOnAir || model.wifiReady {
+                        startRow
+                        if !model.isOnAir, model.phase == .idle, !store.isPro {
+                            Button("Free sessions last 40 minutes. Upgrade") {
+                                showPaywall = true
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.roomTeal)
                         }
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.roomTeal)
+                    } else {
+                        wifiCard
                     }
-                } else {
-                    wifiCard
-                }
-                if let detail = detailText {
-                    Text(detail)
-                        .font(.footnote.weight(.medium))
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(model.failed ? Color.roomPink : Color.white.opacity(0.72))
-                        .frame(maxWidth: .infinity)
-                        .lineLimit(6)
-                }
-                if model.isOnAir {
-                    qrCard(prominent: false)
-                    Text(model.url)
-                        .font(.system(.caption2, design: .monospaced))
-                        .textSelection(.enabled)
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                    shareButton
-                    listenerBlock
-                    meter
-                }
-                Spacer(minLength: 8)
-                Text("Plug in for long events.")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.7))
-                if let reviewURL = AppStoreListing.writeReviewURL {
-                    Link("Rate RoomCast", destination: reviewURL)
+                    if let detail = detailText {
+                        Text(detail)
+                            .font(.footnote.weight(.medium))
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(model.failed ? Color.roomPink : Color.white.opacity(0.72))
+                            .frame(maxWidth: .infinity)
+                            .lineLimit(6)
+                    }
+                    if model.isOnAir {
+                        qrCard(prominent: false)
+                        Text(model.url)
+                            .font(.system(.caption2, design: .monospaced))
+                            .textSelection(.enabled)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                        shareButton
+                        listenerBlock
+                        meter
+                    }
+                    Text("Plug in for long events.")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(Color.roomTeal)
+                        .foregroundStyle(.white.opacity(0.7))
+                        .padding(.top, 8)
+                    if let reviewURL = AppStoreListing.writeReviewURL {
+                        Link("Rate RoomCast", destination: reviewURL)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Color.roomTeal)
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .background {
+            MusicReactiveBackground(level: model.level, live: model.isOnAir)
+                .ignoresSafeArea()
+        }
+        .overlay {
             if model.wifiDown {
                 wifiDroppedOverlay
             } else if model.networkChanged {
@@ -315,7 +325,8 @@ struct BroadcastView: View {
         if prominent {
             return min(380, width - 36)
         }
-        return min(300, width * 0.74)
+        // Two thirds of the previous fixed live-screen code, still a fixed square.
+        return min(300, width * 0.74) * 2 / 3
     }
 
     private var shareButton: some View {
@@ -385,25 +396,37 @@ struct BroadcastView: View {
                     .foregroundStyle(Color.red)
                     .lineLimit(1)
             }
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.12))
-                    Capsule()
-                        .fill(model.muted ? Color.roomPink : (model.clipping ? Color.red : Color.roomTeal))
-                        .frame(width: max(0, geo.size.width * CGFloat(model.level)))
+            HStack(spacing: 8) {
+                Capsule()
+                    .fill(Color.white.opacity(0.18))
+                    .frame(height: 10)
+                    .frame(maxWidth: .infinity)
+                    .overlay(alignment: .leading) {
+                        GeometryReader { geo in
+                            Capsule()
+                                .fill(model.muted ? Color.roomPink : (model.clipping ? Color.red : Color.roomTeal))
+                                .frame(width: max(0, geo.size.width * CGFloat(min(1, model.level))))
+                        }
+                    }
+                    .clipShape(Capsule())
+                    .accessibilityLabel("Level")
+                    .accessibilityValue("\(Int(model.level * 100)) percent")
+                if model.inputSilent && !model.muted {
+                    Text("No sound")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Color.roomAmber)
+                        .fixedSize()
                 }
             }
-            .frame(height: 10)
-            .accessibilityLabel("Level")
-            .accessibilityValue("\(Int(model.level * 100)) percent")
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func freeMinutes(since: Date) -> some View {
         TimelineView(.periodic(from: since, by: 30)) { context in
             let remaining = BroadcastLimits.freeSeconds - context.date.timeIntervalSince(since)
             let minutes = remaining <= 0 ? 0 : Int((remaining / 60).rounded(.up))
-            Text("Free \(minutes) minutes")
+            Text("Free · \(minutes) min remaining")
                 .font(.caption.weight(.semibold).monospacedDigit())
                 .foregroundStyle(minutes <= 5 ? Color.roomAmber : Color.roomTeal)
         }
@@ -641,7 +664,6 @@ private struct SetupSheet: View {
                 }
                 Section {
                     TextField("Broadcast title", text: $draft)
-                        .textFieldStyle(.roundedBorder)
                         .textInputAutocapitalization(.words)
                         .onChange(of: draft) { _, value in
                             if value.count > SessionName.limit {
@@ -672,6 +694,8 @@ private struct SetupSheet: View {
             }
             .navigationTitle("Setup")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.roomNavy, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

@@ -113,8 +113,9 @@ final class AudioCapture {
         }
     }
 
-    /// Gain is applied before the meter and the encoder. Mute still measures
-    /// the mic, then encodes silence so the WebRTC session stays up.
+    /// Gain is applied before the encoder. The meter reads the input before
+    /// gain, mute, and stereo widen, then the encoder sends silence while muted
+    /// so the WebRTC session stays up.
     ///
     /// At 1× and below, the built-in mic keeps Apple's voice-processing AGC
     /// (the sensitive, clean sound). Above 1× that AGC is switched off,
@@ -484,14 +485,16 @@ final class AudioCapture {
             levelerGain = 1
         }
 
-        var sum: Float = 0
+        var rawSum: Float = 0
         var hot = 0
         for index in 0..<sampleCount {
-            if abs(frame[index]) >= 0.98 { hot += 1 }
-            let driven = frame[index] * gain
+            let sample = frame[index]
+            rawSum += sample * sample
+            if abs(sample) >= 0.98 { hot += 1 }
+            let driven = sample * gain
             let heard: Float
             if leveler {
-                heard = softClip(frame[index] * levelerGain)
+                heard = softClip(sample * levelerGain)
             } else if music && gain > 1 {
                 heard = softClip(driven)
             } else if !music && gain > 1 {
@@ -499,10 +502,10 @@ final class AudioCapture {
             } else {
                 heard = min(1, max(-1, driven))
             }
-            sum += heard * heard
             frame[index] = sendSilence ? 0 : heard
         }
-        let rms = sqrt(sum / Float(sampleCount))
+        // Raw input, not the gained, muted, or widened samples listeners hear.
+        let rms = sqrt(rawSum / Float(max(sampleCount, 1)))
         let db = 20 * log10(max(rms, 1e-8))
         let level = min(1, max(0, (db + 50) / 50))
         smoothed = smoothed * 0.65 + level * 0.35
@@ -513,11 +516,15 @@ final class AudioCapture {
         if now.timeIntervalSince(lastLevelAt) > 0.08 {
             lastLevelAt = now
             let shown = smoothed
-            onLevel?(shown)
             let clipping = now < clipUntil
-            if clipping != clipShown {
-                clipShown = clipping
-                onClip?(clipping)
+            let clipChanged = clipping != clipShown
+            if clipChanged { clipShown = clipping }
+            // A Swift Task created on this audio thread does not reliably
+            // reach the main actor, so the bar stayed at 0 while packets
+            // still went out. The main queue is the same hop the profile uses.
+            DispatchQueue.main.async { [weak self] in
+                self?.onLevel?(shown)
+                if clipChanged { self?.onClip?(clipping) }
             }
         }
         guard let encoder else { return }

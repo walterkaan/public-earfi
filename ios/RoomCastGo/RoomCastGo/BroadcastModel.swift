@@ -39,6 +39,8 @@ final class BroadcastModel: ObservableObject {
     @Published var stereoWiden = UserDefaults.standard.object(forKey: "capture.stereoWiden") as? Bool ?? true
     /// Mic icon goes green while the meter is above a small threshold.
     @Published var inputHeard = false
+    /// Live, unmuted, and the input has stayed near silence for about two seconds.
+    @Published var inputSilent = false
     /// The stream's address changed. The server has moved; listeners need the new code.
     @Published var networkChanged = false
     @Published var qrImage: UIImage?
@@ -137,6 +139,10 @@ final class BroadcastModel: ObservableObject {
     private let heardThreshold: Float = 0.12
     private let heardHold: TimeInterval = 0.5
     private var heardUntil = Date.distantPast
+    /// Below this the bar is only a sliver (about −48 dB). Held before "No sound".
+    private let silentThreshold: Float = 0.04
+    private let silentAfter: TimeInterval = 2
+    private var quietSince: Date?
 
     private enum WifiChoice: Equatable {
         case ssid(String)
@@ -240,16 +246,28 @@ final class BroadcastModel: ObservableObject {
 
     func noteLevel(_ value: Float) {
         level = value
+        let now = Date()
         guard isOnAir, !muted else {
             if inputHeard { inputHeard = false }
+            quietSince = nil
+            if inputSilent { inputSilent = false }
             return
         }
-        let now = Date()
-        if !muted && value >= heardThreshold {
+        if value >= heardThreshold {
             heardUntil = now.addingTimeInterval(heardHold)
             if !inputHeard { inputHeard = true }
         } else if inputHeard, now >= heardUntil {
             inputHeard = false
+        }
+        if value >= silentThreshold {
+            quietSince = nil
+            if inputSilent { inputSilent = false }
+        } else if let quietSince {
+            if !inputSilent, now.timeIntervalSince(quietSince) >= silentAfter {
+                inputSilent = true
+            }
+        } else {
+            quietSince = now
         }
     }
 
@@ -549,6 +567,8 @@ final class BroadcastModel: ObservableObject {
         phase = .idle
         level = 0
         inputHeard = false
+        inputSilent = false
+        quietSince = nil
         listeners = 0
         cpuPercent = 0
         startedNetworkIP = nil
@@ -823,13 +843,13 @@ final class BroadcastModel: ObservableObject {
             return
         }
         if Self.isPersonalHotspot(ip: ip, iface: iface) {
-            networkNote = "Connect to this iPhone’s Personal Hotspot, then scan QR Code or type the url in your browser."
+            networkNote = "Connect to this iPhone’s Personal Hotspot, then scan QR Code or type the link in your browser."
             return
         }
         if let knownSSID, !knownSSID.isEmpty {
-            networkNote = "Connect to WiFi \(knownSSID), then scan QR Code or type the url in your browser."
+            networkNote = "Connect to \(knownSSID) Wi-Fi, then scan QR Code or type the link in your browser."
         } else {
-            networkNote = "Connect to the same Wi-Fi, then scan QR Code or type the url in your browser."
+            networkNote = "Connect to the same Wi-Fi, then scan QR Code or type the link in your browser."
         }
     }
 
