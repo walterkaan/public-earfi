@@ -395,7 +395,7 @@ struct BroadcastView: View {
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.white.opacity(0.55))
             if model.clipping && !model.muted {
-                Text("Too loud, turn the source down")
+                Text("Too loud, turn Input level down")
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(Color.red)
                     .lineLimit(1)
@@ -663,8 +663,28 @@ private struct SetupSheet: View {
                     Text("Plug in external mic or USB sound card now")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                    if model.inputGainSettable || model.usbInput {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Input level")
+                                Spacer()
+                                Text("\(Int((model.inputLevel * 100).rounded()))%")
+                                    .foregroundStyle(.secondary)
+                            }
+                            Slider(value: Binding(
+                                get: { model.inputLevel },
+                                set: { model.setInputLevel($0) }
+                            ), in: 0...1)
+                        }
+                    }
                 } header: {
                     Text("Sound source")
+                } footer: {
+                    if model.inputGainSettable {
+                        Text("Line inputs start at half gain so a hot signal is not clipped before Volume boost.")
+                    } else if model.usbInput {
+                        Text("This card has no hardware gain. Input level turns it down before Volume boost.")
+                    }
                 }
                 Section {
                     TextField("Broadcast title", text: $draft)

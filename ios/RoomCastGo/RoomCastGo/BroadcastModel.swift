@@ -46,6 +46,9 @@ final class BroadcastModel: ObservableObject {
     @Published var qrImage: UIImage?
     @Published var muted = false
     @Published var gain = 1.0
+    /// 1 is unity (0 dB). Line cards start here so Volume boost does not add gain.
+    @Published var inputLevel = UserDefaults.standard.object(forKey: "capture.inputLevel") as? Double ?? 0.5
+    @Published var inputGainSettable = false
     /// Remembered across launches. Applied only while a USB input is connected.
     @Published var musicPreferred = true // USB always uses Music quality
     @Published var usbInput = false
@@ -285,6 +288,13 @@ final class BroadcastModel: ObservableObject {
         inputHeard = false
     }
 
+    func setInputLevel(_ value: Double) {
+        let trimmed = min(1, max(0, value))
+        inputLevel = trimmed
+        UserDefaults.standard.set(trimmed, forKey: "capture.inputLevel")
+        capture.setInputLevel(Float(trimmed))
+    }
+
     func setMuted(_ value: Bool) {
         muted = value
         capture.setMix(gain: Float(gain), muted: muted)
@@ -401,6 +411,7 @@ final class BroadcastModel: ObservableObject {
         capture.setMusicPreferred(musicPreferred)
         let range = BroadcastGain.range(music: musicActive)
         gain = min(range.upperBound, max(range.lowerBound, gain))
+        capture.setInputLevel(Float(inputLevel))
         capture.setMix(gain: Float(gain), muted: muted)
         let address = ip
         let interfaceName = iface
@@ -508,6 +519,11 @@ final class BroadcastModel: ObservableObject {
                 self?.noteUSB(usb)
             }
         }
+        capture.onInputGain = { [weak self] settable in
+            Task { @MainActor in
+                self?.inputGainSettable = settable
+            }
+        }
         capture.onCaptureFailure = { [weak self] message in
             Task { @MainActor in
                 guard let self, self.isOnAir else { return }
@@ -554,10 +570,15 @@ final class BroadcastModel: ObservableObject {
     /// Capture already restarted when this arrives during a broadcast.
     /// Do not call `setMusicPreferred` again.
     private func noteUSB(_ usb: Bool) {
+        let becameLine = usb && !usbInput
         if usbInput != usb {
             usbInput = usb
         }
+        if becameLine, gain > 1 {
+            gain = 1
+        }
         clampGainToMode()
+        capture.setInputLevel(Float(inputLevel))
         capture.setMix(gain: Float(gain), muted: muted)
     }
 

@@ -17,16 +17,22 @@ final class AudioCapture {
     var onHardware: ((String, Int) -> Void)?
     var onInterrupted: ((Bool) -> Void)?
     var onUSB: ((Bool) -> Void)?
+    var onInputGain: ((Bool) -> Void)?
     var onProfile: ((String) -> Void)?
     var onCaptureFailure: ((String) -> Void)?
 
     static var routeIsUSB: Bool {
         let session = AVAudioSession.sharedInstance()
-        func isUSB(_ port: AVAudioSessionPortDescription) -> Bool {
-            port.portType == .usbAudio || port.portName.localizedCaseInsensitiveContains("usb")
-        }
-        if session.currentRoute.inputs.contains(where: isUSB) { return true }
-        return session.availableInputs?.contains(where: isUSB) ?? false
+        if let port = session.currentRoute.inputs.first, isLine(port) { return true }
+        return session.availableInputs?.contains(where: isLine) ?? false
+    }
+
+    /// Line-level USB and RCA cards, not the built-in mic. These must not
+    /// run through voice processing or a full-scale input gain.
+    static func isLine(_ port: AVAudioSessionPortDescription) -> Bool {
+        if port.portType == .usbAudio || port.portType == .lineIn { return true }
+        let name = port.portName.lowercased()
+        return name.contains("usb") || name.contains("rca") || name.contains("line in") || name.contains("line-in")
     }
 
     private let log = Logger(subsystem: "channel.roomcast.go", category: "audio")
@@ -53,6 +59,10 @@ final class AudioCapture {
     private var observers: [NSObjectProtocol] = []
     private let mixLock = NSLock()
     private var gain: Float = 1
+    /// Line trim applied before Volume boost when the hardware gain isn't settable.
+    private var inputTrim: Float = 0.5
+    private var hardwareGainSettable = false
+    private var clipHotSince: Date?
     private var sendSilence = false
     private var useLeveler = false
     private var musicMix = false
@@ -147,16 +157,27 @@ final class AudioCapture {
         }
     }
 
-    /// Gain is applied before the encoder and the meter, so the bar follows
-    /// what listeners hear, including Volume boost. Mute still measures that
-    /// signal, then encodes silence so the WebRTC session stays up.
-    ///
-    /// At 1× and below, the built-in mic keeps Apple's voice-processing AGC
-    /// (the sensitive, clean sound). Above 1× that AGC is switched off,
-    /// because it already holds speech near full scale and a later multiply
-    /// only hard-clips. A leveler then aims louder as the slider rises.
-    /// Music has no AGC: the slider is 0× to 2×, and above 1× the samples
-    /// are soft-clipped. Call this on the main thread.
+    /// Line level, 0...1. When the route can set `inputGain`, that is used.
+    /// Otherwise the value attenuates the samples before Volume boost.
+    func setInputLevel(_ value: Float) {
+        let trimmed = min(1, max(0, value))
+        audioQueue.async { [weak self] in
+            guard let self else { return }
+            let session = AVAudioSession.sharedInstance()
+            let settable = session.isInputGainSettable && Self.routeIsUSB
+            self.mixLock.lock()
+            self.inputTrim = trimmed
+            self.hardwareGainSettable = settable
+            self.mixLock.unlock()
+            if settable {
+                try? session.setInputGain(trimmed)
+            }
+            DispatchQueue.main.async { [weak self] in self?.onInputGain?(settable) }
+        }
+    }
+
+    /// Volume boost and mute. Line inputs are not levelled: unity is 0 dB.
+    /// Call from the main thread; the values are read on the tap thread.
     func setMix(gain: Float, muted: Bool) {
         let clamped: Float = musicActive ? min(2, max(0, gain)) : min(3, max(0.5, gain))
         let wantLeveler = !musicActive && voiceProcessing && clamped > 1.001
@@ -261,9 +282,13 @@ final class AudioCapture {
 
     private func configureSession() throws {
         let session = AVAudioSession.sharedInstance()
+        let line = Self.routeIsUSB
+        musicActive = musicPreferred && line
+        // Line cards clip if the voice processor or AGC is left on. Measurement
+        // mode leaves the samples alone. The built-in mic keeps .default.
         try session.setCategory(
             .playAndRecord,
-            mode: musicActive ? .measurement : .default,
+            mode: line ? .measurement : .default,
             options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
         )
         try session.setPreferredSampleRate(48_000)
@@ -277,9 +302,15 @@ final class AudioCapture {
         guard session.sampleRate > 0 else {
             throw CaptureError(message: "The microphone has no audio format yet. Plug it in and tap Start again.")
         }
-        if !musicActive, session.isInputGainSettable {
-            try? session.setInputGain(1)
+        let settable = session.isInputGainSettable
+        mixLock.lock()
+        hardwareGainSettable = settable && line
+        let trim = inputTrim
+        mixLock.unlock()
+        if line, settable {
+            try? session.setInputGain(trim)
         }
+        DispatchQueue.main.async { [weak self] in self?.onInputGain?(settable && line) }
     }
 
     private func installTap() throws {
@@ -299,29 +330,22 @@ final class AudioCapture {
             try? engine.outputNode.setVoiceProcessingEnabled(false)
             voiceProcessing = false
             hardwareLeveler = false
-            // iOS opens USB inputs as mono unless asked; ask for stereo when the device has it.
             if musicActive, session.maximumInputNumberOfChannels >= 2 {
                 try? session.setPreferredInputNumberOfChannels(2)
             }
             engine.prepare()
         }
 
-        // Always tap at the hardware rate. Asking for the engine's 48 kHz output
-        // format when the device is 44.1 kHz crashes installTap; resampling to
-        // 48 kHz happens in one persistent converter, not inside the tap.
+        // Tap the node's own format (int16, int32, float, interleaved or not).
+        // A later converter turns that into float32 at 48 kHz. Reinterpreting
+        // the bytes ourselves is what squares off a hot line input.
         let hardware = input.inputFormat(forBus: 0)
         guard hardware.sampleRate > 0, hardware.channelCount > 0 else {
             throw CaptureError(message: "The microphone has no audio format yet. Plug it in and tap Start again.")
         }
-        guard let tapFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: hardware.sampleRate,
-            channels: hardware.channelCount,
-            interleaved: false
-        ), tapFormat.sampleRate == hardware.sampleRate, tapFormat.channelCount > 0 else {
-            throw CaptureError(message: "The microphone has no audio format yet. Plug it in and tap Start again.")
-        }
-        let captureChannels: AVAudioChannelCount = (musicActive && tapFormat.channelCount >= 2) ? 2 : 1
+        logRouteFormat("tap")
+        let sourceChannels = hardware.channelCount
+        let captureChannels: AVAudioChannelCount = (musicActive && sourceChannels >= 2) ? 2 : 1
         channels = Int(captureChannels)
         let widen = musicActive && channels < 2 && stereoWiden
         encodeChannels = widen ? 2 : channels
@@ -333,22 +357,20 @@ final class AudioCapture {
         guard let target = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: 48_000,
-            channels: captureChannels,
+            channels: sourceChannels,
             interleaved: false
-        ), let converter = AVAudioConverter(from: tapFormat, to: target) else {
+        ), let converter = AVAudioConverter(from: hardware, to: target) else {
             throw CaptureError(message: "Could not convert the input to 48 kHz.")
         }
-        // Streaming: keep the resampler's filter state. Priming would eat
-        // the front of each buffer and click.
         converter.primeMethod = .none
         self.converter = converter
         self.targetFormat = target
-        pullScratch = AVAudioPCMBuffer(pcmFormat: tapFormat, frameCapacity: 16_384)
+        pullScratch = AVAudioPCMBuffer(pcmFormat: hardware, frameCapacity: 16_384)
         convertOut = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: 16_384)
         pending.removeAll(keepingCapacity: true)
         input.removeTap(onBus: 0)
-        let bufferSize = sliceFrames(format: tapFormat, session: session, unit: input.audioUnit)
-        input.installTap(onBus: 0, bufferSize: bufferSize, format: tapFormat) { [weak self] buffer, _ in
+        let bufferSize = sliceFrames(format: hardware, session: session, unit: input.audioUnit)
+        input.installTap(onBus: 0, bufferSize: bufferSize, format: hardware) { [weak self] buffer, _ in
             self?.consume(buffer)
         }
         engine.prepare()
@@ -516,32 +538,65 @@ final class AudioCapture {
     /// The converter asks for a specific frame count. Give it only that many
     /// and keep the rest for the next pull, so a 44.1 kHz buffer is not truncated.
     private func copyIntoScratch(_ buffer: AVAudioPCMBuffer, offset: AVAudioFrameCount, count: AVAudioFrameCount) -> Bool {
-        guard count > 0, let src = buffer.floatChannelData else { return false }
-        if pullScratch == nil || (pullScratch?.frameCapacity ?? 0) < count {
+        guard count > 0 else { return false }
+        if pullScratch == nil || (pullScratch?.frameCapacity ?? 0) < count || pullScratch?.format != buffer.format {
             pullScratch = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: max(count, 16_384))
         }
-        guard let scratch = pullScratch, let dst = scratch.floatChannelData else { return false }
-        let channelCount = min(Int(buffer.format.channelCount), Int(scratch.format.channelCount))
-        let samples = Int(count)
-        let start = Int(offset)
-        guard channelCount > 0, samples > 0 else { return false }
-        for channel in 0..<channelCount {
-            dst[channel].update(from: (src[channel] + start), count: samples)
+        guard let scratch = pullScratch else { return false }
+        if buffer.format.commonFormat == .pcmFormatFloat32, !buffer.format.isInterleaved,
+           let src = buffer.floatChannelData, let dst = scratch.floatChannelData {
+            let channelCount = min(Int(buffer.format.channelCount), Int(scratch.format.channelCount))
+            let samples = Int(count)
+            let start = Int(offset)
+            guard channelCount > 0, samples > 0 else { return false }
+            for channel in 0..<channelCount {
+                dst[channel].update(from: src[channel] + start, count: samples)
+            }
+            scratch.frameLength = count
+            return true
+        }
+        let srcList = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
+        let dstList = UnsafeMutableAudioBufferListPointer(scratch.mutableAudioBufferList)
+        guard !srcList.isEmpty, srcList.count == dstList.count else { return false }
+        let asbd = buffer.format.streamDescription.pointee
+        if buffer.format.isInterleaved {
+            let bytesPerFrame = Int(asbd.mBytesPerFrame)
+            guard bytesPerFrame > 0, let srcData = srcList[0].mData, let dstData = dstList[0].mData else { return false }
+            memcpy(dstData, srcData.advanced(by: Int(offset) * bytesPerFrame), Int(count) * bytesPerFrame)
+        } else {
+            let bytesPerSample = max(1, Int(asbd.mBitsPerChannel / 8))
+            for index in 0..<srcList.count {
+                guard let srcData = srcList[index].mData, let dstData = dstList[index].mData else { return false }
+                memcpy(dstData, srcData.advanced(by: Int(offset) * bytesPerSample), Int(count) * bytesPerSample)
+            }
         }
         scratch.frameLength = count
         return true
     }
 
     private func appendConverted(_ output: AVAudioPCMBuffer) {
-        guard let channel = output.floatChannelData else { return }
+        guard let src = output.floatChannelData else { return }
         let count = Int(output.frameLength)
-        guard count > 0 else { return }
+        let srcCh = Int(output.format.channelCount)
+        guard count > 0, srcCh > 0 else { return }
         let frameCount = OpusEncoderBox.frameSamples
-        if channels >= 2, output.format.channelCount >= 2 {
-            let right = channel[1]
+        if channels >= 2 {
+            let leftCount = max(1, (srcCh + 1) / 2)
+            let rightCount = max(1, srcCh / 2)
             for index in 0..<count {
-                pending.append(channel[0][index])
-                pending.append(right[index])
+                var left: Float = 0
+                var right: Float = 0
+                if srcCh == 1 {
+                    left = src[0][index]
+                    right = left
+                } else {
+                    for channel in 0..<leftCount { left += src[channel][index] }
+                    left /= Float(leftCount)
+                    for channel in leftCount..<srcCh { right += src[channel][index] }
+                    right /= Float(max(1, rightCount))
+                }
+                pending.append(left)
+                pending.append(right)
             }
             if pending.count > 96_000 {
                 let overflow = pending.count - 96_000
@@ -557,7 +612,12 @@ final class AudioCapture {
                 publish(sampleCount: pair)
             }
         } else {
-            pending.append(contentsOf: UnsafeBufferPointer(start: channel[0], count: count))
+            let scale = 1 / Float(srcCh)
+            for index in 0..<count {
+                var sum: Float = 0
+                for channel in 0..<srcCh { sum += src[channel][index] }
+                pending.append(sum * scale)
+            }
             if pending.count > 48_000 {
                 let overflow = pending.count - 48_000
                 pending.removeFirst(overflow)
@@ -579,6 +639,7 @@ final class AudioCapture {
         let sendSilence = self.sendSilence
         let leveler = self.useLeveler && sampleCount == OpusEncoderBox.frameSamples
         let music = self.musicMix
+        let trim: Float = (music && !hardwareGainSettable) ? inputTrim : 1
         mixLock.unlock()
 
         if leveler {
@@ -588,9 +649,6 @@ final class AudioCapture {
                 energy += sample * sample
             }
             let rms = sqrt(energy / Float(sampleCount))
-            // 1.5× aims a little hotter than a normal voice-processed
-            // level. 3× aims clearly louder. The cap stops a quiet room
-            // from being amplified without limit.
             let target = min(0.34, 0.11 * gain)
             let wanted = min(28, target / max(rms, 0.004))
             if levelerWasOn {
@@ -608,29 +666,23 @@ final class AudioCapture {
         var hot = 0
         for index in 0..<sampleCount {
             let sample = frame[index]
-            if abs(sample) >= 0.98 { hot += 1 }
-            let driven = sample * gain
-            let heard: Float
-            if leveler {
-                heard = softClip(sample * levelerGain)
-            } else if music && gain > 1 {
-                heard = softClip(driven)
-            } else if !music && gain > 1 {
-                heard = softClip(driven)
-            } else {
-                heard = min(1, max(-1, driven))
-            }
+            if abs(sample) >= 0.99 { hot += 1 }
+            let driven = sample * trim * (leveler ? levelerGain : gain)
+            let heard = Self.limit(driven)
             heardSum += heard * heard
             frame[index] = sendSilence ? 0 : heard
         }
-        // Same 0...1 the background reads: −60 dBFS is 0, full scale is 1,
-        // after Volume boost. Speech near the mic lands around 0.4–0.7.
         let rms = sqrt(heardSum / Float(max(sampleCount, 1)))
         let db = 20 * log10(max(rms, 1e-8))
         let level = min(1, max(0, (db + 60) / 60))
         let now = Date()
-        if hot >= 3 || (!leveler && gain <= 1 && hot >= 1 && hot >= sampleCount / 200) {
-            clipUntil = now.addingTimeInterval(1.0)
+        if hot > 0 {
+            if clipHotSince == nil { clipHotSince = now }
+            if let clipHotSince, now.timeIntervalSince(clipHotSince) > 0.5 {
+                clipUntil = now.addingTimeInterval(0.5)
+            }
+        } else {
+            clipHotSince = nil
         }
         if now.timeIntervalSince(lastLevelAt) >= 0.04 {
             lastLevelAt = now
@@ -638,8 +690,6 @@ final class AudioCapture {
             let clipping = now < clipUntil
             let clipChanged = clipping != clipShown
             if clipChanged { clipShown = clipping }
-            // Stay off Swift tasks here. The audio thread posts to the main
-            // queue; the model smooths there at this ~25 Hz rate.
             DispatchQueue.main.async { [weak self] in
                 self?.onLevel?(shown)
                 if clipChanged { self?.onClip?(clipping) }
@@ -649,6 +699,9 @@ final class AudioCapture {
         let packet: Data?
         if encodeChannels >= 2 && channels < 2 && !sendSilence {
             widener.expand(frame, count: sampleCount, into: &wide)
+            for index in 0..<(sampleCount * 2) {
+                wide[index] = Self.limit(wide[index])
+            }
             packet = wide.withUnsafeBufferPointer { buffer -> Data? in
                 guard let base = buffer.baseAddress else { return nil }
                 return encoder.encode(base)
@@ -668,6 +721,17 @@ final class AudioCapture {
         guard let packet else { return }
         framesQueued += OpusEncoderBox.frameSamples
         handoff(packet)
+    }
+
+    /// Soft ceiling just under full scale. Linear below −1 dB so a normal
+    /// line level is not coloured, and a hot sample cannot square off.
+    private static func limit(_ sample: Float) -> Float {
+        let capped = min(8, max(-8, sample))
+        let magnitude = abs(capped)
+        if magnitude <= 0.89 { return capped }
+        let sign: Float = capped < 0 ? -1 : 1
+        let extra = 0.09 * (1 - exp(-(magnitude - 0.89) * 8))
+        return sign * (0.89 + extra)
     }
 
     /// Send each 20 ms packet as soon as it is encoded. A timer that emits one
@@ -819,6 +883,7 @@ final class AudioCapture {
             if self.suppressRoute { return }
             self.applyPreferredInput()
             self.reportInput()
+            self.logRouteFormat("change \(reason.rawValue)")
             guard self.running else { return }
             switch reason {
             case .newDeviceAvailable, .oldDeviceUnavailable, .override:
@@ -929,11 +994,6 @@ final class AudioCapture {
         setMix(gain: gain, muted: muted)
     }
 
-    private func softClip(_ sample: Float) -> Float {
-        let drive: Float = 1.2
-        return tanhf(sample * drive) / tanhf(drive)
-    }
-
     private func ensureCategory() {
         let session = AVAudioSession.sharedInstance()
         if session.category != .playAndRecord {
@@ -972,6 +1032,25 @@ final class AudioCapture {
         onInput?(name)
         onHardware?(label, count)
         onUSB?(Self.routeIsUSB)
+        let line = Self.routeIsUSB && session.isInputGainSettable
+        DispatchQueue.main.async { [weak self] in self?.onInputGain?(line) }
+    }
+
+    /// One line Walter can paste after plugging a card in.
+    private func logRouteFormat(_ reason: String) {
+        let session = AVAudioSession.sharedInstance()
+        let port = session.currentRoute.inputs.first
+        let format = engine.inputNode.inputFormat(forBus: 0)
+        let bits = format.streamDescription.pointee.mBitsPerChannel
+        let kind: String
+        switch format.commonFormat {
+        case .pcmFormatFloat32: kind = "float32"
+        case .pcmFormatFloat64: kind = "float64"
+        case .pcmFormatInt16: kind = "int16"
+        case .pcmFormatInt32: kind = "int32"
+        default: kind = "other"
+        }
+        log.info("route \(reason, privacy: .public) port=\(port?.portType.rawValue ?? "-", privacy: .public) name=\(port?.portName ?? "-", privacy: .public) portCh=\(port?.channels?.count ?? 0) sessionRate=\(session.sampleRate, privacy: .public) hwRate=\(format.sampleRate, privacy: .public) format=\(kind, privacy: .public) interleaved=\(format.isInterleaved, privacy: .public) ch=\(format.channelCount, privacy: .public) bits=\(bits, privacy: .public) gainSettable=\(session.isInputGainSettable, privacy: .public)")
     }
 
     private static func bestInput(_ inputs: [AVAudioSessionPortDescription]?) -> AVAudioSessionPortDescription? {
