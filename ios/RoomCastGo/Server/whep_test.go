@@ -29,7 +29,7 @@ func TestPageAndWHEPContract(t *testing.T) {
 		t.Fatal("served reader.js does not match the vendored MediaMTX file")
 	}
 	title := getOK(t, client, base+"earfi.json")
-	if !strings.Contains(title, "RoomCast Broadcast") {
+	if !strings.Contains(title, "RoomCast Broadcast") || !strings.Contains(title, "Walt") || !strings.Contains(title, "1700000000") {
 		t.Fatalf("title json: %s", title)
 	}
 	res, err := client.Get(base + "live")
@@ -141,11 +141,11 @@ func TestDeleteDropsTheListener(t *testing.T) {
 }
 
 func TestSingletonStartStop(t *testing.T) {
-	if err := Start(0, 0, "127.0.0.1", "lo", "RoomCast Broadcast"); err != nil {
+	if err := Start(0, 0, "127.0.0.1", "lo", "RoomCast Broadcast", "Walt's iPhone", 1_700_000_000); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(Stop)
-	if err := Start(0, 0, "127.0.0.1", "lo", "RoomCast Broadcast"); err == nil {
+	if err := Start(0, 0, "127.0.0.1", "lo", "RoomCast Broadcast", "Walt's iPhone", 1_700_000_000); err == nil {
 		t.Fatal("second Start succeeded")
 	}
 	if ListenerCount() != 0 {
@@ -166,7 +166,7 @@ type listenerClient struct {
 
 func testServer(t *testing.T) *server {
 	t.Helper()
-	s, err := newServer(0, 0, "127.0.0.1", "lo", "RoomCast Broadcast")
+	s, err := newServer(0, 0, "127.0.0.1", "lo", "RoomCast Broadcast", "Walt's iPhone", 1_700_000_000)
 	if err != nil {
 		t.Fatal(err)
 	}

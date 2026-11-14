@@ -69,6 +69,8 @@
 		60A7223FB2DEFEFA7E3A1D97 /* decoder_set_fs.c in Sources */ = {isa = PBXBuildFile; fileRef = 9738DA1F6422E9600AB46596 /* decoder_set_fs.c */; };
 		63B8FB50215671EE003994C7 /* tables_NLSF_CB_NB_MB.c in Sources */ = {isa = PBXBuildFile; fileRef = A3173B85C0021B819429631D /* tables_NLSF_CB_NB_MB.c */; };
 		6465180DC61FF8DC912803F2 /* BroadcastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FE57E425FADCE8CEFE692B4 /* BroadcastView.swift */; };
+		B1F0A11CE002B1F0A11CE002 /* WifiAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F0A11CE001B1F0A11CE001 /* WifiAccess.swift */; };
+		B1F0A11CE004B1F0A11CE004 /* ProStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F0A11CE003B1F0A11CE003 /* ProStore.swift */; };
 		64891CB9C0EEBD72006DACAC /* residual_energy_FLP.c in Sources */ = {isa = PBXBuildFile; fileRef = 2A000133D94E6F09F80D20A4 /* residual_energy_FLP.c */; };
 		65AA3F7B6E2566F0DA8B214D /* encode_pulses.c in Sources */ = {isa = PBXBuildFile; fileRef = 21376369C093C38926D07C1A /* encode_pulses.c */; };
 		66F5571802CB66B896C2F191 /* tables_NLSF_CB_WB.c in Sources */ = {isa = PBXBuildFile; fileRef = BE6323F64DA3F78934998D75 /* tables_NLSF_CB_WB.c */; };
@@ -141,6 +143,7 @@
 		D599F8A8832D76898C8643C6 /* opus_multistream_encoder.c in Sources */ = {isa = PBXBuildFile; fileRef = 76B9A7975BDC1DCADDB13E33 /* opus_multistream_encoder.c */; };
 		D6F55ABEC884C5FA3A4F1807 /* LPC_fit.c in Sources */ = {isa = PBXBuildFile; fileRef = 450585DE684DB5C448BC6C05 /* LPC_fit.c */; };
 		D78F1F8DFF13204D7C08D3F0 /* LocalNetworkProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F8461D9EAB532A270611F67 /* LocalNetworkProbe.swift */; };
+		E7C0FFEEA11CE001BACC0002 /* MusicReactiveBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7C0FFEEA11CE001BACC0001 /* MusicReactiveBackground.swift */; };
 		D97095523BA472EBE80EFBF7 /* gain_quant.c in Sources */ = {isa = PBXBuildFile; fileRef = 9D82B8F7CF330AE71088EE42 /* gain_quant.c */; };
 		DC27EB9A847DE768D63129A4 /* entcode.c in Sources */ = {isa = PBXBuildFile; fileRef = 47CA2E6C027E76E7DA17F824 /* entcode.c */; };
 		DC2B6BB85AF1A940AB1AD79C /* LPC_analysis_filter.c in Sources */ = {isa = PBXBuildFile; fileRef = 5CCEEB35D95BA24BB82E8FAE /* LPC_analysis_filter.c */; };
@@ -215,6 +218,7 @@
 		1ADE7B311C550F4CC52BF603 /* stereo_LR_to_MS.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = stereo_LR_to_MS.c; sourceTree = "<group>"; };
 		1D8615915F22600A0993485F /* opus_multistream.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = opus_multistream.c; sourceTree = "<group>"; };
 		1F8461D9EAB532A270611F67 /* LocalNetworkProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalNetworkProbe.swift; sourceTree = "<group>"; };
+		E7C0FFEEA11CE001BACC0001 /* MusicReactiveBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicReactiveBackground.swift; sourceTree = "<group>"; };
 		1FB34920ACC1F48EBD9D5A4B /* sort.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sort.c; sourceTree = "<group>"; };
 		2046C313CCFA4D47D902E9CA /* encode_indices.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = encode_indices.c; sourceTree = "<group>"; };
 		20DE02381227425F9E662E33 /* mdct.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = mdct.c; sourceTree = "<group>"; };
@@ -265,6 +269,9 @@
 		6EDC3DF7A7F650DCBBA5ECD8 /* shell_coder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = shell_coder.c; sourceTree = "<group>"; };
 		6F59CE70C64387B57C1D76CE /* tables_pulses_per_block.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = tables_pulses_per_block.c; sourceTree = "<group>"; };
 		6FE57E425FADCE8CEFE692B4 /* BroadcastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastView.swift; sourceTree = "<group>"; };
+		B1F0A11CE001B1F0A11CE001 /* WifiAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WifiAccess.swift; sourceTree = "<group>"; };
+		B1F0A11CE003B1F0A11CE003 /* ProStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProStore.swift; sourceTree = "<group>"; };
+		B1F0A11CE005B1F0A11CE005 /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Products.storekit; sourceTree = "<group>"; };
 		718A4A7C6F8772241B2F9C50 /* LTP_analysis_filter_FLP.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = LTP_analysis_filter_FLP.c; sourceTree = "<group>"; };
 		72DD38F6F2CA234BDFA64DED /* mapping_matrix.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = mapping_matrix.c; sourceTree = "<group>"; };
 		7346CC16B1B660EC37BB5592 /* enc_API.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = enc_API.c; sourceTree = "<group>"; };
@@ -376,6 +383,7 @@
 		30EA19692570E293759BB724 = {
 			isa = PBXGroup;
 			children = (
+				B1F0A11CE005B1F0A11CE005 /* Products.storekit */,
 				E503DDCC3F30260B6C8D5BA3 /* RoomCastGo */,
 				5E662B5315B9FB174B367664 /* RoomCastGoWidget */,
 				EF354E92AAF73F66719279C5 /* Shared */,
@@ -613,13 +621,16 @@
 				15EB5EAFAC47C0ED26790BAD /* BroadcastPorts.swift */,
 				6FE57E425FADCE8CEFE692B4 /* BroadcastView.swift */,
 				957394814D12E7D9C9381E04 /* HostAddress.swift */,
+				B1F0A11CE003B1F0A11CE003 /* ProStore.swift */,
 				1F8461D9EAB532A270611F67 /* LocalNetworkProbe.swift */,
+				E7C0FFEEA11CE001BACC0001 /* MusicReactiveBackground.swift */,
 				2E03E76405E540CB5800DB8B /* OpusEncoder.swift */,
 				F1EF8C6D5F9FA02AEDD3B754 /* PrivacyInfo.xcprivacy */,
 				4FC1685867368C2B4855EDAE /* QRCodeImage.swift */,
 				EBF71B21E940D3B2C472B416 /* RoomCastGo-Bridging-Header.h */,
 				6E7E09AABDFCD07BB66C44ED /* RoomCastGoApp.swift */,
 				8D839C95D5F60647F16160BC /* ServerBridge.swift */,
+				B1F0A11CE001B1F0A11CE001 /* WifiAccess.swift */,
 			);
 			path = RoomCastGo;
 			sourceTree = "<group>";
@@ -777,6 +788,8 @@
 				C65579918674C9A46150199A /* BroadcastPorts.swift in Sources */,
 				37A9F16113A4224501869723 /* BroadcastShared.swift in Sources */,
 				6465180DC61FF8DC912803F2 /* BroadcastView.swift in Sources */,
+				B1F0A11CE002B1F0A11CE002 /* WifiAccess.swift in Sources */,
+				B1F0A11CE004B1F0A11CE004 /* ProStore.swift in Sources */,
 				6DBE74842023FE019EE3CF6C /* CNG.c in Sources */,
 				4DEADF9EE2DAE8A0AE71EF86 /* HP_variable_cutoff.c in Sources */,
 				2A04ADEF30B506851C2A192E /* HostAddress.swift in Sources */,
@@ -789,6 +802,7 @@
 				36C4301D9FA6FFC63C3750F8 /* LTP_analysis_filter_FLP.c in Sources */,
 				952D7DB1DC723E55624B1AA9 /* LTP_scale_ctrl_FLP.c in Sources */,
 				D78F1F8DFF13204D7C08D3F0 /* LocalNetworkProbe.swift in Sources */,
+				E7C0FFEEA11CE001BACC0002 /* MusicReactiveBackground.swift in Sources */,
 				9E0A2EF1C6D0C42560650AF3 /* NLSF2A.c in Sources */,
 				C61D701B2D17B9D8F3A331A9 /* NLSF_VQ.c in Sources */,
 				CAADBF973BFC877D03059EDD /* NLSF_VQ_weights_laroia.c in Sources */,

@@ -26,6 +26,13 @@
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>RoomCast Go listens on this Wi-Fi or Personal Hotspot so other phones can open the listener page and hear the broadcast. The audio stays on the local network.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>RoomCast Go uses your location to read the Wi-Fi network name, so you can confirm listeners will join the right network. Your location is not saved or sent.</string>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>WifiSSID</key>
+		<string>RoomCast Go needs precise location once so iOS will reveal the Wi-Fi name.</string>
+	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>RoomCast Go uses the microphone to broadcast your voice to phones on this Wi-Fi or Personal Hotspot. The audio stays on the local network.</string>
 	<key>NSSupportsLiveActivities</key>
