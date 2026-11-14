@@ -69,7 +69,7 @@ func newServer(httpPort, icePort int, ip, iface, title, host string, started int
 		Channels:  2,
 		// stereo=1 lets a USB music broadcast send stereo Opus on this same
 		// track. Voice stays mono packets. Listeners do not renegotiate.
-		SDPFmtpLine: "minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1",
+		SDPFmtpLine: "minptime=10;useinbandfec=1;usedtx=0;stereo=1;sprop-stereo=1",
 	}, "audio", "roomcast")
 	if err != nil {
 		return nil, fmt.Errorf("could not create the audio track: %w", err)
@@ -176,6 +176,12 @@ func advertiseStereo(sdp string) string {
 		}
 		if !strings.Contains(line, "sprop-stereo=") {
 			lines[i] += ";sprop-stereo=1"
+		}
+		if !strings.Contains(line, "useinbandfec=") {
+			lines[i] += ";useinbandfec=1"
+		}
+		if !strings.Contains(line, "usedtx=") {
+			lines[i] += ";usedtx=0"
 		}
 	}
 	return strings.Join(lines, "\r\n")

@@ -79,6 +79,19 @@ final class AudioCapture {
     private var mismatchPosted = false
     private var rebuildForce = false
     private var clearInterruption = false
+    private var pullScratch: AVAudioPCMBuffer?
+    private var convertOut: AVAudioPCMBuffer?
+    private let paceQueue = DispatchQueue(label: "channel.roomcast.go.pace")
+    private var paced: [Data] = []
+    private var paceArmed = false
+    private var nextSend = Date.distantPast
+    private var framesIn = 0
+    private var framesOut = 0
+    private var framesQueued = 0
+    private var framesDiscarded = 0
+    private var packetsSent = 0
+    private var packetsDropped = 0
+    private var lastReport = Date.distantPast
 
     /// Lists inputs and prefers a USB or other external port over the built-in mic.
     /// Safe to call before Start. Does not activate the microphone.
@@ -221,6 +234,11 @@ final class AudioCapture {
         pendingRebuild = nil
         rebuildAgain = false
         running = false
+        paceQueue.sync {
+            self.paced.removeAll()
+            self.paceArmed = false
+            self.nextSend = .distantPast
+        }
         for observer in observers {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -284,31 +302,22 @@ final class AudioCapture {
             engine.prepare()
         }
 
-        // Hardware rate, read after the route has been applied. A cached 48 kHz
-        // format crashes installTap when USB unplugs and the mic is 16 or 24 kHz.
+        // Always tap at the hardware rate. Asking for the engine's 48 kHz output
+        // format when the device is 44.1 kHz crashes installTap; resampling to
+        // 48 kHz happens in one persistent converter, not inside the tap.
         let hardware = input.inputFormat(forBus: 0)
         guard hardware.sampleRate > 0, hardware.channelCount > 0 else {
             throw CaptureError(message: "The microphone has no audio format yet. Plug it in and tap Start again.")
         }
-        let output = input.outputFormat(forBus: 0)
-        let tapFormat: AVAudioFormat?
-        let sourceFormat: AVAudioFormat
-        if output.sampleRate == hardware.sampleRate, output.channelCount > 0 {
-            tapFormat = nil
-            sourceFormat = output
-        } else {
-            guard let requested = AVAudioFormat(
-                commonFormat: .pcmFormatFloat32,
-                sampleRate: hardware.sampleRate,
-                channels: hardware.channelCount,
-                interleaved: false
-            ), requested.sampleRate == hardware.sampleRate, requested.channelCount > 0 else {
-                throw CaptureError(message: "The microphone has no audio format yet. Plug it in and tap Start again.")
-            }
-            tapFormat = requested
-            sourceFormat = requested
+        guard let tapFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: hardware.sampleRate,
+            channels: hardware.channelCount,
+            interleaved: false
+        ), tapFormat.sampleRate == hardware.sampleRate, tapFormat.channelCount > 0 else {
+            throw CaptureError(message: "The microphone has no audio format yet. Plug it in and tap Start again.")
         }
-        let captureChannels: AVAudioChannelCount = (musicActive && sourceFormat.channelCount >= 2) ? 2 : 1
+        let captureChannels: AVAudioChannelCount = (musicActive && tapFormat.channelCount >= 2) ? 2 : 1
         channels = Int(captureChannels)
         let widen = musicActive && channels < 2 && stereoWiden
         encodeChannels = widen ? 2 : channels
@@ -322,16 +331,19 @@ final class AudioCapture {
             sampleRate: 48_000,
             channels: captureChannels,
             interleaved: false
-        ), let converter = AVAudioConverter(from: sourceFormat, to: target) else {
+        ), let converter = AVAudioConverter(from: tapFormat, to: target) else {
             throw CaptureError(message: "Could not convert the input to 48 kHz.")
         }
+        // Streaming: keep the resampler's filter state. Priming would eat
+        // the front of each buffer and click.
+        converter.primeMethod = .none
         self.converter = converter
         self.targetFormat = target
+        pullScratch = AVAudioPCMBuffer(pcmFormat: tapFormat, frameCapacity: 16_384)
+        convertOut = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: 16_384)
         pending.removeAll(keepingCapacity: true)
         input.removeTap(onBus: 0)
-        let bufferSize = sliceFrames(format: sourceFormat, session: session, unit: input.audioUnit)
-        // nil uses the node's format when it already matches the hardware rate.
-        // Otherwise the requested format's sample rate is the hardware rate, never a cached one.
+        let bufferSize = sliceFrames(format: tapFormat, session: session, unit: input.audioUnit)
         input.installTap(onBus: 0, bufferSize: bufferSize, format: tapFormat) { [weak self] buffer, _ in
             self?.consume(buffer)
         }
@@ -435,39 +447,102 @@ final class AudioCapture {
 
     private func consume(_ buffer: AVAudioPCMBuffer) {
         guard running, let converter, let targetFormat else { return }
+        let incoming = Int(buffer.frameLength)
+        guard incoming > 0 else { return }
+        framesIn += incoming
         if abs(buffer.format.sampleRate - converter.inputFormat.sampleRate) > 1
             || buffer.format.channelCount != converter.inputFormat.channelCount {
+            framesDiscarded += incoming
             noteFormatMismatch()
             return
         }
         let ratio = targetFormat.sampleRate / buffer.format.sampleRate
-        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio + 32)
-        guard let converted = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: max(capacity, 1)) else {
+        let needed = AVAudioFrameCount(ceil(Double(incoming) * ratio)) + 256
+        if convertOut == nil || (convertOut?.frameCapacity ?? 0) < needed {
+            convertOut = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: max(needed, 8_192))
+        }
+        guard let output = convertOut else {
+            framesDiscarded += incoming
             return
         }
-        var supplied = false
-        var error: NSError?
-        converter.convert(to: converted, error: &error) { _, status in
-            if supplied {
-                status.pointee = .noDataNow
-                return nil
+        var offset: AVAudioFrameCount = 0
+        var spins = 0
+        while offset < buffer.frameLength && spins < 8 {
+            spins += 1
+            let before = offset
+            output.frameLength = 0
+            var convError: NSError?
+            converter.convert(to: output, error: &convError) { requested, status in
+                if offset >= buffer.frameLength {
+                    status.pointee = .noDataNow
+                    return nil
+                }
+                let want = AVAudioFrameCount(max(0, requested))
+                if want == 0 {
+                    status.pointee = .noDataNow
+                    return nil
+                }
+                let give = min(want, buffer.frameLength - offset)
+                guard self.copyIntoScratch(buffer, offset: offset, count: give) else {
+                    status.pointee = .noDataNow
+                    return nil
+                }
+                offset += give
+                status.pointee = .haveData
+                return self.pullScratch
             }
-            supplied = true
-            status.pointee = .haveData
-            return buffer
+            if convError != nil {
+                framesDiscarded += Int(buffer.frameLength - offset)
+                break
+            }
+            let produced = Int(output.frameLength)
+            if produced == 0 {
+                if offset == before { break }
+                continue
+            }
+            framesOut += produced
+            appendConverted(output)
         }
-        guard error == nil, let channel = converted.floatChannelData else { return }
-        let count = Int(converted.frameLength)
+        if offset < buffer.frameLength {
+            framesDiscarded += Int(buffer.frameLength - offset)
+        }
+        maybeLogStats()
+    }
+
+    /// The converter asks for a specific frame count. Give it only that many
+    /// and keep the rest for the next pull, so a 44.1 kHz buffer is not truncated.
+    private func copyIntoScratch(_ buffer: AVAudioPCMBuffer, offset: AVAudioFrameCount, count: AVAudioFrameCount) -> Bool {
+        guard count > 0, let src = buffer.floatChannelData else { return false }
+        if pullScratch == nil || (pullScratch?.frameCapacity ?? 0) < count {
+            pullScratch = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: max(count, 16_384))
+        }
+        guard let scratch = pullScratch, let dst = scratch.floatChannelData else { return false }
+        let channelCount = min(Int(buffer.format.channelCount), Int(scratch.format.channelCount))
+        let samples = Int(count)
+        let start = Int(offset)
+        guard channelCount > 0, samples > 0 else { return false }
+        for channel in 0..<channelCount {
+            dst[channel].update(from: (src[channel] + start), count: samples)
+        }
+        scratch.frameLength = count
+        return true
+    }
+
+    private func appendConverted(_ output: AVAudioPCMBuffer) {
+        guard let channel = output.floatChannelData else { return }
+        let count = Int(output.frameLength)
         guard count > 0 else { return }
         let frameCount = OpusEncoderBox.frameSamples
-        if channels >= 2, converted.format.channelCount >= 2 {
+        if channels >= 2, output.format.channelCount >= 2 {
             let right = channel[1]
             for index in 0..<count {
                 pending.append(channel[0][index])
                 pending.append(right[index])
             }
             if pending.count > 96_000 {
-                pending.removeFirst(pending.count - 96_000)
+                let overflow = pending.count - 96_000
+                pending.removeFirst(overflow)
+                framesDiscarded += overflow / 2
             }
             let pair = frameCount * 2
             while pending.count >= pair {
@@ -480,7 +555,9 @@ final class AudioCapture {
         } else {
             pending.append(contentsOf: UnsafeBufferPointer(start: channel[0], count: count))
             if pending.count > 48_000 {
-                pending.removeFirst(pending.count - 48_000)
+                let overflow = pending.count - 48_000
+                pending.removeFirst(overflow)
+                framesDiscarded += overflow
             }
             while pending.count >= frameCount {
                 for index in 0..<frameCount {
@@ -585,7 +662,53 @@ final class AudioCapture {
             }
         }
         guard let packet else { return }
+        framesQueued += OpusEncoderBox.frameSamples
+        handoff(packet)
+    }
+
+    /// One Opus packet every 20 ms. A tap can emit several frames at once;
+    /// dumping them back-to-back is a UDP burst home routers drop. The hotspot
+    /// path is one hop and hides that.
+    private func handoff(_ packet: Data) {
+        paceQueue.async { [weak self] in
+            guard let self else { return }
+            if self.paced.count >= 25 {
+                self.paced.removeFirst()
+                self.packetsDropped += 1
+            }
+            self.paced.append(packet)
+            self.pumpPace()
+        }
+    }
+
+    private func pumpPace() {
+        let now = Date()
+        if now < nextSend {
+            guard !paceArmed else { return }
+            paceArmed = true
+            let delay = nextSend.timeIntervalSince(now)
+            paceQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self else { return }
+                self.paceArmed = false
+                self.pumpPace()
+            }
+            return
+        }
+        guard !paced.isEmpty else { return }
+        let packet = paced.removeFirst()
+        packetsSent += 1
         onPacket?(packet)
+        nextSend = Date().addingTimeInterval(0.02)
+        if !paced.isEmpty {
+            pumpPace()
+        }
+    }
+
+    private func maybeLogStats() {
+        let now = Date()
+        guard now.timeIntervalSince(lastReport) >= 5 else { return }
+        lastReport = now
+        log.info("RoomCast audio in=\(self.framesIn, privacy: .public) converted=\(self.framesOut, privacy: .public) queued=\(self.framesQueued, privacy: .public) discarded=\(self.framesDiscarded, privacy: .public) sent=\(self.packetsSent, privacy: .public) droppedPkts=\(self.packetsDropped, privacy: .public)")
     }
 
     private func observeSession() {
@@ -609,7 +732,10 @@ final class AudioCapture {
             object: engine,
             queue: nil
         ) { [weak self] _ in
-            self?.enqueueRebuild()
+            self?.audioQueue.async {
+                guard let self, self.running, !self.engine.isRunning else { return }
+                self.enqueueRebuild(force: true)
+            }
         })
     }
 
@@ -644,16 +770,19 @@ final class AudioCapture {
         audioQueue.async { [weak self] in
             guard let self else { return }
             self.mismatchPosted = false
-            self.enqueueRebuild()
+            self.enqueueRebuild(force: true)
         }
     }
 
     private func graphMatchesInput() -> Bool {
         guard let converter else { return false }
         let hardware = engine.inputNode.inputFormat(forBus: 0)
-        return hardware.sampleRate > 0
-            && hardware.channelCount > 0
-            && hardware.sampleRate == converter.inputFormat.sampleRate
+        // A zero rate means the format is not readable from this thread.
+        // Tearing the engine down on that guess is what made the audio click.
+        if hardware.sampleRate <= 0 || hardware.channelCount <= 0 {
+            return true
+        }
+        return hardware.sampleRate == converter.inputFormat.sampleRate
     }
 
     private func handleInterruption(_ note: Notification) {

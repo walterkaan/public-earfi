@@ -234,6 +234,13 @@ if(ticket!==generation)return;
 connected=true;
 if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;}
 video.srcObject=evt.streams[0];
+try{
+const recv=evt.receiver||(evt.transceiver&&evt.transceiver.receiver);
+if(recv){
+if("jitterBufferTarget" in recv)recv.jitterBufferTarget=500;
+if("playoutDelayHint" in recv)recv.playoutDelayHint=0.5;
+}
+}catch(e){}
 const stream=evt.streams[0];
 (stream?stream.getTracks():[]).forEach((track)=>{
 track.addEventListener("ended",()=>{
