@@ -8,7 +8,7 @@ enum BroadcastLimits {
 }
 
 enum ProLegal {
-    static let privacy = URL(string: "https://roomcast.channel/privacy")!
+    static let privacy = URL(string: "https://go.roomcast.channel/privacy")!
     /// Apple’s standard EULA. Use this until RoomCast publishes its own terms.
     static let terms = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
 }
