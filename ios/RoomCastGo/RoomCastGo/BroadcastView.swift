@@ -25,17 +25,7 @@ struct BroadcastView: View {
                     if model.isOnAir || model.wifiReady {
                         startRow
                         if !model.isOnAir, model.phase == .idle, !store.isPro {
-                            #if DEBUG
-                            Button("Debug: 90 sec free in any 3 min. Upgrade") {
-                                showPaywall = true
-                            }
-                            #else
-                            Button("40 free minutes each hour. Upgrade") {
-                                showPaywall = true
-                            }
-                            #endif
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.roomTeal)
+                            freeHourUpgrade
                         }
                     } else {
                         wifiCard
@@ -432,12 +422,28 @@ struct BroadcastView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
+    private var freeHourUpgrade: some View {
+        Button(Self.freeHourTitle) {
+            showPaywall = true
+        }
+        .font(Font.caption.weight(.semibold))
+        .foregroundStyle(Color.roomTeal)
+    }
+
+    private static var freeHourTitle: String {
+        #if DEBUG
+        "Debug: 90 sec free in any 3 min. Upgrade"
+        #else
+        "40 free minutes each hour. Upgrade"
+        #endif
+    }
+
     private func freeMinutes(since: Date) -> some View {
         TimelineView(.periodic(from: since, by: 1)) { context in
             let remaining = FreeUsage.remaining(now: context.date, openStart: since)
             let minutes = remaining <= 0 ? 0 : Int((remaining / 60).rounded(.up))
             Text("Free · \(minutes) min left this hour")
-                .font(.caption.weight(.semibold).monospacedDigit())
+                .font(Font.caption.weight(.semibold).monospacedDigit())
                 .foregroundStyle(minutes <= 5 ? Color.roomAmber : Color.roomTeal)
         }
     }
@@ -537,7 +543,8 @@ struct BroadcastView: View {
     private var soundLine: String {
         if model.muted { return "Sound Muted" }
         guard model.isOnAir else { return "Sound Source" }
-        return "Sound quality: \(model.soundQualityWord)"
+        let quality = model.soundQualityWord
+        return "Sound quality: \(quality)"
     }
 
     private var wifiChangedOverlay: some View {

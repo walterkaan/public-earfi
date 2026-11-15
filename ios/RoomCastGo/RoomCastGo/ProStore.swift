@@ -58,7 +58,7 @@ enum FreeUsage {
     }
 
     static func close(start: Date, now: Date) {
-        var startT = start.timeIntervalSince1970
+        let startT = start.timeIntervalSince1970
         var endT = now.timeIntervalSince1970
         if startT > endT + 2 {
             saveOpen(nil)
