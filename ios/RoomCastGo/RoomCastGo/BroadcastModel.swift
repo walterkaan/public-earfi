@@ -67,6 +67,13 @@ final class BroadcastModel: ObservableObject {
     var isOnAir: Bool { phase == .live || phase == .reconnecting }
     var musicActive: Bool { musicPreferred && usbInput }
     var canWiden: Bool { musicActive && hardwareChannels < 2 }
+    /// What the current capture mode actually is. Voice is the processed mic.
+    /// Music is mono. Stereo music is a stereo card, or mono music with widen on.
+    var soundQualityWord: String {
+        if !musicActive { return "Voice" }
+        if hardwareChannels >= 2 || stereoWiden { return "Stereo music" }
+        return "Music"
+    }
     var soundSourceName: String { inputName.isEmpty ? "Internal Microphone" : inputName }
 
     var listenerLabel: String {
@@ -170,6 +177,7 @@ final class BroadcastModel: ObservableObject {
 
     func appear() {
         UIDevice.current.isBatteryMonitoringEnabled = true
+        FreeUsage.sealAbandoned(now: Date())
         Task { await self.prepareAddress() }
         if phase == .idle {
             activity.endOrphans()
@@ -193,6 +201,9 @@ final class BroadcastModel: ObservableObject {
 
     func noteSceneActive(_ active: Bool) {
         foreground = active
+        if !active, let startedAt, isOnAir, !store.isPro {
+            FreeUsage.checkpoint(start: startedAt, now: Date())
+        }
         guard active else { return }
         Task { await self.refreshAfterActive() }
     }
@@ -350,6 +361,16 @@ final class BroadcastModel: ObservableObject {
 
     private func beginStart() {
         guard phase == .idle else { return }
+        if !store.isPro {
+            let now = Date()
+            if FreeUsage.remaining(now: now, openStart: nil) <= 0 {
+                freeLimitHit = true
+                let mins = FreeUsage.minutesUntilAvailable(now: now)
+                status = "Free time available again in \(mins) min"
+                failed = false
+                return
+            }
+        }
         phase = .starting
         failed = false
         freeLimitHit = false
@@ -472,6 +493,9 @@ final class BroadcastModel: ObservableObject {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         activity.start(activityState())
         WifiDropNotifier.requestPermission()
+        if !store.isPro {
+            FreeUsage.begin(now: started)
+        }
         armFreeLimit()
         startPolling()
     }
@@ -604,6 +628,9 @@ final class BroadcastModel: ObservableObject {
     }
 
     private func finishStop(duration: TimeInterval?) async {
+        if let startedAt, FreeUsage.hasOpenSession {
+            FreeUsage.close(start: startedAt, now: Date())
+        }
         startedAt = nil
         poll?.invalidate()
         poll = nil
@@ -679,6 +706,7 @@ final class BroadcastModel: ObservableObject {
         }
         updateNowPlaying()
         pushActivity(force: false)
+        noteFreeUse()
         enforceFreeLimit()
     }
 
@@ -1088,25 +1116,25 @@ final class BroadcastModel: ObservableObject {
         }
     }
 
+    private func noteFreeUse() {
+        guard !store.isPro, isOnAir, let startedAt else { return }
+        FreeUsage.checkpoint(start: startedAt, now: Date())
+    }
+
     private func armFreeLimit() {
         limitTask?.cancel()
-        guard !store.isPro, let startedAt else { return }
-        let remaining = BroadcastLimits.freeSeconds - Date().timeIntervalSince(startedAt)
-        limitTask = Task { [weak self] in
-            if remaining > 0 {
-                try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
-            }
-            guard !Task.isCancelled else { return }
-            self?.enforceFreeLimit()
-        }
+        limitTask = nil
+        enforceFreeLimit()
     }
 
     private func enforceFreeLimit() {
         guard isOnAir, !store.isPro, let startedAt else { return }
-        guard Date().timeIntervalSince(startedAt) >= BroadcastLimits.freeSeconds - 0.5 else { return }
+        guard FreeUsage.used(now: Date(), openStart: startedAt) >= BroadcastLimits.freeSeconds - 0.5 else { return }
         guard !freeLimitHit else { return }
+        FreeUsage.close(start: startedAt, now: Date())
         freeLimitHit = true
-        stopNote = "The free 40 minutes are up. Upgrade to Pro for unlimited time."
+        let mins = FreeUsage.minutesUntilAvailable(now: Date())
+        stopNote = "Free time available again in \(mins) min. Upgrade to Pro for unlimited time."
         beginStop()
     }
 

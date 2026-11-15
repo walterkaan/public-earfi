@@ -351,8 +351,7 @@ final class AudioCapture {
         encodeChannels = widen ? 2 : channels
         widener.reset()
         encoder = try OpusEncoderBox(music: musicActive, channels: encodeChannels)
-        let kbps = musicActive ? (encodeChannels >= 2 ? 128 : 96) : 32
-        let profile = Self.profileLabel(music: musicActive, kbps: kbps)
+        let profile = Self.profileLabel(music: musicActive, stereo: encodeChannels >= 2)
         DispatchQueue.main.async { [weak self] in self?.onProfile?(profile) }
         guard let target = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
@@ -1092,10 +1091,10 @@ final class AudioCapture {
         return channels >= 2 ? "Stereo (\(kind))" : "Mono (\(kind))"
     }
 
-    private static func profileLabel(music: Bool, kbps: Int) -> String {
-        if music && kbps == 96 { return "96kbps Music quality" }
-        if music { return "\(kbps)kbps Music quality" }
-        return "\(kbps) kbps"
+    private static func profileLabel(music: Bool, stereo: Bool) -> String {
+        if !music { return "Voice" }
+        if stereo { return "Stereo music" }
+        return "Music"
     }
 }
 

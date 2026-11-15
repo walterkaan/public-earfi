@@ -25,9 +25,15 @@ struct BroadcastView: View {
                     if model.isOnAir || model.wifiReady {
                         startRow
                         if !model.isOnAir, model.phase == .idle, !store.isPro {
-                            Button("Free sessions last 40 minutes. Upgrade") {
+                            #if DEBUG
+                            Button("Debug: 90 sec free in any 3 min. Upgrade") {
                                 showPaywall = true
                             }
+                            #else
+                            Button("40 free minutes each hour. Upgrade") {
+                                showPaywall = true
+                            }
+                            #endif
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(Color.roomTeal)
                         }
@@ -371,7 +377,7 @@ struct BroadcastView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            if !store.isPro, let since = model.startedAt {
+            if !store.isPro, model.isOnAir, let since = model.startedAt {
                 freeMinutes(since: since)
             }
             if showStats {
@@ -427,10 +433,10 @@ struct BroadcastView: View {
     }
 
     private func freeMinutes(since: Date) -> some View {
-        TimelineView(.periodic(from: since, by: 30)) { context in
-            let remaining = BroadcastLimits.freeSeconds - context.date.timeIntervalSince(since)
+        TimelineView(.periodic(from: since, by: 1)) { context in
+            let remaining = FreeUsage.remaining(now: context.date, openStart: since)
             let minutes = remaining <= 0 ? 0 : Int((remaining / 60).rounded(.up))
-            Text("Free · \(minutes) min remaining")
+            Text("Free · \(minutes) min left this hour")
                 .font(.caption.weight(.semibold).monospacedDigit())
                 .foregroundStyle(minutes <= 5 ? Color.roomAmber : Color.roomTeal)
         }
@@ -531,10 +537,7 @@ struct BroadcastView: View {
     private var soundLine: String {
         if model.muted { return "Sound Muted" }
         guard model.isOnAir else { return "Sound Source" }
-        let quality = model.musicActive ? "Music quality" : "Voice"
-        let width = model.hardwareChannels >= 2 ? "Stereo" : "Mono"
-        let device = model.hardwareLabel.localizedCaseInsensitiveContains("iPhone") ? "Mic" : "USB"
-        return "\(quality) · \(width) · \(device)"
+        return "Sound quality: \(model.soundQualityWord)"
     }
 
     private var wifiChangedOverlay: some View {

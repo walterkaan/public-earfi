@@ -3,8 +3,147 @@ import SwiftUI
 import UIKit
 
 enum BroadcastLimits {
-    /// Free broadcasts stop at 40 minutes. Pro removes the limit.
+    /// Free accounts can broadcast this long inside any rolling window.
+    /// A debug build uses a short window so the limit can be checked quickly.
+    #if DEBUG
+    static let freeSeconds: TimeInterval = 90
+    static let windowSeconds: TimeInterval = 3 * 60
+    #else
     static let freeSeconds: TimeInterval = 40 * 60
+    static let windowSeconds: TimeInterval = 60 * 60
+    #endif
+}
+
+/// Broadcast time already used by a free account. Intervals survive a relaunch.
+/// A future start (the clock moved back) is ignored.
+enum FreeUsage {
+    private struct Span: Codable {
+        var start: TimeInterval
+        var end: TimeInterval
+    }
+
+    private struct Open: Codable {
+        var start: TimeInterval
+        var checkpoint: TimeInterval
+    }
+
+    private static let spansKey = "broadcast.freeSpans"
+    private static let openKey = "broadcast.freeOpen"
+
+    static func sealAbandoned(now: Date) {
+        guard let open = loadOpen() else { return }
+        let nowT = now.timeIntervalSince1970
+        if open.start > nowT + 2 {
+            saveOpen(nil)
+            return
+        }
+        let end = min(max(open.checkpoint, open.start), nowT)
+        if end > open.start {
+            store(Span(start: open.start, end: end), now: now)
+        }
+        saveOpen(nil)
+    }
+
+    static func begin(now: Date) {
+        let t = now.timeIntervalSince1970
+        saveOpen(Open(start: t, checkpoint: t))
+    }
+
+    static func checkpoint(start: Date, now: Date) {
+        var startT = start.timeIntervalSince1970
+        var nowT = now.timeIntervalSince1970
+        if startT > nowT + 2 { startT = nowT }
+        if nowT < startT { nowT = startT }
+        saveOpen(Open(start: startT, checkpoint: nowT))
+    }
+
+    static func close(start: Date, now: Date) {
+        var startT = start.timeIntervalSince1970
+        var endT = now.timeIntervalSince1970
+        if startT > endT + 2 {
+            saveOpen(nil)
+            return
+        }
+        if endT < startT { endT = startT }
+        store(Span(start: startT, end: endT), now: now)
+        saveOpen(nil)
+    }
+
+    static var hasOpenSession: Bool { loadOpen() != nil }
+
+    static func remaining(now: Date, openStart: Date?) -> TimeInterval {
+        max(0, BroadcastLimits.freeSeconds - used(now: now, openStart: openStart))
+    }
+
+    static func used(now: Date, openStart: Date?) -> TimeInterval {
+        let nowT = now.timeIntervalSince1970
+        let windowStart = nowT - BroadcastLimits.windowSeconds
+        var total = spans(now: now).reduce(0.0) { partial, span in
+            partial + overlap(span, windowStart: windowStart, now: nowT)
+        }
+        if let openStart {
+            var startT = openStart.timeIntervalSince1970
+            if startT <= nowT + 2 {
+                if startT > nowT { startT = nowT }
+                total += overlap(Span(start: startT, end: nowT), windowStart: windowStart, now: nowT)
+            }
+        }
+        return total
+    }
+
+    /// Whole minutes, rounded up, until some free time is back. Zero if time remains.
+    static func minutesUntilAvailable(now: Date) -> Int {
+        if used(now: now, openStart: nil) < BroadcastLimits.freeSeconds - 0.5 { return 0 }
+        let steps = Int(BroadcastLimits.windowSeconds.rounded(.up))
+        for step in 1...max(1, steps) {
+            let later = now.addingTimeInterval(TimeInterval(step))
+            if used(now: later, openStart: nil) < BroadcastLimits.freeSeconds - 0.5 {
+                return max(1, Int((Double(step) / 60).rounded(.up)))
+            }
+        }
+        return max(1, Int((BroadcastLimits.windowSeconds / 60).rounded(.up)))
+    }
+
+    private static func overlap(_ span: Span, windowStart: TimeInterval, now: TimeInterval) -> TimeInterval {
+        if span.start > now + 2 { return 0 }
+        let end = min(span.end, now)
+        let start = max(span.start, windowStart)
+        return max(0, end - start)
+    }
+
+    private static func spans(now: Date) -> [Span] {
+        guard let data = UserDefaults.standard.data(forKey: spansKey),
+              let decoded = try? JSONDecoder().decode([Span].self, from: data) else { return [] }
+        let nowT = now.timeIntervalSince1970
+        let windowStart = nowT - BroadcastLimits.windowSeconds
+        return decoded.filter { span in
+            span.start <= nowT + 2 && span.end > span.start && span.end > windowStart
+        }
+    }
+
+    private static func store(_ span: Span, now: Date) {
+        var all = spans(now: now)
+        all.append(span)
+        let nowT = now.timeIntervalSince1970
+        let windowStart = nowT - BroadcastLimits.windowSeconds
+        all = all.filter { $0.start <= nowT + 2 && $0.end > $0.start && $0.end > windowStart }
+        if let data = try? JSONEncoder().encode(all) {
+            UserDefaults.standard.set(data, forKey: spansKey)
+        }
+    }
+
+    private static func loadOpen() -> Open? {
+        guard let data = UserDefaults.standard.data(forKey: openKey) else { return nil }
+        return try? JSONDecoder().decode(Open.self, from: data)
+    }
+
+    private static func saveOpen(_ open: Open?) {
+        if let open, let data = try? JSONEncoder().encode(open) {
+            UserDefaults.standard.set(data, forKey: openKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: openKey)
+        }
+    }
 }
 
 enum ProLegal {
