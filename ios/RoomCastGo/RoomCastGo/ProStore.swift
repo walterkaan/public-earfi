@@ -274,7 +274,7 @@ final class ProStore: ObservableObject {
         case .success(.verified(let transaction)):
             logPurchase("result=verified id=\(transaction.id) productID=\(transaction.productID) revocationDate=\(Self.iso(transaction.revocationDate))")
             if transaction.revocationDate != nil {
-                await finishRevoked(transaction, retryIfRevoked: retryIfRevoked, product: product)
+                try await finishRevoked(transaction, retryIfRevoked: retryIfRevoked, product: product)
                 return
             }
             if transaction.productID == Self.productID {
@@ -294,7 +294,7 @@ final class ProStore: ObservableObject {
             let seen = Seen(.unverified(transaction, error), source: "purchase")
             logPurchase("result=\(seen.verification) id=\(seen.id) productID=\(seen.productID) revocationDate=\(Self.iso(seen.revocationDate))")
             if seen.revocationDate != nil {
-                await finishRevoked(transaction, retryIfRevoked: retryIfRevoked, product: product)
+                try await finishRevoked(transaction, retryIfRevoked: retryIfRevoked, product: product)
                 return
             }
             if seen.trust, seen.productID == Self.productID {
