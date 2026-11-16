@@ -10,7 +10,7 @@ import UIKit
 /// Reduce Motion, and a backgrounded app all fall back to a calm picture.
 ///
 /// Override with UserDefaults key `visualizer.mode`:
-/// `auto` (default), `off`, `gentle`, or `rich`.
+/// `gentle` (default when nothing is stored), `auto`, `rich`, or `off`.
 struct MusicReactiveBackground: View {
     var level: Float
     var live: Bool
@@ -166,9 +166,9 @@ enum MusicBackdropPreference: String, CaseIterable, Identifiable {
     static let defaultsKey = "visualizer.mode"
 
     static var stored: MusicBackdropPreference {
-        guard let raw = UserDefaults.standard.string(forKey: defaultsKey) else { return .auto }
+        guard let raw = UserDefaults.standard.string(forKey: defaultsKey) else { return .gentle }
         let cleaned = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return MusicBackdropPreference(rawValue: cleaned) ?? .auto
+        return MusicBackdropPreference(rawValue: cleaned) ?? .gentle
     }
 
     func save() {
