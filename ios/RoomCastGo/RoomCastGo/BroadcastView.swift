@@ -176,9 +176,7 @@ struct BroadcastView: View {
         }
     }
 
-    private var sourceName: String {
-        model.inputName.isEmpty ? "iPhone mic" : model.inputName
-    }
+    private var sourceName: String { model.soundSourceName }
 
     private var buttonTitle: String {
         switch model.phase {

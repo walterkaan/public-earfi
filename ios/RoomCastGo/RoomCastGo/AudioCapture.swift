@@ -105,13 +105,14 @@ final class AudioCapture {
     private var lastReport = Date.distantPast
 
     /// Lists inputs and prefers a USB or other external port over the built-in mic.
-    /// Safe to call before Start. Does not activate the microphone.
-    /// Session changes run on `audioQueue`, not the main thread.
+    /// Safe to call before Start. Does not start the audio engine.
+    /// When microphone permission is already granted, the session is activated
+    /// so `currentRoute` and `availableInputs` include a USB interface that was
+    /// plugged in before launch. Session changes run on `audioQueue`.
     func startMonitoringRoutes() {
         audioQueue.async { [weak self] in
             guard let self else { return }
-            self.ensureCategory()
-            self.applyPreferredInput()
+            self.prepareRouteForReading()
             self.reportInput()
             guard self.routeMonitor == nil else { return }
             self.routeMonitor = NotificationCenter.default.addObserver(
@@ -127,8 +128,9 @@ final class AudioCapture {
     func refreshRoute() {
         audioQueue.async { [weak self] in
             guard let self else { return }
-            self.ensureCategory()
-            self.applyPreferredInput()
+            if !self.running {
+                self.prepareRouteForReading()
+            }
             self.reportInput()
         }
     }
@@ -880,7 +882,11 @@ final class AudioCapture {
         audioQueue.async { [weak self] in
             guard let self else { return }
             if self.suppressRoute { return }
-            self.applyPreferredInput()
+            if self.running {
+                self.applyPreferredInput()
+            } else {
+                self.prepareRouteForReading()
+            }
             self.reportInput()
             self.logRouteFormat("change \(reason.rawValue)")
             guard self.running else { return }
@@ -1004,6 +1010,23 @@ final class AudioCapture {
         }
     }
 
+    /// Makes the current input readable without starting `AVAudioEngine`.
+    /// `setActive` is what fills `availableInputs` for a USB interface that is
+    /// already plugged in. It is skipped until the user has already granted
+    /// microphone permission, so idle reading does not present the prompt.
+    private func prepareRouteForReading() {
+        let session = AVAudioSession.sharedInstance()
+        ensureCategory()
+        let granted = AVAudioApplication.shared.recordPermission == .granted
+        if granted {
+            try? session.setActive(true)
+        }
+        applyPreferredInput()
+        if granted {
+            try? session.setActive(true)
+        }
+    }
+
     /// USB and wired inputs win over the built-in mic. The choice is stored
     /// with `setPreferredInput` so the next session activation uses it.
     private func applyPreferredInput() {
@@ -1014,31 +1037,59 @@ final class AudioCapture {
         }
     }
 
-    private func reportInput() {
-        let session = AVAudioSession.sharedInstance()
-        let preferred = Self.bestInput(session.availableInputs)
+    /// Idle and live labels both come from this read.
+    private struct InputSnapshot {
+        var name: String
+        var label: String
+        var channels: Int
+        var usb: Bool
+        var gainSettable: Bool
+    }
+
+    private static func inputSnapshot(_ session: AVAudioSession = .sharedInstance()) -> InputSnapshot {
+        let preferred = bestInput(session.availableInputs)
         let current = session.currentRoute.inputs.first
         let port: AVAudioSessionPortDescription?
-        if let preferred, Self.isExternal(preferred) {
+        if let preferred, isExternal(preferred) {
             port = preferred
         } else {
             port = current ?? preferred
         }
-        let name = port?.portName ?? "Internal Microphone"
-        let count = Self.hardwareChannels(port: port, session: session)
-        let label = Self.channelLabel(channels: count, port: port)
-        log.info("input \(name, privacy: .public)")
-        onInput?(name)
-        onHardware?(label, count)
-        onUSB?(Self.routeIsUSB)
-        let line = Self.routeIsUSB && session.isInputGainSettable
-        DispatchQueue.main.async { [weak self] in self?.onInputGain?(line) }
+        let trimmed = port?.portName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let name = trimmed.isEmpty ? "iPhone mic" : trimmed
+        let count = hardwareChannels(port: port, session: session)
+        let usb = routeIsUSB
+        return InputSnapshot(
+            name: name,
+            label: channelLabel(channels: count, port: port),
+            channels: count,
+            usb: usb,
+            gainSettable: usb && session.isInputGainSettable
+        )
+    }
+
+    private func reportInput() {
+        let snap = Self.inputSnapshot()
+        log.info("input \(snap.name, privacy: .public)")
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.onInput?(snap.name)
+            self.onHardware?(snap.label, snap.channels)
+            self.onUSB?(snap.usb)
+            self.onInputGain?(snap.gainSettable)
+        }
     }
 
     /// One line Walter can paste after plugging a card in.
+    /// The engine's input node is only read while capture is running. Touching
+    /// it while idle builds the input unit and can prompt for the microphone.
     private func logRouteFormat(_ reason: String) {
         let session = AVAudioSession.sharedInstance()
         let port = session.currentRoute.inputs.first
+        guard running else {
+            log.info("route \(reason, privacy: .public) port=\(port?.portType.rawValue ?? "-", privacy: .public) name=\(port?.portName ?? "-", privacy: .public) portCh=\(port?.channels?.count ?? 0) idle=true")
+            return
+        }
         let format = engine.inputNode.inputFormat(forBus: 0)
         let bits = format.streamDescription.pointee.mBitsPerChannel
         let kind: String

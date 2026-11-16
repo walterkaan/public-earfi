@@ -74,7 +74,8 @@ final class BroadcastModel: ObservableObject {
         if hardwareChannels >= 2 || stereoWiden { return "Stereo music" }
         return "Music"
     }
-    var soundSourceName: String { inputName.isEmpty ? "Internal Microphone" : inputName }
+    /// Idle screen, live screen, and Setup all show this name.
+    var soundSourceName: String { inputName.isEmpty ? "iPhone mic" : inputName }
 
     var listenerLabel: String {
         switch listeners {
@@ -205,6 +206,7 @@ final class BroadcastModel: ObservableObject {
     func noteSceneActive(_ active: Bool) {
         foreground = active
         if active {
+            capture.refreshRoute()
             Task { await self.store.refreshEntitlement() }
         }
         if !active, let startedAt, isOnAir, !store.isPro {
@@ -521,17 +523,7 @@ final class BroadcastModel: ObservableObject {
         capture.onProfile = { [weak self] text in
             Task { @MainActor in self?.profileText = text }
         }
-        capture.onInput = { [weak self] name in
-            Task { @MainActor in
-                self?.inputName = name
-            }
-        }
-        capture.onHardware = { [weak self] label, channels in
-            Task { @MainActor in
-                self?.hardwareLabel = label
-                self?.hardwareChannels = channels
-            }
-        }
+        bindInputWatch()
         capture.onInterrupted = { [weak self] interrupted in
             Task { @MainActor in
                 guard let self, self.isOnAir else { return }
@@ -542,16 +534,6 @@ final class BroadcastModel: ObservableObject {
                 } else {
                     self.status = self.liveStatus
                 }
-            }
-        }
-        capture.onUSB = { [weak self] usb in
-            Task { @MainActor in
-                self?.noteUSB(usb)
-            }
-        }
-        capture.onInputGain = { [weak self] settable in
-            Task { @MainActor in
-                self?.inputGainSettable = settable
             }
         }
         capture.onCaptureFailure = { [weak self] message in
@@ -573,6 +555,16 @@ final class BroadcastModel: ObservableObject {
                 self?.hardwareChannels = channels
             }
         }
+        capture.onUSB = { [weak self] usb in
+            Task { @MainActor in
+                self?.noteUSB(usb)
+            }
+        }
+        capture.onInputGain = { [weak self] settable in
+            Task { @MainActor in
+                self?.inputGainSettable = settable
+            }
+        }
     }
 
     private func observeUSBWhileIdle() {
@@ -583,8 +575,7 @@ final class BroadcastModel: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                guard let self, self.phase == .idle else { return }
-                self.refreshUSB()
+                self?.capture.refreshRoute()
             }
         }
     }
