@@ -498,15 +498,15 @@ final class ProStore: ObservableObject {
         #endif
     }
 
+    /// `RenewalState` is a struct with static members, not a frozen enum.
+    /// `@unknown default` does not exhaust a switch over it.
     private static func stateName(_ state: StoreKit.Product.SubscriptionInfo.RenewalState) -> String {
-        switch state {
-        case .subscribed: return "subscribed"
-        case .inGracePeriod: return "inGracePeriod"
-        case .inBillingRetryPeriod: return "inBillingRetryPeriod"
-        case .expired: return "expired"
-        case .revoked: return "revoked"
-        @unknown default: return String(describing: state)
-        }
+        if state == .subscribed { return "subscribed" }
+        if state == .inGracePeriod { return "inGracePeriod" }
+        if state == .inBillingRetryPeriod { return "inBillingRetryPeriod" }
+        if state == .expired { return "expired" }
+        if state == .revoked { return "revoked" }
+        return String(describing: state)
     }
 
     private static func renewalSummary(_ result: StoreKit.VerificationResult<StoreKit.Product.SubscriptionInfo.RenewalInfo>) -> (productID: String, text: String) {
