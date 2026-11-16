@@ -221,7 +221,9 @@ final class AudioCapture {
             paceStopped = false
             paceLock.unlock()
             reportInput()
+            #if DEBUG
             log.info("capture started")
+            #endif
         } catch {
             tearDownOnQueue()
             throw error
@@ -252,7 +254,9 @@ final class AudioCapture {
             guard let self else { return }
             guard self.running || self.encoder != nil else { return }
             self.tearDownOnQueue()
+            #if DEBUG
             self.log.info("capture stopped")
+            #endif
         }
     }
 
@@ -773,6 +777,7 @@ final class AudioCapture {
     }
 
     private func maybeLogStats() {
+        #if DEBUG
         let now = Date()
         guard now.timeIntervalSince(lastReport) >= 5 else { return }
         lastReport = now
@@ -781,6 +786,9 @@ final class AudioCapture {
         let dropped = packetsDropped
         paceLock.unlock()
         log.info("RoomCast audio in=\(self.framesIn, privacy: .public) converted=\(self.framesOut, privacy: .public) queued=\(self.framesQueued, privacy: .public) discarded=\(self.framesDiscarded, privacy: .public) sent=\(sent, privacy: .public) droppedPkts=\(dropped, privacy: .public)")
+        #else
+        _ = lastReport
+        #endif
     }
 
     private func observeSession() {
@@ -863,12 +871,16 @@ final class AudioCapture {
               let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
         switch type {
         case .began:
+            #if DEBUG
             log.info("audio interrupted")
+            #endif
             DispatchQueue.main.async { [weak self] in self?.onInterrupted?(true) }
         case .ended:
             let optionRaw = note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
             let options = AVAudioSession.InterruptionOptions(rawValue: optionRaw)
+            #if DEBUG
             log.info("interruption ended, should resume \(options.contains(.shouldResume), privacy: .public)")
+            #endif
             clearInterruption = true
             enqueueRebuild(force: true)
         @unknown default:
@@ -892,7 +904,9 @@ final class AudioCapture {
             guard self.running else { return }
             switch reason {
             case .newDeviceAvailable, .oldDeviceUnavailable, .override:
+                #if DEBUG
                 self.log.info("route changed: \(String(describing: reason), privacy: .public)")
+                #endif
                 self.musicActive = self.musicPreferred && Self.routeIsUSB
                 self.enqueueRebuild(force: true)
             default:
@@ -1070,7 +1084,9 @@ final class AudioCapture {
 
     private func reportInput() {
         let snap = Self.inputSnapshot()
+        #if DEBUG
         log.info("input \(snap.name, privacy: .public)")
+        #endif
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.onInput?(snap.name)
@@ -1084,6 +1100,7 @@ final class AudioCapture {
     /// The engine's input node is only read while capture is running. Touching
     /// it while idle builds the input unit and can prompt for the microphone.
     private func logRouteFormat(_ reason: String) {
+        #if DEBUG
         let session = AVAudioSession.sharedInstance()
         let port = session.currentRoute.inputs.first
         guard running else {
@@ -1101,6 +1118,9 @@ final class AudioCapture {
         default: kind = "other"
         }
         log.info("route \(reason, privacy: .public) port=\(port?.portType.rawValue ?? "-", privacy: .public) name=\(port?.portName ?? "-", privacy: .public) portCh=\(port?.channels?.count ?? 0) sessionRate=\(session.sampleRate, privacy: .public) hwRate=\(format.sampleRate, privacy: .public) format=\(kind, privacy: .public) interleaved=\(format.isInterleaved, privacy: .public) ch=\(format.channelCount, privacy: .public) bits=\(bits, privacy: .public) gainSettable=\(session.isInputGainSettable, privacy: .public)")
+        #else
+        _ = reason
+        #endif
     }
 
     private static func bestInput(_ inputs: [AVAudioSessionPortDescription]?) -> AVAudioSessionPortDescription? {
