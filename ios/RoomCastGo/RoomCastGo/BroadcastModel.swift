@@ -169,6 +169,9 @@ final class BroadcastModel: ObservableObject {
                 self?.handle(command)
             }
         }
+        store.onBecamePro = { [weak self] in
+            self?.cancelFreeLimit()
+        }
         wifiNames.onAuthorizationChange = { [weak self] in
             self?.syncWifiPrompt()
         }
@@ -201,6 +204,9 @@ final class BroadcastModel: ObservableObject {
 
     func noteSceneActive(_ active: Bool) {
         foreground = active
+        if active {
+            Task { await self.store.refreshEntitlement() }
+        }
         if !active, let startedAt, isOnAir, !store.isPro {
             FreeUsage.checkpoint(start: startedAt, now: Date())
         }
@@ -616,8 +622,7 @@ final class BroadcastModel: ObservableObject {
 
     private func beginStop() {
         guard phase == .live || phase == .reconnecting else { return }
-        limitTask?.cancel()
-        limitTask = nil
+        cancelFreeLimit()
         let duration = startedAt.map { Date().timeIntervalSince($0) }
         phase = .stopping
         status = "Stopping…"
@@ -1116,14 +1121,18 @@ final class BroadcastModel: ObservableObject {
         }
     }
 
+    private func cancelFreeLimit() {
+        limitTask?.cancel()
+        limitTask = nil
+    }
+
     private func noteFreeUse() {
         guard !store.isPro, isOnAir, let startedAt else { return }
         FreeUsage.checkpoint(start: startedAt, now: Date())
     }
 
     private func armFreeLimit() {
-        limitTask?.cancel()
-        limitTask = nil
+        cancelFreeLimit()
         enforceFreeLimit()
     }
 

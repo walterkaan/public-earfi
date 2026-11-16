@@ -163,8 +163,16 @@ final class ProStore: ObservableObject {
     @Published var purchaseError: String?
     @Published private(set) var isWorking = false
 
+    /// Called on the main actor when a verified subscription becomes active.
+    var onBecamePro: (() -> Void)?
+
+    /// Newest verified purchase. `currentEntitlements` can still list a
+    /// deleted StoreKit-test transaction and omit the one just bought.
+    private var trusted: StoreKit.Transaction?
+    private var updatesTask: Task<Void, Never>?
+
     init() {
-        Task { [weak self] in
+        updatesTask = Task { [weak self] in
             for await update in StoreKit.Transaction.updates {
                 await self?.handle(update)
             }
@@ -192,15 +200,26 @@ final class ProStore: ObservableObject {
     }
 
     func refreshEntitlement() async {
-        var pro = false
+        let now = Date()
+        var best: StoreKit.Transaction?
         for await result in StoreKit.Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
-            guard transaction.productID == Self.productID else { continue }
-            guard transaction.revocationDate == nil else { continue }
-            if let expiration = transaction.expirationDate, expiration < Date() { continue }
-            pro = true
+            best = newer(best, transaction, now: now)
         }
-        isPro = pro
+        if let result = await StoreKit.Transaction.latest(for: Self.productID),
+           case .verified(let transaction) = result {
+            best = newer(best, transaction, now: now)
+        }
+        if let trusted {
+            best = newer(best, trusted, now: now)
+        }
+        trusted = best
+        let unlocked = best != nil
+        let became = unlocked && !isPro
+        isPro = unlocked
+        if became {
+            onBecamePro?()
+        }
     }
 
     func purchase() async {
@@ -214,13 +233,18 @@ final class ProStore: ObservableObject {
         do {
             let result = try await product.purchase()
             switch result {
-            case .success(let verification):
-                guard case .verified(let transaction) = verification else {
-                    purchaseError = "The purchase could not be verified."
-                    return
+            case .success(.verified(let transaction)):
+                if accepts(transaction) {
+                    adopt(transaction)
+                    isPro = true
+                    onBecamePro?()
+                } else {
+                    purchaseError = "The subscription is not active."
                 }
                 await transaction.finish()
                 await refreshEntitlement()
+            case .success(.unverified(_, _)):
+                purchaseError = "The purchase could not be verified."
             case .userCancelled, .pending:
                 break
             @unknown default:
@@ -263,8 +287,44 @@ final class ProStore: ObservableObject {
 
     private func handle(_ update: StoreKit.VerificationResult<StoreKit.Transaction>) async {
         guard case .verified(let transaction) = update else { return }
+        if accepts(transaction) {
+            adopt(transaction)
+            if !isPro {
+                isPro = true
+                onBecamePro?()
+            }
+        } else if trusted?.id == transaction.id {
+            trusted = nil
+        }
         await transaction.finish()
         await refreshEntitlement()
+    }
+
+    /// A deleted or upgraded transaction must not clear a newer active one.
+    private func accepts(_ transaction: StoreKit.Transaction, now: Date = Date()) -> Bool {
+        guard transaction.productID == Self.productID else { return false }
+        guard transaction.revocationDate == nil else { return false }
+        guard !transaction.isUpgraded else { return false }
+        if let expiration = transaction.expirationDate, expiration <= now { return false }
+        return true
+    }
+
+    private func newer(
+        _ current: StoreKit.Transaction?,
+        _ candidate: StoreKit.Transaction,
+        now: Date
+    ) -> StoreKit.Transaction? {
+        guard accepts(candidate, now: now) else { return current }
+        guard let current else { return candidate }
+        if candidate.purchaseDate >= current.purchaseDate { return candidate }
+        return current
+    }
+
+    private func adopt(_ transaction: StoreKit.Transaction) {
+        if let trusted, accepts(trusted), transaction.purchaseDate < trusted.purchaseDate {
+            return
+        }
+        trusted = transaction
     }
 }
 
