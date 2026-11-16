@@ -250,38 +250,102 @@ final class ProStore: ObservableObject {
         if product == nil {
             await loadProduct()
         }
-        guard let product else { return }
+        guard let product else {
+            logPurchase("result=no-product")
+            return
+        }
         isWorking = true
         purchaseError = nil
         defer { isWorking = false }
         do {
-            let result = try await product.purchase()
-            switch result {
-            case .success(let verification):
-                let seen = Seen(verification, source: "purchase")
-                if seen.trust, seen.productID == Self.productID, seen.revocationDate == nil {
-                    adopt(seen.transaction)
-                    purchasedAt = Date()
-                    purchaseError = nil
-                    if !isPro {
-                        isPro = true
-                        onBecamePro?()
-                    }
-                } else if !seen.trust {
-                    purchaseError = "The purchase could not be verified."
-                } else {
-                    purchaseError = "The subscription is not active."
-                }
-                await seen.transaction.finish()
-                await refreshEntitlement()
-            case .userCancelled, .pending:
-                break
-            @unknown default:
-                break
-            }
+            // A revoked or refunded transaction is not a reason to skip the
+            // sheet. `purchase()` can hand that old transaction back; finish
+            // it and ask once more so it cannot be the only result.
+            try await buy(product, retryIfRevoked: true)
         } catch {
+            logPurchase("result=error error=\(error.localizedDescription)")
             purchaseError = error.localizedDescription
         }
+    }
+
+    private func buy(_ product: StoreKit.Product, retryIfRevoked: Bool) async throws {
+        let result = try await product.purchase()
+        switch result {
+        case .success(.verified(let transaction)):
+            logPurchase("result=verified id=\(transaction.id) productID=\(transaction.productID) revocationDate=\(Self.iso(transaction.revocationDate))")
+            if transaction.revocationDate != nil {
+                await finishRevoked(transaction, retryIfRevoked: retryIfRevoked, product: product)
+                return
+            }
+            if transaction.productID == Self.productID {
+                adopt(transaction)
+                purchasedAt = Date()
+                purchaseError = nil
+                if !isPro {
+                    isPro = true
+                    onBecamePro?()
+                }
+            } else {
+                purchaseError = "The subscription is not active."
+            }
+            await transaction.finish()
+            await refreshEntitlement()
+        case .success(.unverified(let transaction, let error)):
+            let seen = Seen(.unverified(transaction, error), source: "purchase")
+            logPurchase("result=\(seen.verification) id=\(seen.id) productID=\(seen.productID) revocationDate=\(Self.iso(seen.revocationDate))")
+            if seen.revocationDate != nil {
+                await finishRevoked(transaction, retryIfRevoked: retryIfRevoked, product: product)
+                return
+            }
+            if seen.trust, seen.productID == Self.productID {
+                adopt(transaction)
+                purchasedAt = Date()
+                purchaseError = nil
+                if !isPro {
+                    isPro = true
+                    onBecamePro?()
+                }
+            } else {
+                purchaseError = "The purchase could not be verified."
+            }
+            await transaction.finish()
+            await refreshEntitlement()
+        case .pending:
+            logPurchase("result=pending")
+        case .userCancelled:
+            logPurchase("result=userCancelled")
+        @unknown default:
+            logPurchase("result=unknown")
+        }
+    }
+
+    /// The transaction StoreKit returned was already refunded. Finishing it
+    /// lets the next `purchase()` create a new one. It is not kept as Pro.
+    private func finishRevoked(
+        _ transaction: StoreKit.Transaction,
+        retryIfRevoked: Bool,
+        product: StoreKit.Product
+    ) async throws {
+        await transaction.finish()
+        if trusted?.id == transaction.id {
+            trusted = nil
+            purchasedAt = nil
+        }
+        if retryIfRevoked {
+            logPurchase("result=retry-after-revoked id=\(transaction.id)")
+            try await buy(product, retryIfRevoked: false)
+        } else {
+            purchaseError = "The subscription is not active."
+            await refreshEntitlement()
+        }
+    }
+
+    private func logPurchase(_ message: String) {
+        #if DEBUG
+        print("[RoomCast Pro] purchase \(message)".replacingOccurrences(of: "\n", with: " "))
+        #else
+        _ = message
+        #endif
     }
 
     func restore() async {
