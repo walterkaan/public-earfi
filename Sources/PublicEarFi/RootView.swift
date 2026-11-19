@@ -1097,6 +1097,11 @@ struct SettingsTab: View {
     .helperText()
     Toggle("Launch at login", isOn: loginBinding)
     Toggle("Start broadcasting when the app opens", isOn: autoStartBinding)
+    Toggle("Share usage statistics", isOn: shareUsageBinding)
+    Text(
+      "Sends an anonymous ID, app version and launch dates to help the developer. No personal data."
+    )
+    .helperText()
     if let message = model.loginItemMessage {
       Text(message)
         .helperText()
@@ -1248,6 +1253,11 @@ struct SettingsTab: View {
       get: { model.settings.startWhenAppOpens },
       set: { value in model.mutate { $0.startWhenAppOpens = value } })
   }
+  private var shareUsageBinding: Binding<Bool> {
+    Binding(
+      get: { model.settings.shareUsageStatistics },
+      set: { value in model.mutate { $0.shareUsageStatistics = value } })
+  }
   private var iceText: Binding<String> { numberText(\.icePort) }
   private var styleBinding: Binding<URLStyle> {
     Binding(
@@ -1353,7 +1363,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
     case .poster:
       return "Wi-Fi details printed on the QR poster so guests can join and listen."
     case .general:
-      return "Keep the Mac awake, launch at login, start broadcasting automatically, and check for updates."
+      return "Keep the Mac awake, launch at login, start broadcasting automatically, share usage statistics, and check for updates."
     case .advanced:
       return "Ports, listener limits, logging, and custom bitrate for organisers who need them."
     }
@@ -1368,7 +1378,10 @@ private enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
     case .poster:
       return ["wifi", "wi-fi", "password", "ssid", "security", "hidden", "qr"]
     case .general:
-      return ["awake", "login", "launch", "autostart", "sleep", "update", "updates", "version"]
+      return [
+        "awake", "login", "launch", "autostart", "sleep", "update", "updates", "version",
+        "usage", "statistics", "privacy",
+      ]
     case .advanced:
       return ["ice", "webrtc", "url", "local", "listeners", "log", "custom", "reset"]
     }

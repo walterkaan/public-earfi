@@ -201,6 +201,70 @@ final class RoomCastAPITests: XCTestCase {
     )
   }
 
+  func testSharingUsageOffSendsNothingAndKeepsTheSerial() throws {
+    let suite = "roomcast-opt-out-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defaults.removePersistentDomain(forName: suite)
+    let now = Date(timeIntervalSince1970: 1_763_577_600)
+    var sent: [(url: String, body: Data)] = []
+    func deliver(
+      _ url: URL, _ body: Data, _ completion: @escaping (UsagePostOutcome) -> Void
+    ) {
+      sent.append((url.absoluteString, body))
+      XCTAssertFalse(url.absoluteString.contains("latest.json"))
+      completion(.registered)
+    }
+
+    UsageDispatch.sendLaunch(
+      shareUsage: false, defaults: defaults, appVersion: "1.0.2", osVersion: "15.1.0", now: now,
+      post: deliver)
+    UsageDispatch.sendLaunch(
+      shareUsage: false, defaults: defaults, appVersion: "1.0.2", osVersion: "15.1.0", now: now,
+      post: deliver)
+    XCTAssertTrue(sent.isEmpty)
+    let serial = try XCTUnwrap(defaults.string(forKey: UsageIdentityStore.serialKey))
+    XCTAssertTrue(UsagePayload.isInstallationSerial(serial))
+    XCTAssertEqual(serial.count, 36)
+    XCTAssertFalse(defaults.bool(forKey: UsageIdentityStore.installAcknowledgedKey))
+    let installedAt = try XCTUnwrap(defaults.string(forKey: UsageIdentityStore.installedAtKey))
+    XCTAssertTrue(RoomCastTime.isUTCTimestamp(installedAt))
+
+    var settings = AppSettings.defaults
+    settings.shareUsageStatistics = false
+    let store = SettingsStore(userDefaults: defaults)
+    store.save(settings)
+    XCTAssertFalse(store.load().shareUsageStatistics)
+    UsageDispatch.sendLaunch(
+      shareUsage: store.load().shareUsageStatistics,
+      defaults: defaults,
+      appVersion: "1.0.2",
+      osVersion: "15.1.0",
+      now: now,
+      post: deliver)
+    XCTAssertTrue(sent.isEmpty)
+
+    settings.shareUsageStatistics = true
+    store.save(settings)
+    UsageDispatch.sendLaunch(
+      shareUsage: store.load().shareUsageStatistics,
+      defaults: defaults,
+      appVersion: "1.0.2",
+      osVersion: "15.1.0",
+      now: now,
+      post: deliver)
+    XCTAssertEqual(
+      sent.map(\.url),
+      [RoomCastAPI.installURL.absoluteString, RoomCastAPI.runURL.absoluteString])
+    let install = try strings(sent[0].body)
+    let run = try strings(sent[1].body)
+    XCTAssertEqual(install["serial"], serial)
+    XCTAssertEqual(run["serial"], serial)
+    XCTAssertEqual(install["installed_at"], installedAt)
+    XCTAssertEqual(run["ran_at"], RoomCastTime.iso8601(now))
+    XCTAssertTrue(defaults.bool(forKey: UsageIdentityStore.installAcknowledgedKey))
+    XCTAssertEqual(defaults.string(forKey: UsageIdentityStore.serialKey), serial)
+  }
+
   private func strings(_ data: Data) throws -> [String: String] {
     try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: String])
   }

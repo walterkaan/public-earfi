@@ -23,6 +23,7 @@ final class SettingsTests: XCTestCase {
     XCTAssertTrue(settings.keepAwake)
     XCTAssertFalse(settings.launchAtLogin)
     XCTAssertFalse(settings.startWhenAppOpens)
+    XCTAssertTrue(settings.shareUsageStatistics)
     XCTAssertEqual(settings.logLevel, .info)
     XCTAssertEqual(settings.posterHeader, "Listen live on your phone")
     XCTAssertEqual(settings.posterDescription, "")
@@ -134,6 +135,7 @@ final class SettingsTests: XCTestCase {
     settings.inputGainDB = 18
     settings.broadcastTitle = "Hall A"
     settings.posterWiFiPassword = "secret"
+    settings.shareUsageStatistics = false
     XCTAssertEqual(BroadcastSignature(settings), before)
     settings.listenerPort = 8890
     XCTAssertNotEqual(BroadcastSignature(settings), before)
@@ -266,6 +268,7 @@ final class SettingsTests: XCTestCase {
     XCTAssertFalse(missingPosterFields.posterWiFiHidden)
     XCTAssertEqual(missingPosterFields.posterNetworkName, "")
     XCTAssertEqual(missingPosterFields.posterWiFiPassword, "")
+    XCTAssertTrue(missingPosterFields.shareUsageStatistics)
 
     var poster = AppSettings.defaults
     poster.posterNetworkName = "Hall-Guest"

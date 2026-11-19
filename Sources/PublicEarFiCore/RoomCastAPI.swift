@@ -129,6 +129,61 @@ public enum UsagePayload {
   }
 }
 
+/// Decides the install and run posts for one launch. The update check is not
+/// part of this. Sharing off stores the serial and posts nothing, including a
+/// pending install.
+public enum UsageDispatch {
+  public static func sendLaunch(
+    shareUsage: Bool,
+    defaults: UserDefaults,
+    appVersion: String,
+    osVersion: String,
+    now: Date = Date(),
+    post: @escaping (_ url: URL, _ body: Data, _ completion: @escaping (UsagePostOutcome) -> Void) -> Void
+  ) {
+    let store = UsageIdentityStore(defaults: defaults)
+    let identity = store.loadOrCreate(now: now)
+    guard shareUsage else { return }
+    if identity.installAcknowledged {
+      sendRun(serial: identity.serial, appVersion: appVersion, now: now, post: post)
+      return
+    }
+    guard
+      let body = UsagePayload.installJSON(
+        serial: identity.serial,
+        installedAt: identity.installedAt,
+        appVersion: appVersion,
+        osVersion: osVersion
+      )
+    else { return }
+    post(RoomCastAPI.installURL, body) { outcome in
+      switch outcome {
+      case .registered, .rejected:
+        store.markInstallAcknowledged()
+        sendRun(serial: identity.serial, appVersion: appVersion, now: now, post: post)
+      case .throttled, .retryLater:
+        break
+      }
+    }
+  }
+
+  private static func sendRun(
+    serial: String,
+    appVersion: String,
+    now: Date,
+    post: @escaping (_ url: URL, _ body: Data, _ completion: @escaping (UsagePostOutcome) -> Void) -> Void
+  ) {
+    guard
+      let body = UsagePayload.runJSON(
+        serial: serial,
+        ranAt: RoomCastTime.iso8601(now),
+        appVersion: appVersion
+      )
+    else { return }
+    post(RoomCastAPI.runURL, body) { _ in }
+  }
+}
+
 /// How to treat one install or run response. Runs are never queued for later.
 public enum UsagePostOutcome: Equatable {
   /// 2xx. The install is registered.

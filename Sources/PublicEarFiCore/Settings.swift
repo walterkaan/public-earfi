@@ -51,6 +51,8 @@ public struct AppSettings: Codable, Equatable {
   public var keepAwake: Bool
   public var launchAtLogin: Bool
   public var startWhenAppOpens: Bool
+  /// Anonymous install and run reports. On by default. The update check ignores this.
+  public var shareUsageStatistics: Bool
   public var logLevel: LogLevel
   public var posterHeader: String
   public var posterDescription: String
@@ -83,6 +85,7 @@ public struct AppSettings: Codable, Equatable {
     keepAwake: Bool = true,
     launchAtLogin: Bool = false,
     startWhenAppOpens: Bool = false,
+    shareUsageStatistics: Bool = true,
     logLevel: LogLevel = .info,
     posterHeader: String = PosterBuilder.defaultHeader,
     posterDescription: String = "",
@@ -112,6 +115,7 @@ public struct AppSettings: Codable, Equatable {
     self.keepAwake = keepAwake
     self.launchAtLogin = launchAtLogin
     self.startWhenAppOpens = startWhenAppOpens
+    self.shareUsageStatistics = shareUsageStatistics
     self.logLevel = logLevel
     self.posterHeader = posterHeader
     self.posterDescription = posterDescription
@@ -642,6 +646,7 @@ private struct StoredSettings: Codable {
   var keepAwake: Bool?
   var launchAtLogin: Bool?
   var startWhenAppOpens: Bool?
+  var shareUsageStatistics: Bool?
   var logLevel: LogLevel?
   var posterHeader: String?
   var posterDescription: String?
@@ -721,6 +726,7 @@ public struct SettingsStore {
     if let value = stored.keepAwake { settings.keepAwake = value }
     if let value = stored.launchAtLogin { settings.launchAtLogin = value }
     if let value = stored.startWhenAppOpens { settings.startWhenAppOpens = value }
+    if let value = stored.shareUsageStatistics { settings.shareUsageStatistics = value }
     if let value = stored.logLevel { settings.logLevel = value }
     if let value = stored.posterHeader { settings.posterHeader = value }
     if let value = stored.posterDescription { settings.posterDescription = value }

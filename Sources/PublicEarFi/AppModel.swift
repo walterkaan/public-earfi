@@ -142,6 +142,7 @@ final class AppModel: ObservableObject {
     Self.didReportLaunch = true
     UsageReporter.sendLaunch(
       defaults: UserDefaults.standard,
+      shareUsage: settings.shareUsageStatistics,
       appVersion: Self.shortVersion(),
       osVersion: RoomCastSystem.versionString
     )

@@ -74,6 +74,10 @@ Do this once, on the Wi-Fi you will take to the venue.
 
 Take the same router, the same Mac, and that PDF to the event.
 
+## Usage statistics
+
+**Settings → General** has **Share usage statistics**. It is on unless you turn it off. While it is on, RoomCast sends an anonymous ID, the app version, and launch dates to help the developer. No personal data. While it is off, those reports are not sent, and one that never arrived is not sent later. The ID stays stored on the Mac and is unused until you turn sharing back on. The next launch then reports as usual, including the first install report if that never succeeded. Nothing asks you to confirm either way. **Check for Updates** on the same page does not depend on this switch.
+
 ## Install and first open
 
 1. Download `RoomCast-x.y.z.dmg` from [roomcast.channel](https://roomcast.channel).

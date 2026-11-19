@@ -60,49 +60,25 @@ enum RoomCastHTTP {
 }
 
 /// Install until the server accepts it or rejects the payload, and one run
-/// report per launch. Both posts are background URLSession tasks.
+/// report per launch. Both posts are background URLSession tasks. Sharing
+/// usage off skips both, including a pending install.
 enum UsageReporter {
   static func sendLaunch(
-    defaults: UserDefaults, appVersion: String, osVersion: String, now: Date = Date()
+    defaults: UserDefaults,
+    shareUsage: Bool,
+    appVersion: String,
+    osVersion: String,
+    now: Date = Date()
   ) {
-    let store = UsageIdentityStore(defaults: defaults)
-    let identity = store.loadOrCreate(now: now)
-    if identity.installAcknowledged {
-      sendRun(serial: identity.serial, appVersion: appVersion, now: now)
-      return
+    UsageDispatch.sendLaunch(
+      shareUsage: shareUsage,
+      defaults: defaults,
+      appVersion: appVersion,
+      osVersion: osVersion,
+      now: now
+    ) { url, body, completion in
+      RoomCastHTTP.post(body, to: url, completion: completion)
     }
-    guard
-      let body = UsagePayload.installJSON(
-        serial: identity.serial,
-        installedAt: identity.installedAt,
-        appVersion: appVersion,
-        osVersion: osVersion
-      )
-    else { return }
-    RoomCastHTTP.post(body, to: RoomCastAPI.installURL) { outcome in
-      switch outcome {
-      case .registered, .rejected:
-        // 2xx is registered. 400, 413, and 415 will not succeed on a retry.
-        store.markInstallAcknowledged()
-        sendRun(serial: identity.serial, appVersion: appVersion, now: now)
-      case .throttled, .retryLater:
-        // 429 stops this launch. 503 and network errors retry the install
-        // next time. Either way the run for this launch is dropped.
-        break
-      }
-    }
-  }
-
-  /// One shot. A 429, 503, or network error is ignored. The next launch sends a new run.
-  private static func sendRun(serial: String, appVersion: String, now: Date) {
-    guard
-      let body = UsagePayload.runJSON(
-        serial: serial,
-        ranAt: RoomCastTime.iso8601(now),
-        appVersion: appVersion
-      )
-    else { return }
-    RoomCastHTTP.post(body, to: RoomCastAPI.runURL) { _ in }
   }
 }
 
