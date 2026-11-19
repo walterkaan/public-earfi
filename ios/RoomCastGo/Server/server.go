@@ -36,6 +36,8 @@ type server struct {
 	api      *webrtc.API
 	sessions map[string]*session
 	title    string
+	host     string
+	started  int64
 	closed   bool
 	cancel   context.CancelFunc
 	ctx      context.Context
@@ -46,7 +48,7 @@ type server struct {
 	tcpListener *net.TCPListener
 }
 
-func newServer(httpPort, icePort int, ip, iface, title string) (*server, error) {
+func newServer(httpPort, icePort int, ip, iface, title, host string, started int64) (*server, error) {
 	parsed := net.ParseIP(ip).To4()
 	if parsed == nil {
 		return nil, errors.New("the broadcast address is not an IPv4 address")
@@ -55,6 +57,10 @@ func newServer(httpPort, icePort int, ip, iface, title string) (*server, error) 
 		return nil, errors.New("RoomCast Go only broadcasts on Wi-Fi or Personal Hotspot")
 	}
 	title = sanitizeTitle(title)
+	host = sanitizeHost(host)
+	if started <= 0 {
+		started = time.Now().Unix()
+	}
 	iface = safeIfaceName(iface)
 
 	track, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{
@@ -63,7 +69,7 @@ func newServer(httpPort, icePort int, ip, iface, title string) (*server, error) 
 		Channels:  2,
 		// stereo=1 lets a USB music broadcast send stereo Opus on this same
 		// track. Voice stays mono packets. Listeners do not renegotiate.
-		SDPFmtpLine: "minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1",
+		SDPFmtpLine: "minptime=10;useinbandfec=1;usedtx=0;stereo=1;sprop-stereo=1",
 	}, "audio", "roomcast")
 	if err != nil {
 		return nil, fmt.Errorf("could not create the audio track: %w", err)
@@ -111,6 +117,8 @@ func newServer(httpPort, icePort int, ip, iface, title string) (*server, error) 
 		api:         webrtc.NewAPI(webrtc.WithSettingEngine(setting)),
 		sessions:    map[string]*session{},
 		title:       title,
+		host:        host,
+		started:     started,
 		cancel:      cancel,
 		ctx:         ctx,
 		udpConn:     udpConn,
@@ -168,6 +176,12 @@ func advertiseStereo(sdp string) string {
 		}
 		if !strings.Contains(line, "sprop-stereo=") {
 			lines[i] += ";sprop-stereo=1"
+		}
+		if !strings.Contains(line, "useinbandfec=") {
+			lines[i] += ";useinbandfec=1"
+		}
+		if !strings.Contains(line, "usedtx=") {
+			lines[i] += ";usedtx=0"
 		}
 	}
 	return strings.Join(lines, "\r\n")

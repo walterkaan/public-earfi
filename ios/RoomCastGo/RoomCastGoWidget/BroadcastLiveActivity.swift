@@ -36,7 +36,7 @@ struct BroadcastLiveActivity: Widget {
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    livePill(context.state)
+                    livePill(context.state, stale: context.isStale)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 8) {
@@ -48,7 +48,7 @@ struct BroadcastLiveActivity: Widget {
                     }
                 }
             } compactLeading: {
-                logo(size: 18)
+                logo(size: 28)
             } compactTrailing: {
                 Text("\(context.state.listeners)")
                     .font(.caption2.weight(.bold).monospacedDigit())
@@ -65,7 +65,7 @@ struct BroadcastLiveActivity: Widget {
     private func lockScreen(_ context: ActivityViewContext<BroadcastAttributes>) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                logo(size: 36)
+                logo(size: 56)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("RoomCast Go")
                         .font(.headline)
@@ -74,7 +74,7 @@ struct BroadcastLiveActivity: Widget {
                         .foregroundStyle(.white.opacity(0.82))
                 }
                 Spacer(minLength: 8)
-                livePill(context.state)
+                livePill(context.state, stale: context.isStale)
             }
             LevelBar(
                 level: context.state.level,
@@ -90,19 +90,21 @@ struct BroadcastLiveActivity: Widget {
     private func logo(size: CGFloat) -> some View {
         Image("Logo")
             .resizable()
-            .scaledToFill()
+            .scaledToFit()
             .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
             .accessibilityHidden(true)
     }
 
-    private func livePill(_ state: BroadcastAttributes.ContentState) -> some View {
-        Text(state.muted ? "Muted" : "Live")
+    private func livePill(_ state: BroadcastAttributes.ContentState, stale: Bool) -> some View {
+        let title = stale ? "Ended" : (state.muted ? "Muted" : "Live")
+        let fill = stale ? Color.white.opacity(0.28) : (state.muted ? pink : teal)
+        let ink: Color = stale || state.muted ? .white : navy
+        return Text(title)
             .font(.caption.weight(.bold))
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(state.muted ? pink : teal, in: Capsule())
-            .foregroundStyle(state.muted ? Color.white : navy)
+            .background(fill, in: Capsule())
+            .foregroundStyle(ink)
     }
 
     private func controls(_ state: BroadcastAttributes.ContentState) -> some View {

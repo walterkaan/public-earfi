@@ -1,9 +1,11 @@
 # RoomCast Go
 
 iPhone-only proof that a phone can host a **voice-only** RoomCast broadcast.
-One screen: Start / Stop, a mute button, a mic-gain slider, and, while
-live, a QR code, Share, the listener URL, a listener count, and a live
-microphone meter. Tap the listener count for CPU, heat, and battery.
+One screen: a Wi-Fi confirmation, Start / Stop, a Setup sheet for the
+session name, a mute button, a volume-boost slider, and, while live, a
+QR code, Share, the listener URL, a listener count, and a live
+microphone meter. Free sessions last 40 minutes. Pro
+(`channel.roomcast.go.pro.monthly`) removes that limit. Tap the listener count for CPU, heat, and battery.
 Voice is Opus mono at 32 kbps. A USB input can switch to Music. No input
 picker: iOS switches the mic on its own.
 While a broadcast is running, a Live Activity on the lock screen and in
@@ -51,9 +53,15 @@ by hand.
    Xcode creates the App ID, the Apple Development certificate, and the
    development provisioning profile, and registers the phone’s UDID.
 
-Do not add capabilities. This proof does not use Push Notifications,
-Associated Domains, Multicast Networking, iCloud, or Sign in with Apple.
-No `.p8` key is required.
+Add one capability on the `channel.roomcast.go` App ID: Access Wi-Fi
+Information (`com.apple.developer.networking.wifi-info`). It is already
+in `RoomCastGo.entitlements`. Xcode’s automatic signing can turn it on
+when you build. If it does not, enable it under Certificates, Identifiers
+& Profiles → the App ID → Access Wi-Fi Information. The app also asks for
+Location While Using so iOS will reveal the Wi-Fi name. It does not use
+Push Notifications, Associated Domains, Multicast Networking, iCloud, or
+Sign in with Apple. No `.p8` key is required. The Pro subscription is an
+App Store Connect product, not an extra entitlement.
 
 If automatic signing fails, create these in
 [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources):
@@ -101,19 +109,32 @@ In Xcode, choose your iPhone in the destination menu, not a simulator, and
 press Run. Trust the developer on the phone if iOS asks
 (Settings → General → VPN & Device Management).
 
-On the phone, allow Microphone and Local Network. If you deny one of them:
+On the phone, allow Microphone, Location, and Local Network. Location is
+only used to read the Wi-Fi name. If you deny one of them:
 
 - Settings → Privacy & Security → Microphone → RoomCast Go
+- Settings → Privacy & Security → Location → RoomCast Go
 - Settings → Privacy & Security → Local Network → RoomCast Go
+
+The shared scheme selects `Products.storekit` so Pro can be purchased in
+the simulator of StoreKit Testing without App Store Connect. Edit Scheme →
+Run → Options should show that file. The paywall reads `displayPrice` from
+the product.
+
+On launch the app reads the Wi-Fi name and asks you to continue before
+Start appears. No Wi-Fi, and this iPhone’s Personal Hotspot, each get
+their own prompt. Tap Setup to name the session. That name is the title
+on the listener page.
 
 Press Start. The orange microphone dot means the phone is capturing. Another
 phone on the same Wi-Fi scans the QR code, or you tap Share and send the
-URL by Messages or AirDrop. The page starts muted, the same way the Mac
-listener page does, so the browser will allow autoplay. Tap the speaker
-icon. The host’s lock screen keeps the broadcast running. Start and Stop
+URL by Messages or AirDrop. The page tries to play unmuted. iOS Safari
+blocks that without a tap, so the large play button is the one tap that
+starts the sound. Desktop browsers that allow unmuted autoplay start on
+their own. The host’s lock screen keeps the broadcast running. Start and Stop
 show Starting… or Stopping… until the server answers, so a second tap does
 not undo the first. Mute sends silence and leaves the listeners connected.
-The gain slider runs from 0.5× to 3×. At 1× the built-in mic keeps its
+The volume boost slider runs from 0.5× to 3×. At 1× the built-in mic keeps its
 usual voice processing. Above 1× that automatic gain switches off so the
 boost can be heard. Plug in a USB input and Voice / Music appears under
 the mic. Music turns voice processing off, sends 48 kHz Opus (128 kbps
@@ -163,9 +184,10 @@ sound fine. See [FINDINGS.md](FINDINGS.md).
 - **“Roomcast.xcframework is missing”**, or you just pulled a change to
   the listener page or the Go server: run `./scripts/build-server-framework.sh`
   from `ios/RoomCastGo`, then build again. The page and the server are
-  compiled into the framework. Rebuild before testing this branch: the
-  listener page gained a no-JavaScript line, and the Opus SDP advertises
-  stereo so USB Music does not need a renegotiation.
+  compiled into the framework. Rebuild before testing this branch:
+  `RoomcastStart` now takes the session name, the device name, and the
+  broadcast start time, and the listener page is the new player. An old
+  framework will not link.
 - **Widget or App Group signing error**: create `group.channel.roomcast.go`
   and the App ID `channel.roomcast.go.widget` as in the table above, enable
   the group on both `channel.roomcast.go` and `channel.roomcast.go.widget`,

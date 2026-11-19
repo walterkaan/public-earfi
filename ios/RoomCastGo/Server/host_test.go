@@ -75,4 +75,10 @@ func TestSanitizeTitle(t *testing.T) {
 	if got := sanitizeTitle("   "); got != "RoomCast Broadcast" {
 		t.Fatalf("blank title = %q", got)
 	}
+	if got := sanitizeHost("  Walt's   iPhone  "); got != "Walt's iPhone" {
+		t.Fatalf("host = %q", got)
+	}
+	if got := sanitizeHost("  "); got != "this iPhone" {
+		t.Fatalf("blank host = %q", got)
+	}
 }

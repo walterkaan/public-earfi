@@ -90,11 +90,31 @@ go install "golang.org/x/mobile/cmd/gomobile@${GOMOBILE_REV}"
 go install "golang.org/x/mobile/cmd/gobind@${GOMOBILE_REV}"
 
 mkdir -p "$ROOT/build"
+# Replace any previous framework. Xcode links this exact path
+# (project file reference build/Roomcast.xcframework, SRCROOT = this folder).
+# Leaving the old one in place is why RoomcastStart still looks like
+# (httpPort, icePort, ip, iface, title, error) and Swift reports extra
+# arguments at #7 and #8.
+rm -rf "$OUT"
 echo "Compiling the listener server for iPhone (arm64). This takes a few minutes the first time."
+echo "Output, which Xcode links: $OUT"
 (
   cd "$ROOT/Server"
   gomobile bind -target=ios/arm64 -iosversion=17.0 -trimpath -o "$OUT" .
 )
 
+header="$(find "$OUT" -name 'Roomcast.objc.h' -print -quit)"
+if [[ -z "$header" ]]; then
+  echo "error: $OUT has no Roomcast.objc.h" >&2
+  exit 1
+fi
+if ! grep -q 'startedUnix' "$header"; then
+  echo "error: RoomcastStart in $header has no startedUnix parameter." >&2
+  echo "Swift expects RoomcastStart(httpPort, icePort, ip, iface, title, host, startedUnix, &error)." >&2
+  grep -n 'RoomcastStart' "$header" >&2 || true
+  exit 1
+fi
+echo "RoomcastStart signature:"
+grep -n 'RoomcastStart' "$header"
 echo "Wrote $OUT"
 echo "In Xcode, open $ROOT/RoomCastGo.xcodeproj, select your iPhone, and press Run."

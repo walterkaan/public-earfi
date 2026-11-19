@@ -23,6 +23,8 @@ OpusEncoder *roomcast_opus_create(int channels, int bitrate, int application, in
     opus_encoder_ctl(encoder, OPUS_SET_VBR(1));
     opus_encoder_ctl(encoder, OPUS_SET_SIGNAL(app == OPUS_APPLICATION_AUDIO ? OPUS_SIGNAL_MUSIC : OPUS_SIGNAL_VOICE));
     opus_encoder_ctl(encoder, OPUS_SET_DTX(0));
+    opus_encoder_ctl(encoder, OPUS_SET_INBAND_FEC(1));
+    opus_encoder_ctl(encoder, OPUS_SET_PACKET_LOSS_PERC(15));
     opus_encoder_ctl(encoder, OPUS_SET_LSB_DEPTH(16));
     return encoder;
 }

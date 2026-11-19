@@ -25,9 +25,16 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>RoomCast Go listens on this Wi-Fi or Personal Hotspot so other phones can open the listener page and hear the broadcast. The audio stays on the local network.</string>
+	<string>RoomCast Go needs local network access so phones on this Wi-Fi or Personal Hotspot can open the listener page and hear the broadcast. Audio stays on the local network and is never uploaded.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Phone will ask for Location access, which is used to confirm your Wi-Fi name. App will display your current Wi-Fi to assist clients joining.</string>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>WifiSSID</key>
+		<string>Phone will ask for Location access, which is used to confirm your Wi-Fi name. App will display your current Wi-Fi to assist clients joining.</string>
+	</dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>RoomCast Go uses the microphone to broadcast your voice to phones on this Wi-Fi or Personal Hotspot. The audio stays on the local network.</string>
+	<string>RoomCast Go will ask for access to your phone's Microphone to enable it to share sound</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

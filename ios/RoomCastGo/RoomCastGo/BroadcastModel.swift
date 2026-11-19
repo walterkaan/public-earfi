@@ -7,6 +7,52 @@ import Network
 import StoreKit
 import UIKit
 
+/// Shown before a system permission dialog, or after the user has said no.
+enum PermissionExplain: String, Identifiable {
+    case microphone
+    case microphoneDenied
+    case location
+    case locationDenied
+    case notifications
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .microphone, .microphoneDenied:
+            return "Microphone"
+        case .location, .locationDenied:
+            return "Location notification"
+        case .notifications:
+            return "Notifications"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .microphone:
+            return "RoomCast Go will ask for access to your phone's Microphone to enable it to share sound"
+        case .microphoneDenied:
+            return "Microphone access is off. RoomCast Go needs it to broadcast your voice or a plugged-in mic. Open Settings to turn it on."
+        case .location:
+            return "Phone will ask for Location access, which is used to confirm your Wi-Fi name. App will display your current Wi-Fi to assist clients joining."
+        case .locationDenied:
+            return "Location access is off, so the Wi-Fi name can’t be read. Open Settings to allow location while using the app."
+        case .notifications:
+            return "Allows RoomCast Go to communicate with you even when it is in the background."
+        }
+    }
+
+    var continues: Bool {
+        switch self {
+        case .microphone, .location, .notifications:
+            return true
+        case .microphoneDenied, .locationDenied:
+            return false
+        }
+    }
+}
+
 enum BroadcastPhase: Equatable {
     case idle
     case starting
@@ -33,9 +79,22 @@ final class BroadcastModel: ObservableObject {
     @Published var level: Float = 0
     @Published var clipping = false
     @Published var inputName = ""
+    @Published var hardwareLabel = "Mono (iPhone mic)"
+    @Published var hardwareChannels = 1
+    /// On for a mono music input until the host turns it off.
+    @Published var stereoWiden = UserDefaults.standard.object(forKey: "capture.stereoWiden") as? Bool ?? true
+    /// Mic icon goes green while the meter is above a small threshold.
+    @Published var inputHeard = false
+    /// Live, unmuted, and the input has stayed near silence for about two seconds.
+    @Published var inputSilent = false
+    /// The stream's address changed. The server has moved; listeners need the new code.
+    @Published var networkChanged = false
     @Published var qrImage: UIImage?
     @Published var muted = false
     @Published var gain = 1.0
+    /// 1 is unity (0 dB). Line cards start here so Volume boost does not add gain.
+    @Published var inputLevel = UserDefaults.standard.object(forKey: "capture.inputLevel") as? Double ?? 0.5
+    @Published var inputGainSettable = false
     /// Remembered across launches. Applied only while a USB input is connected.
     @Published var musicPreferred = true // USB always uses Music quality
     @Published var usbInput = false
@@ -43,9 +102,28 @@ final class BroadcastModel: ObservableObject {
     @Published var cpuPercent = 0.0
     @Published var thermal = ProcessInfo.processInfo.thermalState
     @Published var batteryLevel: Float = -1
+    @Published var sessionName = SessionName.stored
+    @Published var wifiPrompt: WifiPrompt = .checking
+    @Published var wifiReady = false
+    @Published var wifiDown = false
+    /// Set when a free session is stopped at 40 minutes, so the paywall opens.
+    @Published var freeLimitHit = false
+    /// In-app explanation shown before the system permission dialog.
+    @Published var permissionExplain: PermissionExplain?
+    let store = ProStore()
 
     var isOnAir: Bool { phase == .live || phase == .reconnecting }
     var musicActive: Bool { musicPreferred && usbInput }
+    var canWiden: Bool { musicActive && hardwareChannels < 2 }
+    /// What the current capture mode actually is. Voice is the processed mic.
+    /// Music is mono. Stereo music is a stereo card, or mono music with widen on.
+    var soundQualityWord: String {
+        if !musicActive { return "Voice" }
+        if hardwareChannels >= 2 || stereoWiden { return "Stereo music" }
+        return "Music"
+    }
+    /// Idle screen, live screen, and Setup all show this name.
+    var soundSourceName: String { inputName.isEmpty ? "iPhone mic" : inputName }
 
     var listenerLabel: String {
         switch listeners {
@@ -92,7 +170,7 @@ final class BroadcastModel: ObservableObject {
     private var rebindRunning = false
     private var rebindAgain = false
     private var remoteInstalled = false
-    private var startedAt: Date?
+    @Published var startedAt: Date?
     private var cpuSampler = AppCPUSampler()
     private var usbObserver: NSObjectProtocol?
     private var nowPlayingKey = ""
@@ -100,6 +178,42 @@ final class BroadcastModel: ObservableObject {
         guard let image = UIImage(named: "Logo") else { return nil }
         return MPMediaItemArtwork(boundsSize: image.size) { _ in image }
     }()
+    private let wifiNames = WifiNameSource()
+    private var knownSSID: String?
+    /// IP the cached SSID was read for. Empty means the confirm dialog still needs a read.
+    private var ssidFetchedForIP = ""
+    private var ssidTask: Task<Void, Never>?
+    /// False while the app is not the active scene, so a timer or a resume does not read the SSID.
+    private var foreground = true
+    /// Set when NWPathMonitor reports a new Wi-Fi path. One SSID read consumes it.
+    private var pathSSIDDirty = false
+    private var acceptedWifi: WifiChoice?
+    private var limitTask: Task<Void, Never>?
+    private var stopNote: String?
+    private var wifiAlertSent = false
+    private var wifiDownTask: Task<Void, Never>?
+    private var networkChangeTask: Task<Void, Never>?
+    private var locationExplainDismissed = false
+    private var locationPromptActive = false
+    private var queuedPermission: PermissionExplain?
+    private var sawAddress = false
+    private var startedNetworkIP: String?
+    private var startedNetworkSSID: String?
+    private var announcedNetwork: String?
+    /// −60 dBFS is 0 and 0 dBFS is 1, same scale as `level`. −55 dBFS is the quiet line.
+    private let audibleLevel: Float = 5.0 / 60.0
+    private let silentAfter: TimeInterval = 3
+    private let attackSeconds: Float = 0.045
+    private let releaseSeconds: Float = 0.28
+    private var displayedLevel: Float = 0
+    private var lastLevelNote = Date.distantPast
+    private var quietSince: Date?
+
+    private enum WifiChoice: Equatable {
+        case ssid(String)
+        case hotspot
+        case unnamed
+    }
 
     init() {
         BroadcastBus.start { [weak self] command in
@@ -107,15 +221,26 @@ final class BroadcastModel: ObservableObject {
                 self?.handle(command)
             }
         }
+        store.onBecamePro = { [weak self] in
+            self?.cancelFreeLimit()
+        }
+        wifiNames.onAuthorizationChange = { [weak self] in
+            self?.syncWifiPrompt()
+        }
+        activity.endOrphans()
     }
 
     func appear() {
         UIDevice.current.isBatteryMonitoringEnabled = true
+        FreeUsage.sealAbandoned(now: Date())
         Task { await self.prepareAddress() }
         if phase == .idle {
             activity.endOrphans()
             refreshUSB()
         }
+        bindInputWatch()
+        capture.setStereoWiden(stereoWiden)
+        capture.startMonitoringRoutes()
         observeUSBWhileIdle()
         guard monitor == nil else { return }
         let monitor = NWPathMonitor()
@@ -129,8 +254,126 @@ final class BroadcastModel: ObservableObject {
         self.monitor = monitor
     }
 
-    func sceneBecameActive() {
+    func noteSceneActive(_ active: Bool) {
+        foreground = active
+        if active {
+            capture.refreshRoute()
+            Task { await self.store.refreshEntitlement() }
+        }
+        if !active, let startedAt, isOnAir, !store.isPro {
+            FreeUsage.checkpoint(start: startedAt, now: Date())
+        }
+        guard active else { return }
         Task { await self.refreshAfterActive() }
+    }
+
+    func setSessionName(_ raw: String) {
+        let name = SessionName.cleaned(raw)
+        sessionName = name
+        UserDefaults.standard.set(name, forKey: SessionName.key)
+    }
+
+    func confirmWifi() {
+        switch wifiPrompt {
+        case .ssid(let name):
+            acceptedWifi = .ssid(name)
+        case .hotspot:
+            acceptedWifi = .hotspot
+        case .unnamed:
+            acceptedWifi = .unnamed
+        case .checking, .noNetwork:
+            return
+        }
+        wifiReady = true
+    }
+
+    func recheckWifi() {
+        acceptedWifi = nil
+        wifiReady = false
+        ssidFetchedForIP = ""
+        locationExplainDismissed = false
+        wifiPrompt = .checking
+        Task { await self.updateAddress() }
+    }
+
+    func continuePermission() {
+        let current = permissionExplain
+        permissionExplain = nil
+        switch current {
+        case .microphone:
+            requestMicrophone()
+        case .location:
+            Task { await self.requestLocation() }
+        case .notifications:
+            WifiDropNotifier.requestPermission()
+            promotePermission()
+        case .microphoneDenied, .locationDenied, nil:
+            promotePermission()
+        }
+    }
+
+    func dismissPermission() {
+        if permissionExplain == .location {
+            locationExplainDismissed = true
+        }
+        permissionExplain = nil
+        promotePermission()
+    }
+
+    private func offerPermission(_ ask: PermissionExplain) {
+        if permissionExplain == nil {
+            permissionExplain = ask
+        } else if permissionExplain != ask, queuedPermission == nil {
+            queuedPermission = ask
+        }
+    }
+
+    private func promotePermission() {
+        guard permissionExplain == nil else { return }
+        if let queuedPermission {
+            permissionExplain = queuedPermission
+            self.queuedPermission = nil
+        }
+    }
+
+    private func requestMicrophone() {
+        AVAudioApplication.requestRecordPermission { [weak self] granted in
+            Task { @MainActor in
+                guard let self else { return }
+                if granted {
+                    self.beginStart()
+                } else {
+                    self.permissionExplain = .microphoneDenied
+                }
+                self.promotePermission()
+            }
+        }
+    }
+
+    private func requestLocation() async {
+        locationPromptActive = true
+        let status = await wifiNames.requestWhenInUse()
+        locationPromptActive = false
+        if status == .denied || status == .restricted {
+            permissionExplain = .locationDenied
+            syncWifiPrompt()
+            return
+        }
+        locationExplainDismissed = false
+        syncWifiPrompt()
+        promotePermission()
+    }
+
+    /// The system notification dialog. Only after the in-app explanation, and
+    /// only while the choice is still not determined.
+    private func offerNotificationsIfNeeded() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let status = settings.authorizationStatus
+            Task { @MainActor in
+                guard status == .notDetermined else { return }
+                self.offerPermission(.notifications)
+            }
+        }
     }
 
     func toggle() {
@@ -142,6 +385,65 @@ final class BroadcastModel: ObservableObject {
         case .idle:
             beginStart()
         }
+    }
+
+    func setStereoWiden(_ on: Bool) {
+        guard stereoWiden != on else { return }
+        stereoWiden = on
+        UserDefaults.standard.set(on, forKey: "capture.stereoWiden")
+        capture.setStereoWiden(on)
+    }
+
+    func dismissNetworkChange() {
+        networkChanged = false
+    }
+
+    func noteLevel(_ value: Float) {
+        let now = Date()
+        let aim = min(1, max(0, value))
+        let dt = Float(min(0.1, max(0, now.timeIntervalSince(lastLevelNote))))
+        lastLevelNote = now
+        let tau = aim >= displayedLevel ? attackSeconds : releaseSeconds
+        let follow = dt <= 0 ? Float(1) : (1 - exp(-dt / tau))
+        displayedLevel += (aim - displayedLevel) * follow
+        level = displayedLevel
+        let sounding = aim >= audibleLevel
+        guard isOnAir, !muted else {
+            if inputHeard { inputHeard = false }
+            quietSince = nil
+            if inputSilent { inputSilent = false }
+            return
+        }
+        if sounding {
+            if !inputHeard { inputHeard = true }
+            quietSince = nil
+            if inputSilent { inputSilent = false }
+        } else {
+            if inputHeard { inputHeard = false }
+            if let quietSince {
+                if !inputSilent, now.timeIntervalSince(quietSince) >= silentAfter {
+                    inputSilent = true
+                }
+            } else {
+                quietSince = now
+            }
+        }
+    }
+
+    private func resetMeter() {
+        level = 0
+        displayedLevel = 0
+        lastLevelNote = .distantPast
+        quietSince = nil
+        inputSilent = false
+        inputHeard = false
+    }
+
+    func setInputLevel(_ value: Double) {
+        let trimmed = min(1, max(0, value))
+        inputLevel = trimmed
+        UserDefaults.standard.set(trimmed, forKey: "capture.inputLevel")
+        capture.setInputLevel(Float(trimmed))
     }
 
     func setMuted(_ value: Bool) {
@@ -199,26 +501,48 @@ final class BroadcastModel: ObservableObject {
 
     private func beginStart() {
         guard phase == .idle else { return }
+        switch AVAudioApplication.shared.recordPermission {
+        case .undetermined:
+            offerPermission(.microphone)
+            return
+        case .denied:
+            offerPermission(.microphoneDenied)
+            return
+        case .granted:
+            break
+        @unknown default:
+            failStart("Microphone access is unavailable.")
+            return
+        }
+        if !store.isPro {
+            let now = Date()
+            if FreeUsage.remaining(now: now, openStart: nil) <= 0 {
+                freeLimitHit = true
+                let mins = FreeUsage.minutesUntilAvailable(now: now)
+                status = "Free time available again in \(mins) min"
+                failed = false
+                return
+            }
+        }
         phase = .starting
         failed = false
+        freeLimitHit = false
         dropCount = 0
         status = "Starting…"
         switch AVAudioApplication.shared.recordPermission {
         case .granted:
-            Task { await self.startGranted() }
-        case .denied:
-            failStart("Microphone access is off. Turn it on in Settings → Privacy & Security → Microphone.")
-        case .undetermined:
-            AVAudioApplication.requestRecordPermission {  [weak self] granted in
+            // Paint Starting… on this frame. The next turn does the slow work.
+            DispatchQueue.main.async { [weak self] in
                 Task { @MainActor in
-                    guard let self, self.phase == .starting else { return }
-                    if granted {
-                        await self.startGranted()
-                    } else {
-                        self.failStart("Microphone access is off. The broadcast needs the microphone.")
-                    }
+                    await self?.startGranted()
                 }
             }
+        case .denied:
+            phase = .idle
+            offerPermission(.microphoneDenied)
+        case .undetermined:
+            phase = .idle
+            offerPermission(.microphone)
         @unknown default:
             failStart("Microphone access is unavailable.")
         }
@@ -235,6 +559,12 @@ final class BroadcastModel: ObservableObject {
         guard phase == .starting else { return }
         await updateAddress()
         guard phase == .starting else { return }
+        if let pending = ssidTask {
+            await pending.value
+        }
+        guard phase == .starting else { return }
+        await fetchSSIDAndWait()
+        guard phase == .starting else { return }
         guard !ip.isEmpty else {
             failed = true
             phase = .idle
@@ -244,13 +574,22 @@ final class BroadcastModel: ObservableObject {
         probe.poke(ip: ip)
         wireCapture()
         refreshUSB()
+        capture.setStereoWiden(stereoWiden)
         capture.setMusicPreferred(musicPreferred)
         let range = BroadcastGain.range(music: musicActive)
         gain = min(range.upperBound, max(range.lowerBound, gain))
+        capture.setInputLevel(Float(inputLevel))
         capture.setMix(gain: Float(gain), muted: muted)
         let address = ip
         let interfaceName = iface
-        if let failure = await gate.start(ip: address, iface: interfaceName) {
+        let started = Date()
+        if let failure = await gate.start(
+            ip: address,
+            iface: interfaceName,
+            title: sessionName,
+            host: ListenerHostName.current,
+            started: started
+        ) {
             capture.stop()
             await gate.stop()
             guard phase == .starting else { return }
@@ -284,17 +623,26 @@ final class BroadcastModel: ObservableObject {
         }
         boundIP = address
         boundIface = interfaceName
-        startedAt = Date()
+        startedAt = started
         phase = .live
         failed = false
-        level = 0
+        resetMeter()
         listeners = 0
         cpuSampler.reset()
         sampleStats()
         status = liveStatus
+        startedNetworkIP = address
+        startedNetworkSSID = knownSSID
+        announcedNetwork = nil
+        networkChanged = false
         // Now Playing card dropped: the Live Activity has mute, gain and the meter.
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         activity.start(activityState())
+        offerNotificationsIfNeeded()
+        if !store.isPro {
+            FreeUsage.begin(now: started)
+        }
+        armFreeLimit()
         startPolling()
     }
 
@@ -304,7 +652,7 @@ final class BroadcastModel: ObservableObject {
         }
         capture.onLevel = { [weak self] level in
             Task { @MainActor in
-                self?.level = level
+                self?.noteLevel(level)
             }
         }
         capture.onClip = { [weak self] on in
@@ -313,16 +661,12 @@ final class BroadcastModel: ObservableObject {
         capture.onProfile = { [weak self] text in
             Task { @MainActor in self?.profileText = text }
         }
-        capture.onInput = { [weak self] name in
-            Task { @MainActor in
-                self?.inputName = name
-            }
-        }
+        bindInputWatch()
         capture.onInterrupted = { [weak self] interrupted in
             Task { @MainActor in
                 guard let self, self.isOnAir else { return }
                 if interrupted {
-                    self.level = 0
+                    self.resetMeter()
                     self.failed = false
                     self.status = "Interrupted. It resumes when the call ends."
                 } else {
@@ -330,16 +674,33 @@ final class BroadcastModel: ObservableObject {
                 }
             }
         }
-        capture.onUSB = { [weak self] usb in
-            Task { @MainActor in
-                self?.noteUSB(usb)
-            }
-        }
         capture.onCaptureFailure = { [weak self] message in
             Task { @MainActor in
                 guard let self, self.isOnAir else { return }
                 self.failed = true
                 self.status = message
+            }
+        }
+    }
+
+    private func bindInputWatch() {
+        capture.onInput = { [weak self] name in
+            Task { @MainActor in self?.inputName = name }
+        }
+        capture.onHardware = { [weak self] label, channels in
+            Task { @MainActor in
+                self?.hardwareLabel = label
+                self?.hardwareChannels = channels
+            }
+        }
+        capture.onUSB = { [weak self] usb in
+            Task { @MainActor in
+                self?.noteUSB(usb)
+            }
+        }
+        capture.onInputGain = { [weak self] settable in
+            Task { @MainActor in
+                self?.inputGainSettable = settable
             }
         }
     }
@@ -352,8 +713,7 @@ final class BroadcastModel: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                guard let self, self.phase == .idle else { return }
-                self.refreshUSB()
+                self?.capture.refreshRoute()
             }
         }
     }
@@ -369,10 +729,15 @@ final class BroadcastModel: ObservableObject {
     /// Capture already restarted when this arrives during a broadcast.
     /// Do not call `setMusicPreferred` again.
     private func noteUSB(_ usb: Bool) {
+        let becameLine = usb && !usbInput
         if usbInput != usb {
             usbInput = usb
         }
+        if becameLine, gain > 1 {
+            gain = 1
+        }
         clampGainToMode()
+        capture.setInputLevel(Float(inputLevel))
         capture.setMix(gain: Float(gain), muted: muted)
     }
 
@@ -385,6 +750,8 @@ final class BroadcastModel: ObservableObject {
     }
 
     private func beginStop() {
+        guard phase == .live || phase == .reconnecting else { return }
+        cancelFreeLimit()
         let duration = startedAt.map { Date().timeIntervalSince($0) }
         phase = .stopping
         status = "Stopping…"
@@ -395,6 +762,9 @@ final class BroadcastModel: ObservableObject {
     }
 
     private func finishStop(duration: TimeInterval?) async {
+        if let startedAt, FreeUsage.hasOpenSession {
+            FreeUsage.close(start: startedAt, now: Date())
+        }
         startedAt = nil
         poll?.invalidate()
         poll = nil
@@ -402,19 +772,34 @@ final class BroadcastModel: ObservableObject {
         await gate.stop()
         guard phase == .stopping else { return }
         phase = .idle
-        level = 0
+        resetMeter()
         listeners = 0
         cpuPercent = 0
-        inputName = ""
+        startedNetworkIP = nil
+        startedNetworkSSID = nil
+        announcedNetwork = nil
+        networkChanged = false
+        WifiDropNotifier.clearChanged()
         boundIP = nil
         boundIface = nil
         failed = false
         muted = false
         cpuSampler.reset()
-        status = "Ready"
+        let note = stopNote
+        stopNote = nil
+        status = note ?? "Ready"
+        wifiDownTask?.cancel()
+        wifiDownTask = nil
+        networkChangeTask?.cancel()
+        networkChangeTask = nil
+        wifiDown = false
+        wifiAlertSent = false
+        WifiDropNotifier.clear()
         activity.end()
         clearRemote()
-        if let duration {
+        capture.refreshRoute()
+        syncWifiPrompt()
+        if let duration, note == nil {
             requestReviewIfEarned(duration: duration)
         }
     }
@@ -455,13 +840,12 @@ final class BroadcastModel: ObservableObject {
         }
         updateNowPlaying()
         pushActivity(force: false)
+        noteFreeUse()
+        enforceFreeLimit()
     }
 
     private func prepareAddress() async {
         await updateAddress()
-        if !ip.isEmpty {
-            probe.poke(ip: ip)
-        }
     }
 
     private func refreshAfterActive() async {
@@ -483,6 +867,9 @@ final class BroadcastModel: ObservableObject {
         let changed = sawPath && key != lastPathKey
         sawPath = true
         lastPathKey = key
+        if changed {
+            pathSSIDDirty = true
+        }
         if changed, isOnAir {
             scheduleRebind()
         }
@@ -569,7 +956,13 @@ final class BroadcastModel: ObservableObject {
             status = "Reconnecting…"
             await gate.stop()
             guard generation == rebindGeneration, phase == .reconnecting else { return }
-            if let failure = await gate.start(ip: target, iface: interfaceName) {
+            if let failure = await gate.start(
+                ip: target,
+                iface: interfaceName,
+                title: sessionName,
+                host: ListenerHostName.current,
+                started: startedAt ?? Date()
+            ) {
                 await gate.stop()
                 guard generation == rebindGeneration, phase == .reconnecting else { return }
                 failed = true
@@ -628,11 +1021,6 @@ final class BroadcastModel: ObservableObject {
                 url = nextURL
                 qrImage = QRCodeImage.make(nextURL)
             }
-            if ip == "172.20.10.1" || iface.hasPrefix("bridge") {
-                networkNote = "Personal Hotspot. Listeners join this iPhone’s hotspot, then scan."
-            } else {
-                networkNote = "Listeners join the same Wi-Fi, then scan."
-            }
         } else {
             iface = ""
             ip = ""
@@ -644,6 +1032,256 @@ final class BroadcastModel: ObservableObject {
                 networkNote = "Join a Wi-Fi network, or turn on Personal Hotspot."
             }
         }
+        sawAddress = true
+        syncWifiPrompt()
+    }
+
+    private static func isPersonalHotspot(ip: String, iface: String) -> Bool {
+        ip == "172.20.10.1" || iface.hasPrefix("bridge")
+    }
+
+    private func refreshJoinNote() {
+        if ip.isEmpty {
+            if !isOnAir {
+                networkNote = "Join a Wi-Fi network, or turn on Personal Hotspot."
+            }
+            return
+        }
+        if Self.isPersonalHotspot(ip: ip, iface: iface) {
+            networkNote = "Connect to this iPhone’s Personal Hotspot, then scan QR Code or type the link in your browser."
+            return
+        }
+        if let knownSSID, !knownSSID.isEmpty {
+            networkNote = "Connect to \(knownSSID) Wi-Fi, then scan QR Code or type the link in your browser."
+        } else {
+            networkNote = "Connect to the same Wi-Fi, then scan QR Code or type the link in your browser."
+        }
+    }
+
+    /// The server already rebinds when `ip` moves. This flags a new address or
+    /// name so the host can show the new code. A short wait ignores a flap.
+    /// Same network again clears it.
+    private func noteNetworkIdentity() {
+        guard isOnAir, !ip.isEmpty else { return }
+        if !networkIdentityChanged() {
+            networkChangeTask?.cancel()
+            networkChangeTask = nil
+            announcedNetwork = nil
+            if networkChanged {
+                networkChanged = false
+                WifiDropNotifier.clearChanged()
+            }
+            return
+        }
+        let key = networkIdentityKey()
+        guard announcedNetwork != key, networkChangeTask == nil else { return }
+        networkChangeTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard !Task.isCancelled, let self else { return }
+            self.networkChangeTask = nil
+            guard self.isOnAir, !self.ip.isEmpty, self.networkIdentityChanged() else { return }
+            let confirmed = self.networkIdentityKey()
+            guard self.announcedNetwork != confirmed else { return }
+            self.announcedNetwork = confirmed
+            self.networkChanged = true
+            WifiDropNotifier.postChanged()
+            if let started = self.startedNetworkIP, self.ip != started {
+                self.scheduleRebind()
+            }
+        }
+    }
+
+    private func networkIdentityChanged() -> Bool {
+        let ssid = knownSSID ?? ""
+        if let startedNetworkIP, !startedNetworkIP.isEmpty, ip != startedNetworkIP {
+            return true
+        }
+        if let startedNetworkSSID, !startedNetworkSSID.isEmpty, !ssid.isEmpty, ssid != startedNetworkSSID {
+            return true
+        }
+        return false
+    }
+
+    private func networkIdentityKey() -> String {
+        let ssid = knownSSID ?? ""
+        if let startedNetworkIP, ip != startedNetworkIP {
+            return "ip:\(ip)"
+        }
+        return "ssid:\(ip)|\(ssid)"
+    }
+
+    private func syncWifiPrompt() {
+        noteNetworkPresence()
+        refreshJoinNote()
+        if phase == .starting { return }
+        if isOnAir {
+            noteNetworkIdentity()
+            refreshLiveSSID()
+            return
+        }
+        guard sawAddress else {
+            wifiPrompt = .checking
+            return
+        }
+        if ip.isEmpty {
+            applyPrompt(.noNetwork)
+            return
+        }
+        if Self.isPersonalHotspot(ip: ip, iface: iface) {
+            applyPrompt(.hotspot)
+            return
+        }
+        let status = wifiNames.authorization
+        if status == .notDetermined {
+            if !locationExplainDismissed && !locationPromptActive {
+                offerPermission(.location)
+            }
+            if locationExplainDismissed && !locationPromptActive {
+                applyPrompt(.unnamed(locationDenied: false))
+            } else {
+                applyPrompt(.checking)
+            }
+            return
+        }
+        if status == .denied || status == .restricted {
+            applyPrompt(.unnamed(locationDenied: true))
+            return
+        }
+        // One read when the confirm dialog first has a network, and again only
+        // if that network's address changes. Coming back to the app reuses the cache.
+        if foreground, ip != ssidFetchedForIP {
+            if !ssidFetchedForIP.isEmpty {
+                wifiReady = false
+                acceptedWifi = nil
+            }
+            if knownSSID == nil {
+                applyPrompt(.checking)
+            }
+            fetchSSIDIfNeeded(force: true)
+            return
+        }
+        showCachedSSIDPrompt()
+    }
+
+    /// While live, read the SSID only after the path or the local address actually changes.
+    private func refreshLiveSSID() {
+        guard !ip.isEmpty, !Self.isPersonalHotspot(ip: ip, iface: iface) else { return }
+        let ipMoved = ip != ssidFetchedForIP
+        guard pathSSIDDirty || (ipMoved && foreground) else { return }
+        guard ssidTask == nil else { return }
+        pathSSIDDirty = false
+        fetchSSIDIfNeeded(force: true)
+    }
+
+    private func showCachedSSIDPrompt() {
+        if let knownSSID, !knownSSID.isEmpty {
+            applyPrompt(.ssid(knownSSID))
+        } else if ssidFetchedForIP == ip {
+            applyPrompt(.unnamed(locationDenied: false))
+        }
+    }
+
+    private func applyPrompt(_ prompt: WifiPrompt) {
+        wifiPrompt = prompt
+        if isOnAir { return }
+        switch prompt {
+        case .ssid(let name):
+            wifiReady = acceptedWifi == .ssid(name)
+        case .hotspot:
+            wifiReady = acceptedWifi == .hotspot
+        case .unnamed:
+            wifiReady = acceptedWifi == .unnamed
+        case .checking:
+            break
+        case .noNetwork:
+            wifiReady = false
+        }
+    }
+
+    private func fetchSSIDIfNeeded(force: Bool) {
+        guard ssidTask == nil else { return }
+        guard !ip.isEmpty, !Self.isPersonalHotspot(ip: ip, iface: iface) else { return }
+        if !force, ssidFetchedForIP == ip { return }
+        ssidTask = Task { [weak self] in
+            guard let self else { return }
+            await self.fetchSSIDAndWait()
+            self.ssidTask = nil
+            guard self.phase != .starting else { return }
+            self.syncWifiPrompt()
+        }
+    }
+
+    /// Reads the joined network name once. A miss keeps the previous name.
+    private func fetchSSIDAndWait() async {
+        if ip.isEmpty || Self.isPersonalHotspot(ip: ip, iface: iface) {
+            ssidFetchedForIP = ip
+            return
+        }
+        let ticketIP = ip
+        let name = await wifiNames.currentSSID()
+        guard ticketIP == ip else { return }
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trimmed.isEmpty {
+            knownSSID = trimmed
+        } else if ssidFetchedForIP != ticketIP {
+            knownSSID = nil
+        }
+        ssidFetchedForIP = ticketIP
+        refreshJoinNote()
+    }
+
+    /// Waits a moment so a one-packet path flap does not cover the screen
+    /// or buzz the lock screen. A real drop still shows within about a second.
+    private func noteNetworkPresence() {
+        let down = isOnAir && ip.isEmpty
+        if down {
+            guard wifiDownTask == nil, !wifiDown else { return }
+            wifiDownTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled, let self else { return }
+                self.wifiDownTask = nil
+                guard self.isOnAir, self.ip.isEmpty else { return }
+                self.wifiDown = true
+                if !self.wifiAlertSent {
+                    self.wifiAlertSent = true
+                    WifiDropNotifier.post()
+                }
+            }
+        } else {
+            wifiDownTask?.cancel()
+            wifiDownTask = nil
+            if wifiDown {
+                wifiDown = false
+                wifiAlertSent = false
+                WifiDropNotifier.clear()
+            }
+        }
+    }
+
+    private func cancelFreeLimit() {
+        limitTask?.cancel()
+        limitTask = nil
+    }
+
+    private func noteFreeUse() {
+        guard !store.isPro, isOnAir, let startedAt else { return }
+        FreeUsage.checkpoint(start: startedAt, now: Date())
+    }
+
+    private func armFreeLimit() {
+        cancelFreeLimit()
+        enforceFreeLimit()
+    }
+
+    private func enforceFreeLimit() {
+        guard isOnAir, !store.isPro, let startedAt else { return }
+        guard FreeUsage.used(now: Date(), openStart: startedAt) >= BroadcastLimits.freeSeconds - 0.5 else { return }
+        guard !freeLimitHit else { return }
+        FreeUsage.close(start: startedAt, now: Date())
+        freeLimitHit = true
+        let mins = FreeUsage.minutesUntilAvailable(now: Date())
+        stopNote = "Free time available again in \(mins) min. Upgrade to Pro for unlimited time."
+        beginStop()
     }
 
     private func sampleStats() {
@@ -774,12 +1412,22 @@ private struct AppCPUSampler {
 
 /// Local Live Activity. If the phone has Live Activities turned off, start
 /// fails quietly and the broadcast still runs.
+///
+/// `staleDate` is 30 seconds ahead and refreshed while the broadcast is up.
+/// If the process is killed without `applicationWillTerminate` (a SIGKILL),
+/// the system marks the activity stale instead of leaving a live card up
+/// indefinitely. The next launch ends anything still on screen.
 final class BroadcastActivityController {
+    private static let staleAfter: TimeInterval = 30
+    private static let refreshAfter: TimeInterval = 15
+
     private var current: Activity<BroadcastAttributes>?
     private var last: BroadcastAttributes.ContentState?
+    private var lastPush = Date.distantPast
 
     func start(_ state: BroadcastAttributes.ContentState) {
         last = state
+        lastPush = Date()
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
             current = nil
             return
@@ -787,7 +1435,7 @@ final class BroadcastActivityController {
         do {
             current = try Activity.request(
                 attributes: BroadcastAttributes(name: "RoomCast Go"),
-                content: ActivityContent(state: state, staleDate: nil),
+                content: content(state),
                 pushType: nil
             )
         } catch {
@@ -797,9 +1445,17 @@ final class BroadcastActivityController {
 
     func update(_ state: BroadcastAttributes.ContentState, force: Bool) {
         guard let current else { return }
-        if !force, state == last { return }
+        let due = Date().timeIntervalSince(lastPush) >= Self.refreshAfter
+        let signalChanged = last.map {
+            $0.listeners != state.listeners || $0.muted != state.muted || $0.gain != state.gain
+        } ?? true
+        // The meter moves constantly. Push it with listener, mute, or gain changes,
+        // or at most every 15 seconds, so ActivityKit is not woken several times a second.
+        if !force, !due, !signalChanged { return }
         last = state
-        Task { await current.update(ActivityContent(state: state, staleDate: nil)) }
+        lastPush = Date()
+        let next = content(state)
+        Task { await current.update(next) }
     }
 
     func end() {
@@ -810,13 +1466,37 @@ final class BroadcastActivityController {
         Task { await ending.end(nil, dismissalPolicy: .immediate) }
     }
 
+    /// Ends activities left by a previous process. The list is captured now
+    /// so a broadcast started a moment later is not included.
     func endOrphans() {
-        guard current == nil else { return }
+        let keep = current?.id
+        let existing = Activity<BroadcastAttributes>.activities.filter { $0.id != keep }
+        guard !existing.isEmpty else { return }
         Task {
-            for activity in Activity<BroadcastAttributes>.activities {
+            for activity in existing {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
         }
+    }
+
+    /// Called from `applicationWillTerminate`. `Activity.end` is async and
+    /// does not need the main actor. The wait gives ActivityKit time to
+    /// record the immediate dismissal before the process exits.
+    static func endAllOnTerminate() {
+        let existing = Activity<BroadcastAttributes>.activities
+        guard !existing.isEmpty else { return }
+        let semaphore = DispatchSemaphore(value: 0)
+        Task.detached {
+            for activity in existing {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+            semaphore.signal()
+        }
+        _ = semaphore.wait(timeout: .now() + 2)
+    }
+
+    private func content(_ state: BroadcastAttributes.ContentState) -> ActivityContent<BroadcastAttributes.ContentState> {
+        ActivityContent(state: state, staleDate: Date().addingTimeInterval(Self.staleAfter))
     }
 }
 
