@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 import UIKit
 
@@ -686,12 +687,15 @@ private struct GateButtonStyle: ButtonStyle {
 
 private struct SetupSheet: View {
     @ObservedObject var model: BroadcastModel
+    @ObservedObject var store: ProStore
     @Environment(\.dismiss) private var dismiss
     @State private var draft: String
     @State private var backgroundMode: MusicBackdropPreference
+    @State private var manageSubscription = false
 
     init(model: BroadcastModel) {
         self.model = model
+        self.store = model.store
         _draft = State(initialValue: model.sessionName)
         _backgroundMode = State(initialValue: .stored)
         let teal = UIColor(red: 47 / 255, green: 208 / 255, blue: 189 / 255, alpha: 1)
@@ -764,6 +768,19 @@ private struct SetupSheet: View {
                     Text("Background")
                 } footer: {
                     Text("Auto is gentle on battery and richer while charging. It moves with the sound while you are live.")
+                }
+                if store.isPro {
+                    Section {
+                        Button("Manage subscription") {
+                            manageSubscription = true
+                        }
+                    }
+                }
+            }
+            .manageSubscriptionsSheet(isPresented: $manageSubscription)
+            .onChange(of: manageSubscription) { _, presented in
+                if !presented {
+                    Task { await store.refreshEntitlement() }
                 }
             }
             .navigationTitle("Setup")
