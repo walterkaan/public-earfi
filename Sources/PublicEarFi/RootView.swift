@@ -175,7 +175,8 @@ struct RunningTab: View {
         BroadcastButton(
           title: buttonTitle,
           isStop: isStop,
-          showsProgress: isStarting
+          showsProgress: isStarting,
+          isDisabled: needsNetwork
         ) {
           model.toggleBroadcast()
         }
@@ -300,9 +301,11 @@ struct RunningTab: View {
           }
         }
         HStack {
-          TintedPushButton("Open PDF QR Poster") { model.openQuickPosterPDF() }
-            .disabled(model.listenerURL == nil)
-            .help("Save a PDF of the QR poster and open it. Print that PDF yourself.")
+          TintedPushButton("Open PDF QR Poster", textColor: .white) {
+            model.openQuickPosterPDF()
+          }
+          .disabled(model.listenerURL == nil)
+          .help("Save a PDF of the QR poster and open it. Print that PDF yourself.")
           Spacer(minLength: 0)
         }
         if model.rankedNetworks.count > 1 {
@@ -416,7 +419,18 @@ struct RunningTab: View {
     }
   }
 
+  /// Stopped with no LAN address: Start cannot work yet.
+  private var needsNetwork: Bool {
+    switch model.phase {
+    case .stopped, .blocked:
+      return !model.hasLANAddress
+    default:
+      return false
+    }
+  }
+
   private var buttonTitle: String {
+    if needsNetwork { return "Connect to Network to begin" }
     switch model.phase {
     case .starting:
       return "Starting…"
@@ -565,23 +579,26 @@ struct TintedPushButton: View {
   var title: LocalizedStringKey
   var systemImage: String?
   var tint: Color
+  var textColor: Color?
   var action: () -> Void
 
   init(
     _ title: LocalizedStringKey,
     systemImage: String? = nil,
     tint: Color = AppChrome.primary,
+    textColor: Color? = nil,
     action: @escaping () -> Void
   ) {
     self.title = title
     self.systemImage = systemImage
     self.tint = tint
+    self.textColor = textColor
     self.action = action
   }
 
   var body: some View {
     Button(action: action) {
-      TintedLabel(title: title, systemImage: systemImage, tint: tint)
+      TintedLabel(title: title, systemImage: systemImage, tint: tint, textColor: textColor)
     }
     .buttonStyle(.plain)
     .modifier(DarkFocusRing())
@@ -617,6 +634,7 @@ struct BroadcastButton: View {
   var title: String
   var isStop: Bool
   var showsProgress: Bool
+  var isDisabled: Bool = false
   var action: () -> Void
 
   var body: some View {
@@ -632,11 +650,14 @@ struct BroadcastButton: View {
       .frame(maxWidth: .infinity)
       .padding(.vertical, 12)
       .foregroundStyle(.white)
-      .background(isStop ? AppChrome.stopButton : AppChrome.primary)
+      .background(
+        isDisabled ? Color.gray.opacity(0.5) : (isStop ? AppChrome.stopButton : AppChrome.primary)
+      )
       .clipShape(RoundedRectangle(cornerRadius: 10))
       .contentShape(RoundedRectangle(cornerRadius: 10))
     }
     .buttonStyle(.plain)
+    .disabled(isDisabled)
     .modifier(DarkFocusRing())
   }
 }
@@ -664,6 +685,7 @@ private struct TintedLabel: View {
   var title: LocalizedStringKey
   var systemImage: String?
   var tint: Color
+  var textColor: Color? = nil
 
   var body: some View {
     HStack(spacing: 6) {
@@ -675,7 +697,7 @@ private struct TintedLabel: View {
         .font(.system(size: 13, weight: .semibold))
         .lineLimit(1)
     }
-    .foregroundStyle(tint)
+    .foregroundStyle(textColor ?? tint)
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
     .background(tint.opacity(0.16))
@@ -811,7 +833,7 @@ struct SettingsTab: View {
       Button("Reset to defaults", role: .destructive) { model.resetDefaults() }
     } message: {
       Text(
-        "Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start."
+        "Logs are kept. The Wi-Fi password is cleared with the other settings. The defaults are saved immediately. If you are live, they apply on the next Start."
       )
     }
   }
@@ -1034,13 +1056,8 @@ struct SettingsTab: View {
       SecureField("Wi-Fi password", text: posterPasswordBinding)
         .frame(maxWidth: 280)
     }
-    if let notice = model.posterPasswordNotice {
-      Text(notice)
-        .helperText()
-        .foregroundStyle(.orange)
-    }
     Text(
-      "Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code."
+      "Saved with your other RoomCast settings on this Mac. It is not written into the log or Copy diagnostics. The printed poster shows it under the join code."
     )
     .helperText()
     LabeledRow(title: "Security") {
@@ -1097,7 +1114,49 @@ struct SettingsTab: View {
     .helperText()
     Toggle("Launch at login", isOn: loginBinding)
     Toggle("Start broadcasting when the app opens", isOn: autoStartBinding)
+    Toggle("Share usage statistics", isOn: shareUsageBinding)
+    Text(
+      "Sends an anonymous ID, app version and launch dates to help the developer. No personal data."
+    )
+    .helperText()
     if let message = model.loginItemMessage {
+      Text(message)
+        .helperText()
+        .foregroundStyle(.orange)
+    }
+    TintedPushButton("Check for Updates") { model.checkForUpdates() }
+      .disabled(model.updateCheck == .checking)
+    Text("Looks for a newer RoomCast when you ask. Nothing is installed automatically.")
+      .helperText()
+    updateCheckStatus
+  }
+
+  @ViewBuilder
+  private var updateCheckStatus: some View {
+    switch model.updateCheck {
+    case .idle:
+      EmptyView()
+    case .checking:
+      Text("Checking for updates…")
+        .helperText()
+    case .upToDate(let version):
+      Text("You're up to date (\(version))")
+        .helperText()
+    case .available(let version, let notes, _, let osNote):
+      Text("Version \(version) is available")
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundStyle(.white)
+      if !notes.isEmpty {
+        Text(notes)
+          .helperText()
+          .textSelection(.enabled)
+      }
+      if let osNote {
+        Text(osNote)
+          .helperText()
+      }
+      TintedPushButton("Download") { model.openUpdateDownload() }
+    case .failed(let message):
       Text(message)
         .helperText()
         .foregroundStyle(.orange)
@@ -1211,6 +1270,11 @@ struct SettingsTab: View {
       get: { model.settings.startWhenAppOpens },
       set: { value in model.mutate { $0.startWhenAppOpens = value } })
   }
+  private var shareUsageBinding: Binding<Bool> {
+    Binding(
+      get: { model.settings.shareUsageStatistics },
+      set: { value in model.mutate { $0.shareUsageStatistics = value } })
+  }
   private var iceText: Binding<String> { numberText(\.icePort) }
   private var styleBinding: Binding<URLStyle> {
     Binding(
@@ -1248,7 +1312,10 @@ struct SettingsTab: View {
       set: { value in model.mutate { $0.posterNetworkName = value } })
   }
   private var posterPasswordBinding: Binding<String> {
-    Binding(get: { model.posterPassword }, set: { model.setPosterPassword($0) })
+    Binding(
+      get: { model.settings.posterWiFiPassword },
+      set: { value in model.mutate { $0.posterWiFiPassword = value } }
+    )
   }
   private var posterSecurityBinding: Binding<WiFiSecurity> {
     Binding(
@@ -1313,7 +1380,8 @@ private enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
     case .poster:
       return "Wi-Fi details printed on the QR poster so guests can join and listen."
     case .general:
-      return "Keep the Mac awake, launch at login, and start broadcasting automatically."
+      return "Keep the Mac awake, launch at login, and start broadcasting automatically. "
+        + "Share usage statistics, and check for updates."
     case .advanced:
       return "Ports, listener limits, logging, and custom bitrate for organisers who need them."
     }
@@ -1322,13 +1390,19 @@ private enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
   var keywords: [String] {
     switch self {
     case .audio:
-      return ["mic", "device", "mono", "stereo", "quality", "speech", "music", "bitrate", "blackhole"]
+      return [
+        "mic", "device", "mono", "stereo", "quality", "speech", "music", "bitrate",
+        "blackhole",
+      ]
     case .stream:
       return ["port", "title", "udp", "tcp", "network", "name"]
     case .poster:
       return ["wifi", "wi-fi", "password", "ssid", "security", "hidden", "qr"]
     case .general:
-      return ["awake", "login", "launch", "autostart", "sleep"]
+      return [
+        "awake", "login", "launch", "autostart", "sleep", "update", "updates", "version",
+        "usage", "statistics", "privacy",
+      ]
     case .advanced:
       return ["ice", "webrtc", "url", "local", "listeners", "log", "custom", "reset"]
     }
@@ -1349,7 +1423,6 @@ private struct SettingsSidebarIcon: View {
       .background(RoundedRectangle(cornerRadius: side * 0.24, style: .continuous).fill(tint))
   }
 }
-
 
 /// Escape closes the window that contains this view. The main window does not
 /// use it, and a window titled as the broadcast is never closed from here.

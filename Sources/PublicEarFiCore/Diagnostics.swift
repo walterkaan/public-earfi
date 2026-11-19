@@ -77,8 +77,8 @@ public enum DiagnosticsReport {
       """
   }
 
-  /// Poster Wi-Fi name and security only. The password is never a settings field
-  /// and must not be passed into this report.
+  /// Poster Wi-Fi name and security only. The password is stored with the
+  /// other settings and must not appear in this report.
   public static func settingsSummary(
     _ settings: AppSettings, appName: String = BroadcastTitle.fallbackAppName
   ) -> String {

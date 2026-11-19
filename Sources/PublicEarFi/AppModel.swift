@@ -22,10 +22,7 @@ final class AppModel: ObservableObject {
   @Published var showQR = false
   @Published var onBattery = false
   @Published var knownSSID: String?
-  /// Poster Wi-Fi password. Held in memory for the poster and the Settings
-  /// field. The Keychain is the only copy on disk. Never log this value.
-  @Published var posterPassword = ""
-  @Published var posterPasswordNotice: String?
+  @Published var updateCheck: UpdateCheckPhase = .idle
   @Published var now = Date()
   @Published var loginItemMessage: String?
   @Published var qrImage: NSImage?
@@ -61,6 +58,8 @@ final class AppModel: ObservableObject {
   private var silenceWatch = SilenceWatch()
   private var timer: Timer?
   private var meterTimer: Timer?
+  private var updateCheckInFlight = false
+  private static var didReportLaunch = false
 
   init() {
     let home = FileManager.default.homeDirectoryForCurrentUser
@@ -69,11 +68,6 @@ final class AppModel: ObservableObject {
     store = SettingsStore()
     let resolved = store.loadResolved()
     settings = resolved.settings
-    let passwordLoad = PosterPasswordStore.load()
-    posterPassword = passwordLoad.password
-    if passwordLoad.unreadable {
-      posterPasswordNotice = "The saved Wi-Fi password could not be read from the Keychain."
-    }
     credits = BundledResources.credits()
     controller.onPhase = { [weak self] phase in
       Task { @MainActor in self?.apply(phase: phase) }
@@ -135,6 +129,20 @@ final class AppModel: ObservableObject {
       Task { @MainActor in self?.pollMeter() }
     }
     Self.shared = self
+    reportLaunch()
+  }
+
+  /// Anonymous install (until the server accepts it) and a run report.
+  /// URLSession work starts here and is not awaited.
+  private func reportLaunch() {
+    if Self.didReportLaunch { return }
+    Self.didReportLaunch = true
+    UsageReporter.sendLaunch(
+      defaults: UserDefaults.standard,
+      shareUsage: settings.shareUsageStatistics,
+      appVersion: Self.shortVersion(),
+      osVersion: RoomCastSystem.versionString
+    )
   }
 
   var isBroadcasting: Bool {
@@ -169,6 +177,11 @@ final class AppModel: ObservableObject {
       return chosen
     }
     return rankedNetworks.first?.address
+  }
+
+  /// True when an interface is up and has a LAN address listeners can reach.
+  var hasLANAddress: Bool {
+    rankedNetworks.contains(where: \.isUp) && selectedIP != nil
   }
 
   var hostname: String {
@@ -206,12 +219,36 @@ final class AppModel: ObservableObject {
     ListenerLink.staleWarning(previousURL: store.posterStamp()?.url, currentURL: listenerURL)
   }
 
+  static func shortVersion() -> String {
+    let raw = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? "1.0.0" : trimmed
+  }
+
   var versionLabel: String {
     let info = Bundle.main.infoDictionary
-    let short = info?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     let build = info?["CFBundleVersion"] as? String ?? "0"
     let commit = info?["RoomCastCommit"] as? String ?? "dev"
-    return "\(short) (\(build), \(commit))"
+    return "\(Self.shortVersion()) (\(build), \(commit))"
+  }
+
+  func checkForUpdates() {
+    guard !updateCheckInFlight else { return }
+    updateCheckInFlight = true
+    updateCheck = .checking
+    UpdateChecker.check(
+      currentVersion: Self.shortVersion(), osVersion: RoomCastSystem.versionString
+    ) { [weak self] phase in
+      Task { @MainActor in
+        self?.updateCheckInFlight = false
+        self?.updateCheck = phase
+      }
+    }
+  }
+
+  func openUpdateDownload() {
+    guard case .available(_, _, let url, _) = updateCheck else { return }
+    NSWorkspace.shared.open(url)
   }
 
   var selectedDevice: AudioInputDevice? {
@@ -307,6 +344,7 @@ final class AppModel: ObservableObject {
       controller.stop()
       return
     }
+    guard hasLANAddress else { return }
     if !UserDefaults.standard.bool(forKey: Self.firewallKey) {
       showFirewall = true
       return
@@ -354,13 +392,6 @@ final class AppModel: ObservableObject {
   }
 
   func resetDefaults() {
-    if case .failed(let status) = PosterPasswordStore.delete() {
-      posterPasswordNotice =
-        "The Wi-Fi password could not be removed from the Keychain (error \(status))."
-    } else {
-      posterPasswordNotice = nil
-    }
-    posterPassword = ""
     settings = store.reset()
     settingsRevision += 1
     loginItemMessage = nil
@@ -381,17 +412,6 @@ final class AppModel: ObservableObject {
   func useCurrentNetworkName() {
     guard let knownSSID, !knownSSID.isEmpty else { return }
     mutate { $0.posterNetworkName = knownSSID }
-  }
-
-  func setPosterPassword(_ value: String) {
-    posterPassword = value
-    switch PosterPasswordStore.save(value) {
-    case .saved, .cleared:
-      posterPasswordNotice = nil
-    case .failed(let status):
-      posterPasswordNotice =
-        "The Wi-Fi password could not be saved in the Keychain (error \(status))."
-    }
   }
 
   func setInputGain(_ db: Double) {
@@ -457,24 +477,9 @@ final class AppModel: ObservableObject {
   }
 
   func openQuickPosterPDF() {
-    refreshPosterPasswordFromKeychain()
     guard let page = quickPosterModel() else { return }
     let url = AppPaths.posterFile(home: FileManager.default.homeDirectoryForCurrentUser)
     PosterActions.writeAndOpenPDF(model: page, url: url) { self.rememberPoster() }
-  }
-
-  /// Re-read the Keychain immediately before a PDF so a password saved earlier
-  /// (or unlocked after launch) actually prints.
-  private func refreshPosterPasswordFromKeychain() {
-    let passwordLoad = PosterPasswordStore.load()
-    if !passwordLoad.password.isEmpty || !passwordLoad.unreadable {
-      posterPassword = passwordLoad.password
-    }
-    if passwordLoad.unreadable && posterPassword.isEmpty {
-      posterPasswordNotice = "The saved Wi-Fi password could not be read from the Keychain."
-    } else if !passwordLoad.unreadable {
-      posterPasswordNotice = nil
-    }
   }
 
   private func quickPosterModel() -> PosterRenderModel? {
@@ -486,7 +491,7 @@ final class AppModel: ObservableObject {
     let network = settings.posterNetworkName.trimmingCharacters(in: .whitespacesAndNewlines)
     let plan = PosterBuilder.quickPlan(
       networkName: network,
-      password: posterPassword,
+      password: settings.posterWiFiPassword,
       security: settings.posterWiFiSecurity,
       hidden: settings.posterWiFiHidden,
       listenerURL: listenerURL

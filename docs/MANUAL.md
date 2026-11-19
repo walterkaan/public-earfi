@@ -45,7 +45,7 @@ The app warns you if the Mac’s address has changed since the poster was made. 
 Listeners have to join your network before the listen code will work. Open **Settings → Poster** and fill in:
 
 - **Wi-Fi name.** The name people see when they join. **Use this Mac’s Wi-Fi** fills in the network the Mac is on right now. Press it only when that is the network the phones will use. If you are at home preparing a travel router, type the travel router’s name instead. The button is missing when the Mac cannot see a Wi-Fi name; type it yourself.
-- **Password.** What people type if they cannot scan the join code. It is saved in the macOS Keychain on this Mac. It is not saved in the settings file, the log, or **Copy diagnostics**.
+- **Password.** What people type if they cannot scan the join code. It is saved with the other RoomCast settings on this Mac. It is not written into the log or **Copy diagnostics**.
 - **Security.** WPA/WPA2/WPA3 is the usual choice. WEP is the old one. None means the network has no password.
 - **Hidden network.** Turn this on only when the router does not broadcast its name.
 
@@ -73,6 +73,10 @@ Do this once, on the Wi-Fi you will take to the venue.
 10. Stop the broadcast. Power the router off and on, start the Mac again, and confirm the listener link is unchanged.
 
 Take the same router, the same Mac, and that PDF to the event.
+
+## Usage statistics
+
+**Settings → General** has **Share usage statistics**. It is on unless you turn it off. While it is on, RoomCast sends an anonymous ID, the app version, and launch dates to help the developer. No personal data. While it is off, those reports are not sent, and one that never arrived is not sent later. The ID stays stored on the Mac and is unused until you turn sharing back on. The next launch then reports as usual, including the first install report if that never succeeded. Nothing asks you to confirm either way. **Check for Updates** on the same page does not depend on this switch.
 
 ## Install and first open
 

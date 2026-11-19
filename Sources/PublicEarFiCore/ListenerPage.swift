@@ -42,7 +42,7 @@ public enum ListenerPage {
     if (verb == "GET" || verb == "HEAD") && isPageAlias(path, streamName: streamName) {
       return .redirectRoot
     }
-    if (verb == "GET" || verb == "HEAD"), let size = artworkSize(for: path) {
+    if verb == "GET" || verb == "HEAD", let size = artworkSize(for: path) {
       return .artwork(size: size)
     }
     return .notFound
@@ -202,10 +202,14 @@ public enum ListenerPage {
       #credit{margin-top:clamp(6px,1vh,10px);color:var(--dim);font-size:11px;flex-shrink:0}
       #credit a{color:var(--dim);text-decoration:none}
       audio{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+      .needs-js{color:red;font-weight:700;font-size:18px;margin:16px 12px 0;animation:needs-js-flash 1s linear infinite}
+      @keyframes needs-js-flash{0%,49%{color:red}50%,100%{color:transparent}}
+      @media (prefers-reduced-motion:reduce){.needs-js{animation:none;color:red}}
       </style>
       <script defer src="\(readerPath)"></script>
       </head>
       <body>
+      <noscript><p class="needs-js" role="alert">This page needs javascript enabled</p></noscript>
       \(iconImg)
       <div class="live" id="live"><span class="dot"></span><span id="liveLabel">LIVE · 0:00</span></div>
       <h1 id="title">\(safeTitle)</h1>
@@ -621,7 +625,6 @@ public enum ListenerPage {
     return
       "<footer id=\"credit\"><a href=\"https://roomcast.channel\" target=\"_blank\" rel=\"noopener\">\(label)</a></footer>"
   }
-
 
   private static func artworkSize(for path: String) -> Int? {
     for size in artworkSizes {
