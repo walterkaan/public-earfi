@@ -55,7 +55,8 @@ enum PosterPasswordMigration {
     var ok = true
     for name in [service] + legacyServices {
       for protection in [true, false] {
-        let status = SecItemDelete(baseQuery(service: name, dataProtection: protection) as CFDictionary)
+        let status = SecItemDelete(
+          baseQuery(service: name, dataProtection: protection) as CFDictionary)
         if status != errSecSuccess && status != errSecItemNotFound {
           ok = false
         }

@@ -17,7 +17,6 @@ enum CoreResources {
     return "data:image/png;base64," + data.base64EncodedString()
   }
 
-
   static let artworkSizes = [96, 192, 256, 512]
 
   static func artworkPNG(size: Int, searching root: URL? = nil) -> Data? {

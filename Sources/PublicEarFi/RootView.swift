@@ -1363,7 +1363,8 @@ private enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
     case .poster:
       return "Wi-Fi details printed on the QR poster so guests can join and listen."
     case .general:
-      return "Keep the Mac awake, launch at login, start broadcasting automatically, share usage statistics, and check for updates."
+      return "Keep the Mac awake, launch at login, and start broadcasting automatically. "
+        + "Share usage statistics, and check for updates."
     case .advanced:
       return "Ports, listener limits, logging, and custom bitrate for organisers who need them."
     }
@@ -1372,7 +1373,10 @@ private enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
   var keywords: [String] {
     switch self {
     case .audio:
-      return ["mic", "device", "mono", "stereo", "quality", "speech", "music", "bitrate", "blackhole"]
+      return [
+        "mic", "device", "mono", "stereo", "quality", "speech", "music", "bitrate",
+        "blackhole",
+      ]
     case .stream:
       return ["port", "title", "udp", "tcp", "network", "name"]
     case .poster:
@@ -1402,7 +1406,6 @@ private struct SettingsSidebarIcon: View {
       .background(RoundedRectangle(cornerRadius: side * 0.24, style: .continuous).fill(tint))
   }
 }
-
 
 /// Escape closes the window that contains this view. The main window does not
 /// use it, and a window titled as the broadcast is never closed from here.

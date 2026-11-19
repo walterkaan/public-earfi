@@ -34,7 +34,9 @@ final class RoomCastAPITests: XCTestCase {
         "os_version": String(repeating: "o", count: 64),
         "serial": serial,
       ])
-    XCTAssertEqual(Set(try strings(install).keys), ["serial", "installed_at", "app_version", "os_version"])
+    XCTAssertEqual(
+      Set(try strings(install).keys),
+      ["serial", "installed_at", "app_version", "os_version"])
 
     let run = try XCTUnwrap(
       UsagePayload.runJSON(serial: serial, ranAt: "2026-11-19T20:00:00Z", appVersion: longApp)
@@ -161,7 +163,11 @@ final class RoomCastAPITests: XCTestCase {
       .upToDate(version: "1.0.10"))
     XCTAssertEqual(
       UpdateVerdict.decide(current: "1.0.2", osVersion: "14.0.0", payload: payload),
-      .available(version: "1.0.3", notes: "Fixes pause.", url: "https://roomcast.channel/roomcast.dmg", minOS: nil)
+      .available(
+        version: "1.0.3",
+        notes: "Fixes pause.",
+        url: "https://roomcast.channel/roomcast.dmg",
+        minOS: nil)
     )
     XCTAssertEqual(
       UpdateVerdict.decide(current: "1.0.2", osVersion: "13.6.0", payload: payload),
@@ -216,10 +222,18 @@ final class RoomCastAPITests: XCTestCase {
     }
 
     UsageDispatch.sendLaunch(
-      shareUsage: false, defaults: defaults, appVersion: "1.0.2", osVersion: "15.1.0", now: now,
+      shareUsage: false,
+      defaults: defaults,
+      appVersion: "1.0.2",
+      osVersion: "15.1.0",
+      now: now,
       post: deliver)
     UsageDispatch.sendLaunch(
-      shareUsage: false, defaults: defaults, appVersion: "1.0.2", osVersion: "15.1.0", now: now,
+      shareUsage: false,
+      defaults: defaults,
+      appVersion: "1.0.2",
+      osVersion: "15.1.0",
+      now: now,
       post: deliver)
     XCTAssertTrue(sent.isEmpty)
     let serial = try XCTUnwrap(defaults.string(forKey: UsageIdentityStore.serialKey))
@@ -254,7 +268,10 @@ final class RoomCastAPITests: XCTestCase {
       post: deliver)
     XCTAssertEqual(
       sent.map(\.url),
-      [RoomCastAPI.installURL.absoluteString, RoomCastAPI.runURL.absoluteString])
+      [
+        RoomCastAPI.installURL.absoluteString,
+        RoomCastAPI.runURL.absoluteString,
+      ])
     let install = try strings(sent[0].body)
     let run = try strings(sent[1].body)
     XCTAssertEqual(install["serial"], serial)

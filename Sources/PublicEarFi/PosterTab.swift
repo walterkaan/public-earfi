@@ -338,7 +338,7 @@ struct FirstRunSheet: View {
           model.finishFirstRun()
           dismiss()
         }
-          .keyboardShortcut(.defaultAction)
+        .keyboardShortcut(.defaultAction)
       }
     }
     .padding(14)

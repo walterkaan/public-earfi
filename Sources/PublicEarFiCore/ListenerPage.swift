@@ -42,7 +42,7 @@ public enum ListenerPage {
     if (verb == "GET" || verb == "HEAD") && isPageAlias(path, streamName: streamName) {
       return .redirectRoot
     }
-    if (verb == "GET" || verb == "HEAD"), let size = artworkSize(for: path) {
+    if verb == "GET" || verb == "HEAD", let size = artworkSize(for: path) {
       return .artwork(size: size)
     }
     return .notFound
@@ -625,7 +625,6 @@ public enum ListenerPage {
     return
       "<footer id=\"credit\"><a href=\"https://roomcast.channel\" target=\"_blank\" rel=\"noopener\">\(label)</a></footer>"
   }
-
 
   private static func artworkSize(for path: String) -> Int? {
     for size in artworkSizes {

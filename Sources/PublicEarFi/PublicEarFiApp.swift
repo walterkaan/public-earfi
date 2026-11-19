@@ -94,10 +94,14 @@ private struct MainWindowLifecycle: View {
       .onReceive(NotificationCenter.default.publisher(for: .roomCastOpenMainWindow)) { _ in
         openWindow(id: "main")
       }
-      .onReceive(NotificationCenter.default.publisher(for: NSWindow.didMiniaturizeNotification)) { _ in
+      .onReceive(
+        NotificationCenter.default.publisher(for: NSWindow.didMiniaturizeNotification)
+      ) { _ in
         model.refreshChrome()
       }
-      .onReceive(NotificationCenter.default.publisher(for: NSWindow.didDeminiaturizeNotification)) { _ in
+      .onReceive(
+        NotificationCenter.default.publisher(for: NSWindow.didDeminiaturizeNotification)
+      ) { _ in
         model.refreshChrome()
       }
   }
