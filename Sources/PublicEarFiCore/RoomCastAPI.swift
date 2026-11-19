@@ -139,9 +139,10 @@ public enum UsageDispatch {
     appVersion: String,
     osVersion: String,
     now: Date = Date(),
-    post: @escaping (
-      _ url: URL, _ body: Data, _ completion: @escaping (UsagePostOutcome) -> Void
-    ) -> Void
+    post:
+      @escaping (
+        _ url: URL, _ body: Data, _ completion: @escaping (UsagePostOutcome) -> Void
+      ) -> Void
   ) {
     let store = UsageIdentityStore(defaults: defaults)
     let identity = store.loadOrCreate(now: now)
@@ -173,9 +174,10 @@ public enum UsageDispatch {
     serial: String,
     appVersion: String,
     now: Date,
-    post: @escaping (
-      _ url: URL, _ body: Data, _ completion: @escaping (UsagePostOutcome) -> Void
-    ) -> Void
+    post:
+      @escaping (
+        _ url: URL, _ body: Data, _ completion: @escaping (UsagePostOutcome) -> Void
+      ) -> Void
   ) {
     guard
       let body = UsagePayload.runJSON(
