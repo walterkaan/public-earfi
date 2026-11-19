@@ -507,17 +507,6 @@
         }
       }
     },
-    "Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start."
-          }
-        }
-      }
-    },
     "Mono": {
       "extractionState": "manual",
       "localizations": {
@@ -734,17 +723,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Save a PDF of the QR poster and open it. Print that PDF yourself."
-          }
-        }
-      }
-    },
-    "Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code."
           }
         }
       }

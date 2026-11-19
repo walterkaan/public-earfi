@@ -132,8 +132,6 @@
 	<string>Live</string>
 	<key>Log</key>
 	<string>Log</string>
-	<key>Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start.</key>
-	<string>Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start.</string>
 	<key>Microphone</key>
 	<string>Microphone</string>
 	<key>Mono</key>
@@ -196,8 +194,6 @@
 	<string>Save a PDF of the QR poster and open it. Print that PDF yourself.</string>
 	<key>Save and Close</key>
 	<string>Save and Close</string>
-	<key>Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code.</key>
-	<string>Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code.</string>
 	<key>Share the QR</key>
 	<string>Share the QR</string>
 	<key>Show Log</key>

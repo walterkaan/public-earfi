@@ -22,8 +22,6 @@ final class AppModel: ObservableObject {
   @Published var showQR = false
   @Published var onBattery = false
   @Published var knownSSID: String?
-  /// Set when a Keychain password could not be moved into settings yet.
-  @Published var posterPasswordNotice: String?
   @Published var updateCheck: UpdateCheckPhase = .idle
   @Published var now = Date()
   @Published var loginItemMessage: String?
@@ -131,7 +129,6 @@ final class AppModel: ObservableObject {
       Task { @MainActor in self?.pollMeter() }
     }
     Self.shared = self
-    migratePosterPasswordFromKeychain()
     reportLaunch()
   }
 
@@ -146,34 +143,6 @@ final class AppModel: ObservableObject {
       appVersion: Self.shortVersion(),
       osVersion: RoomCastSystem.versionString
     )
-  }
-
-  /// Copies a legacy Keychain password into settings, then deletes the item.
-  /// A later launch does not touch the Keychain once the move has finished.
-  private func migratePosterPasswordFromKeychain() {
-    let defaults = UserDefaults.standard
-    if defaults.bool(forKey: PosterPasswordMigration.finishedKey) { return }
-    let outcome = PosterPasswordMigration.read()
-    if outcome.unreadable {
-      if settings.posterWiFiPassword.isEmpty {
-        posterPasswordNotice =
-          "The saved Wi-Fi password is still in the Keychain and could not be moved yet. RoomCast will try again the next time it opens."
-      }
-      return
-    }
-    if let password = outcome.password, !password.isEmpty, settings.posterWiFiPassword.isEmpty {
-      settings.posterWiFiPassword = password
-      store.save(settings)
-    }
-    // A failed delete is retried next launch. Settings already hold the
-    // password, so the retry does not overwrite them. Reset sets the flag
-    // itself so a cleared password is not copied back.
-    if PosterPasswordMigration.deleteAll() {
-      defaults.set(true, forKey: PosterPasswordMigration.finishedKey)
-    } else {
-      posterPasswordNotice =
-        "The old Keychain copy of the Wi-Fi password could not be removed."
-    }
   }
 
   var isBroadcasting: Bool {
@@ -418,13 +387,6 @@ final class AppModel: ObservableObject {
 
   func resetDefaults() {
     settings = store.reset()
-    UserDefaults.standard.set(true, forKey: PosterPasswordMigration.finishedKey)
-    if PosterPasswordMigration.deleteAll() {
-      posterPasswordNotice = nil
-    } else {
-      posterPasswordNotice =
-        "The old Keychain copy of the Wi-Fi password could not be removed."
-    }
     settingsRevision += 1
     loginItemMessage = nil
     try? LoginItemController.apply(false)

@@ -1034,11 +1034,6 @@ struct SettingsTab: View {
       SecureField("Wi-Fi password", text: posterPasswordBinding)
         .frame(maxWidth: 280)
     }
-    if let notice = model.posterPasswordNotice {
-      Text(notice)
-        .helperText()
-        .foregroundStyle(.orange)
-    }
     Text(
       "Saved with your other RoomCast settings on this Mac. It is not written into the log or Copy diagnostics. The printed poster shows it under the join code."
     )

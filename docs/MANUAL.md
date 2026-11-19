@@ -45,7 +45,7 @@ The app warns you if the Mac’s address has changed since the poster was made. 
 Listeners have to join your network before the listen code will work. Open **Settings → Poster** and fill in:
 
 - **Wi-Fi name.** The name people see when they join. **Use this Mac’s Wi-Fi** fills in the network the Mac is on right now. Press it only when that is the network the phones will use. If you are at home preparing a travel router, type the travel router’s name instead. The button is missing when the Mac cannot see a Wi-Fi name; type it yourself.
-- **Password.** What people type if they cannot scan the join code. It is saved with the other RoomCast settings on this Mac. A password left in the Keychain by an older version is moved into settings and then removed from the Keychain. It is not written into the log or **Copy diagnostics**.
+- **Password.** What people type if they cannot scan the join code. It is saved with the other RoomCast settings on this Mac. It is not written into the log or **Copy diagnostics**.
 - **Security.** WPA/WPA2/WPA3 is the usual choice. WEP is the old one. None means the network has no password.
 - **Hidden network.** Turn this on only when the router does not broadcast its name.
 
