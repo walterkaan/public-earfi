@@ -95,6 +95,34 @@
           "winbackOffers" : [
 
           ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "50.00",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "PROYEARLY",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlimited broadcast length on this iPhone.",
+              "displayName" : "RoomCast Go Pro Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "channel.roomcast.go.pro.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Pro Yearly",
+          "subscriptionGroupID" : "21482050",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
         }
       ]
     }

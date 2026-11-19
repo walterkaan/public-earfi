@@ -96,6 +96,9 @@ struct BroadcastView: View {
         .sheet(isPresented: $showPaywall) {
             PaywallView(store: store)
         }
+        .sheet(item: $model.permissionExplain) { ask in
+            PermissionExplainSheet(ask: ask, model: model)
+        }
     }
 
     private var detailText: String? {
@@ -474,7 +477,7 @@ struct BroadcastView: View {
         case .hotspot:
             return "Listeners must join this iPhone’s hotspot."
         case .unnamed(true):
-            return "Location access is off, so the network name can’t be read."
+            return "Location access is off, so the Wi-Fi name can’t be read. Open Settings to allow it while using the app."
         case .unnamed(false):
             return "The network name can’t be read."
         case .noNetwork:
@@ -619,6 +622,45 @@ struct BroadcastView: View {
 }
 
 /// Keeps Starting… and Stopping… at full color. The plain style fades a disabled button.
+private struct PermissionExplainSheet: View {
+    var ask: PermissionExplain
+    @ObservedObject var model: BroadcastModel
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(ask.message)
+                    .font(.body)
+                    .foregroundStyle(.white.opacity(0.9))
+                if ask.continues {
+                    Button("Continue") { model.continuePermission() }
+                        .buttonStyle(GateButtonStyle(fill: .roomTeal, ink: .roomNavy))
+                    Button("Not now") { model.dismissPermission() }
+                        .buttonStyle(GateButtonStyle(fill: Color.white.opacity(0.12), ink: .white))
+                } else {
+                    Button("Open Settings") { openSettings() }
+                        .buttonStyle(GateButtonStyle(fill: .roomTeal, ink: .roomNavy))
+                    Button("Close") { model.dismissPermission() }
+                        .buttonStyle(GateButtonStyle(fill: Color.white.opacity(0.12), ink: .white))
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Color.roomNavy.ignoresSafeArea())
+            .navigationTitle(ask.title)
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .preferredColorScheme(.dark)
+        .presentationDetents([.medium])
+    }
+
+    private func openSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
+}
+
 private struct SteadyButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label

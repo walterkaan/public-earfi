@@ -156,9 +156,17 @@ enum ProLegal {
 /// (`displayPrice`), never from a hardcoded amount.
 @MainActor
 final class ProStore: ObservableObject {
-    static let productID = "channel.roomcast.go.pro.monthly"
+    static let monthlyProductID = "channel.roomcast.go.pro.monthly"
+    static let yearlyProductID = "channel.roomcast.go.pro.yearly"
+    static let productIDs = [monthlyProductID, yearlyProductID]
 
-    @Published private(set) var product: StoreKit.Product?
+    static func isOurProduct(_ productID: String) -> Bool {
+        productID == monthlyProductID || productID == yearlyProductID
+    }
+
+    @Published private(set) var products: [StoreKit.Product] = []
+    /// Monthly is first. The paywall Subscribe button buys this one.
+    @Published var selectedProductID = ProStore.monthlyProductID
     @Published private(set) var isPro = false
     @Published var purchaseError: String?
     @Published private(set) var isWorking = false
@@ -190,8 +198,11 @@ final class ProStore: ObservableObject {
 
     func loadProduct() async {
         do {
-            let products = try await StoreKit.Product.products(for: [Self.productID])
-            product = products.first
+            let loaded = try await StoreKit.Product.products(for: Self.productIDs)
+            products = loaded.sorted { Self.productRank($0.id) < Self.productRank($1.id) }
+            if !products.contains(where: { $0.id == selectedProductID }), let first = products.first {
+                selectedProductID = first.id
+            }
             if products.isEmpty {
                 purchaseError = "The subscription isn’t available from the App Store yet."
             } else {
@@ -202,8 +213,18 @@ final class ProStore: ObservableObject {
         }
     }
 
+    var selectedProduct: StoreKit.Product? {
+        products.first { $0.id == selectedProductID } ?? products.first
+    }
+
+    private static func productRank(_ productID: String) -> Int {
+        if productID == monthlyProductID { return 0 }
+        if productID == yearlyProductID { return 1 }
+        return 2
+    }
+
     func refreshEntitlement() async {
-        if product == nil {
+        if products.isEmpty {
             await loadProduct()
         }
         let now = Date()
@@ -211,14 +232,16 @@ final class ProStore: ObservableObject {
         for await result in StoreKit.Transaction.currentEntitlements {
             seen.append(Seen(result, source: "currentEntitlements"))
         }
-        if let result = await StoreKit.Transaction.latest(for: Self.productID) {
-            seen.append(Seen(result, source: "latest"))
+        for id in Self.productIDs {
+            if let result = await StoreKit.Transaction.latest(for: id) {
+                seen.append(Seen(result, source: "latest"))
+            }
         }
         var history = 0
         for await result in StoreKit.Transaction.all {
             let item = Seen(result, source: "all")
             history += 1
-            if item.productID == Self.productID {
+            if Self.isOurProduct(item.productID) {
                 seen.append(item)
             }
         }
@@ -243,14 +266,24 @@ final class ProStore: ObservableObject {
         if became {
             onBecamePro?()
         }
-        logRefresh(seen: seen, status: status, history: history, now: now, unlocked: decision.unlocked, reason: decision.reason)
+        let activeProduct: String
+        if !decision.unlocked {
+            activeProduct = "none"
+        } else if let productID = decision.winner?.productID {
+            activeProduct = productID
+        } else if let granted = status.first(where: { $0.grants }) {
+            activeProduct = granted.productID
+        } else {
+            activeProduct = "none"
+        }
+        logRefresh(seen: seen, status: status, history: history, now: now, unlocked: decision.unlocked, reason: decision.reason, activeProduct: activeProduct)
     }
 
     func purchase() async {
-        if product == nil {
+        if products.isEmpty {
             await loadProduct()
         }
-        guard let product else {
+        guard let product = selectedProduct else {
             logPurchase("result=no-product")
             return
         }
@@ -277,7 +310,7 @@ final class ProStore: ObservableObject {
                 try await finishRevoked(transaction, retryIfRevoked: retryIfRevoked, product: product)
                 return
             }
-            if transaction.productID == Self.productID {
+            if Self.isOurProduct(transaction.productID) {
                 adopt(transaction)
                 purchasedAt = Date()
                 purchaseError = nil
@@ -297,7 +330,7 @@ final class ProStore: ObservableObject {
                 try await finishRevoked(transaction, retryIfRevoked: retryIfRevoked, product: product)
                 return
             }
-            if seen.trust, seen.productID == Self.productID {
+            if seen.trust, Self.isOurProduct(seen.productID) {
                 adopt(transaction)
                 purchasedAt = Date()
                 purchaseError = nil
@@ -381,7 +414,7 @@ final class ProStore: ObservableObject {
     private func handle(_ update: StoreKit.VerificationResult<StoreKit.Transaction>) async {
         let seen = Seen(update, source: "updates")
         let recent = Date().timeIntervalSince(seen.purchaseDate) < 180
-        if seen.trust, seen.productID == Self.productID, seen.revocationDate == nil, (seen.activeByDate || recent) {
+        if seen.trust, Self.isOurProduct(seen.productID), seen.revocationDate == nil, (seen.activeByDate || recent) {
             adopt(seen.transaction)
             if recent { purchasedAt = Date() }
             if !isPro {
@@ -472,44 +505,48 @@ final class ProStore: ObservableObject {
     /// accelerated clock makes a still-subscribed transaction look expired,
     /// and `isUpgraded` stays true on the current record after a test renewal.
     private func subscriptionStatus() async -> [StatusSeen] {
-        guard let product, let subscription = product.subscription else { return [] }
-        do {
-            let statuses = try await subscription.status
-            return statuses.map { status in
-                let seen = Seen(status.transaction, source: "status")
-                let state = Self.stateName(status.state)
-                let renewal = Self.renewalSummary(status.renewalInfo)
-                let matches = seen.productID == Self.productID || renewal.productID == Self.productID
-                let grants = matches && seen.trust && seen.revocationDate == nil
-                    && (status.state == .subscribed || status.state == .inGracePeriod)
-                let dead = matches && (status.state == .expired || status.state == .revoked)
-                return StatusSeen(
-                    state: state,
-                    productID: seen.productID,
-                    verification: seen.verification,
-                    trust: seen.trust,
-                    grants: grants,
-                    dead: dead,
-                    transactionID: seen.id,
-                    summary: "source=status state=\(state) verification=\(seen.verification) productID=\(seen.productID) id=\(seen.id) purchaseDate=\(Self.iso(seen.purchaseDate)) expirationDate=\(Self.iso(seen.expirationDate)) revocationDate=\(Self.iso(seen.revocationDate)) isUpgraded=\(seen.isUpgraded) \(renewal.text)"
-                )
+        var rows: [StatusSeen] = []
+        for product in products {
+            guard let subscription = product.subscription else { continue }
+            do {
+                let statuses = try await subscription.status
+                for status in statuses {
+                    let seen = Seen(status.transaction, source: "status")
+                    let state = Self.stateName(status.state)
+                    let renewal = Self.renewalSummary(status.renewalInfo)
+                    let matches = Self.isOurProduct(seen.productID) || Self.isOurProduct(renewal.productID)
+                    let grants = matches && seen.trust && seen.revocationDate == nil
+                        && (status.state == .subscribed || status.state == .inGracePeriod)
+                    let dead = matches && (status.state == .expired || status.state == .revoked)
+                    rows.append(StatusSeen(
+                        state: state,
+                        productID: seen.productID,
+                        verification: seen.verification,
+                        trust: seen.trust,
+                        grants: grants,
+                        dead: dead,
+                        transactionID: seen.id,
+                        summary: "source=status state=\(state) verification=\(seen.verification) productID=\(seen.productID) id=\(seen.id) purchaseDate=\(Self.iso(seen.purchaseDate)) expirationDate=\(Self.iso(seen.expirationDate)) revocationDate=\(Self.iso(seen.revocationDate)) isUpgraded=\(seen.isUpgraded) \(renewal.text)"
+                    ))
+                }
+            } catch {
+                rows.append(StatusSeen(
+                    state: "error",
+                    productID: product.id,
+                    verification: "error",
+                    trust: false,
+                    grants: false,
+                    dead: false,
+                    transactionID: 0,
+                    summary: "source=status productID=\(product.id) error=\(error)"
+                ))
             }
-        } catch {
-            return [StatusSeen(
-                state: "error",
-                productID: Self.productID,
-                verification: "error",
-                trust: false,
-                grants: false,
-                dead: false,
-                transactionID: 0,
-                summary: "source=status error=\(error)"
-            )]
         }
+        return rows
     }
 
     private func decide(seen: [Seen], status: [StatusSeen], now: Date) -> Decision {
-        let ours = seen.filter { $0.productID == Self.productID }
+        let ours = seen.filter { Self.isOurProduct($0.productID) }
         let revokedTrusted = trusted.map { id in
             ours.contains { $0.id == id.id && $0.revocationDate != nil }
         } ?? false
@@ -537,7 +574,7 @@ final class ProStore: ObservableObject {
            now.timeIntervalSince(purchasedAt) < 180,
            let trusted,
            trusted.revocationDate == nil,
-           trusted.productID == Self.productID,
+           Self.isOurProduct(trusted.productID),
            !status.contains(where: { $0.dead && $0.transactionID == trusted.id }) {
             return Decision(unlocked: true, reason: "recent-purchase", winner: trusted, revokedTrusted: false)
         }
@@ -545,7 +582,7 @@ final class ProStore: ObservableObject {
         return Decision(unlocked: false, reason: reason, winner: nil, revokedTrusted: revokedTrusted)
     }
 
-    private func logRefresh(seen: [Seen], status: [StatusSeen], history: Int, now: Date, unlocked: Bool, reason: String) {
+    private func logRefresh(seen: [Seen], status: [StatusSeen], history: Int, now: Date, unlocked: Bool, reason: String, activeProduct: String) {
         #if DEBUG
         var parts = seen.map { item in
             "source=\(item.source) verification=\(item.verification) productID=\(item.productID) id=\(item.id) purchaseDate=\(Self.iso(item.purchaseDate)) expirationDate=\(Self.iso(item.expirationDate)) revocationDate=\(Self.iso(item.revocationDate)) isUpgraded=\(item.isUpgraded) environment=\(item.transaction.environment.rawValue)"
@@ -554,11 +591,11 @@ final class ProStore: ObservableObject {
         if parts.isEmpty {
             parts.append("none")
         }
-        let loaded = product == nil ? "nil" : (product?.type.rawValue ?? "nil")
-        let line = "[RoomCast Pro] entitlement refresh isPro=\(unlocked) reason=\(reason) expected=\(Self.productID) productType=\(loaded) history=\(history) now=\(Self.iso(now)) | " + parts.joined(separator: " || ")
+        let loaded = products.map { "\($0.id):\($0.type.rawValue)" }.joined(separator: ",")
+        let line = "[RoomCast Pro] entitlement refresh isPro=\(unlocked) reason=\(reason) activeProduct=\(activeProduct) expected=\(Self.monthlyProductID),\(Self.yearlyProductID) productType=\(loaded) history=\(history) now=\(Self.iso(now)) | " + parts.joined(separator: " || ")
         print(line.replacingOccurrences(of: "\n", with: " "))
         #else
-        _ = (seen.count, status.count, history, now, unlocked, reason)
+        _ = (seen.count, status.count, history, now, unlocked, reason, activeProduct)
         #endif
     }
 
@@ -612,7 +649,7 @@ struct PaywallView: View {
                         .font(.body)
                         .foregroundStyle(.white.opacity(0.86))
                     offer
-                    if let product = store.product {
+                    if let product = store.selectedProduct, !store.isPro {
                         Text(disclosure(product))
                             .font(.footnote)
                             .foregroundStyle(.white.opacity(0.62))
@@ -648,23 +685,20 @@ struct PaywallView: View {
                 .foregroundStyle(Color.roomTeal)
             Button("Manage subscription") { manage() }
                 .buttonStyle(PaywallButtonStyle(fill: Color.white.opacity(0.12), ink: .white))
-        } else if let product = store.product {
-            Text(product.displayName)
-                .font(.title2.weight(.bold))
+        } else if !store.products.isEmpty {
+            Text("Choose a plan")
+                .font(.headline)
                 .foregroundStyle(.white)
-            if !product.description.isEmpty {
-                Text(product.description)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.8))
+            HStack(alignment: .top, spacing: 10) {
+                ForEach(store.products, id: \.id) { product in
+                    planChoice(product)
+                }
             }
-            Text("\(product.displayPrice) per \(store.periodLabel(product))")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.white)
             Button(store.isWorking ? "Working…" : "Subscribe") {
                 Task { await store.purchase() }
             }
             .buttonStyle(PaywallButtonStyle(fill: .roomTeal, ink: .roomNavy))
-            .disabled(store.isWorking)
+            .disabled(store.isWorking || store.selectedProduct == nil)
         } else {
             ProgressView()
                 .tint(.white)
@@ -688,6 +722,39 @@ struct PaywallView: View {
         }
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(Color.roomTeal)
+    }
+
+    private func planChoice(_ product: StoreKit.Product) -> some View {
+        let selected = store.selectedProductID == product.id
+        return Button {
+            store.selectedProductID = product.id
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(product.displayName)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.leading)
+                Text(store.periodLabel(product))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.72))
+                Text(product.displayPrice)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.white)
+                Text("per \(store.periodLabel(product))")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.72))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(selected ? Color.roomTeal.opacity(0.22) : Color.white.opacity(0.08))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(selected ? Color.roomTeal : Color.white.opacity(0.16), lineWidth: 2)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? AccessibilityTraits.isSelected : AccessibilityTraits())
     }
 
     private func disclosure(_ product: StoreKit.Product) -> String {

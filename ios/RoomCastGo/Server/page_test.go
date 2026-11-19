@@ -18,7 +18,7 @@ func TestListenerPageMatchesMacContract(t *testing.T) {
 		"Tap to listen",
 		"video.play()",
 		"The listener page could not load.",
-		"This page needs JavaScript turned on.",
+		"JavaScript is required.",
 		"MediaMTXWebRTCReader",
 		`readyState==="ended"`,
 		"Room &lt;Cast&gt; &amp; &#34;live&#34;",

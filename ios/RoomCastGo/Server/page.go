@@ -80,11 +80,14 @@ footer{padding:8px 22px 22px;text-align:center}
 .hint{margin:0 0 6px;font-size:16px;font-weight:400;color:rgba(255,255,255,.72)}
 #credit{margin:0;font-size:14px}
 #credit a{color:rgba(255,255,255,.5);text-decoration:none}
-.noscript{margin:24px;text-align:center;font-size:16px;font-weight:700}
+.noscript{margin:0;padding:16px 18px;text-align:center;font-size:20px;font-weight:800;line-height:1.3;color:#ff2a2a;background:#3a1016;border-bottom:4px solid #ff2a2a;animation:jsblink 1s step-start infinite}
+@keyframes jsblink{0%,49%{opacity:1}50%,100%{opacity:.15}}
+@media (prefers-reduced-motion:reduce){.noscript{animation:none;opacity:1;border-bottom:4px solid #ff2a2a}}
 </style>
 <script defer src="/reader.js"></script>
 </head>
 <body>
+<noscript><p class="noscript">JavaScript is required.</p></noscript>
 <video id="video" playsinline webkit-playsinline title="` + safeTitle + `"></video>
 <div class="frame">
 <main>
@@ -100,7 +103,6 @@ footer{padding:8px 22px 22px;text-align:center}
 </div>
 <div id="wave" aria-hidden="true">` + waveformBars() + `</div>
 </main>
-<noscript><p class="noscript">This page needs JavaScript turned on.</p></noscript>
 <footer>
 <p class="hint">Keep this screen open. Earbuds work best.</p>
 <p id="credit"><a href="https://roomcast.channel" target="_blank" rel="noopener">Powered by RoomCast</a></p>

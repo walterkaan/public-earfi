@@ -101,13 +101,18 @@ final class WifiNameSource: NSObject, CLLocationManagerDelegate {
         manager.authorizationStatus
     }
 
-    /// One SSID read. Asks for When In Use only if the user has not chosen yet.
-    /// Does not watch location: `fetchCurrent` is the only location use.
+    /// One SSID read. Does not ask for location. The broadcast screen shows
+    /// its own explanation first, then calls `requestWhenInUse`.
     func currentSSID() async -> String? {
-        let status = await ensureAuthorization()
+        let status = manager.authorizationStatus
         guard status == .authorizedWhenInUse || status == .authorizedAlways else { return nil }
         await ensurePrecise()
         return await Self.readSSIDOffMain()
+    }
+
+    /// The system location prompt. Call only after the in-app explanation.
+    func requestWhenInUse() async -> CLAuthorizationStatus {
+        await ensureAuthorization()
     }
 
     private func ensureAuthorization() async -> CLAuthorizationStatus {
