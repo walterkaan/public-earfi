@@ -31,6 +31,7 @@ final class SettingsTests: XCTestCase {
     XCTAssertEqual(settings.posterNetworkName, "")
     XCTAssertEqual(settings.posterWiFiSecurity, .wpa)
     XCTAssertFalse(settings.posterWiFiHidden)
+    XCTAssertEqual(settings.posterWiFiPassword, "")
     XCTAssertNil(settings.posterPaperSize)
     XCTAssertTrue(settings.posterUseFooter)
     XCTAssertEqual(AppSettings.listenerTarget, 30)
@@ -99,12 +100,14 @@ final class SettingsTests: XCTestCase {
     settings.posterDescription = "Talk"
     settings.keepAwake = false
     settings.quality = .speech
+    settings.posterWiFiPassword = "secret"
     store.save(settings)
     store.rememberPoster(url: "http://192.168.1.40:8889/live")
     defaults.set("log-line", forKey: "unrelated.log")
 
     let reset = store.reset()
     XCTAssertEqual(reset, .defaults)
+    XCTAssertEqual(reset.posterWiFiPassword, "")
     XCTAssertEqual(store.load(), .defaults)
     XCTAssertEqual(defaults.string(forKey: "unrelated.log"), "log-line")
     XCTAssertEqual(store.posterStamp()?.url, "http://192.168.1.40:8889/live")
@@ -130,6 +133,7 @@ final class SettingsTests: XCTestCase {
     settings.keepAwake = false
     settings.inputGainDB = 18
     settings.broadcastTitle = "Hall A"
+    settings.posterWiFiPassword = "secret"
     XCTAssertEqual(BroadcastSignature(settings), before)
     settings.listenerPort = 8890
     XCTAssertNotEqual(BroadcastSignature(settings), before)
@@ -261,19 +265,22 @@ final class SettingsTests: XCTestCase {
     XCTAssertEqual(missingPosterFields.posterWiFiSecurity, .wpa)
     XCTAssertFalse(missingPosterFields.posterWiFiHidden)
     XCTAssertEqual(missingPosterFields.posterNetworkName, "")
+    XCTAssertEqual(missingPosterFields.posterWiFiPassword, "")
 
     var poster = AppSettings.defaults
     poster.posterNetworkName = "Hall-Guest"
     poster.posterWiFiSecurity = .wep
     poster.posterWiFiHidden = true
+    poster.posterWiFiPassword = "venue-secret"
     store.save(poster)
     XCTAssertEqual(store.load().posterNetworkName, "Hall-Guest")
     XCTAssertEqual(store.load().posterWiFiSecurity, .wep)
     XCTAssertTrue(store.load().posterWiFiHidden)
-    let saved = try XCTUnwrap(JSONEncoder().encode(poster))
+    XCTAssertEqual(store.load().posterWiFiPassword, "venue-secret")
+    let saved = try XCTUnwrap(defaults.data(forKey: SettingsStore.storageKey))
     let json = String(decoding: saved, as: UTF8.self)
-    XCTAssertFalse(json.contains("password"))
-    XCTAssertFalse(json.contains("venue-password"))
+    XCTAssertTrue(json.contains("venue-secret"))
+    XCTAssertFalse(DiagnosticsReport.settingsSummary(store.load()).contains("venue-secret"))
 
     defaults.set(Data([0x00, 0x01, 0xFF]), forKey: SettingsStore.storageKey)
     let unreadable = store.loadResolved()
@@ -1005,6 +1012,7 @@ final class APIAndCreditsTests: XCTestCase {
     settings.posterWiFiSecurity = .wpa
     settings.posterWiFiHidden = true
     let secret = "venue-password-9f3a"
+    settings.posterWiFiPassword = secret
     let report = DiagnosticsReport.make(
       appVersion: "1.0.0",
       systemDescription: "macOS",
@@ -1019,7 +1027,7 @@ final class APIAndCreditsTests: XCTestCase {
     XCTAssertTrue(report.contains("poster Wi-Fi hidden: true"))
     XCTAssertTrue(report.contains("poster Wi-Fi password: not included"))
     let data = try XCTUnwrap(JSONEncoder().encode(settings))
-    XCTAssertFalse(String(decoding: data, as: UTF8.self).contains(secret))
+    XCTAssertTrue(String(decoding: data, as: UTF8.self).contains(secret))
   }
 
   func testMonoDownmixGainAndSoftLimit() {

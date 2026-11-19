@@ -59,6 +59,9 @@ public struct AppSettings: Codable, Equatable {
   public var posterNetworkName: String
   public var posterWiFiSecurity: WiFiSecurity
   public var posterWiFiHidden: Bool
+  /// Printed on the main-window poster. Stored with the other settings.
+  /// Diagnostics and the log must not include this value.
+  public var posterWiFiPassword: String
   public var posterPaperSize: PaperSize?
   public var posterUseFooter: Bool
 
@@ -88,6 +91,7 @@ public struct AppSettings: Codable, Equatable {
     posterNetworkName: String = "",
     posterWiFiSecurity: WiFiSecurity = .wpa,
     posterWiFiHidden: Bool = false,
+    posterWiFiPassword: String = "",
     posterPaperSize: PaperSize? = nil,
     posterUseFooter: Bool = true
   ) {
@@ -116,6 +120,7 @@ public struct AppSettings: Codable, Equatable {
     self.posterNetworkName = posterNetworkName
     self.posterWiFiSecurity = posterWiFiSecurity
     self.posterWiFiHidden = posterWiFiHidden
+    self.posterWiFiPassword = posterWiFiPassword
     self.posterPaperSize = posterPaperSize
     self.posterUseFooter = posterUseFooter
   }
@@ -645,6 +650,7 @@ private struct StoredSettings: Codable {
   var posterNetworkName: String?
   var posterWiFiSecurity: WiFiSecurity?
   var posterWiFiHidden: Bool?
+  var posterWiFiPassword: String?
   var posterPaperSize: PaperSize?
   var posterUseFooter: Bool?
 }
@@ -723,6 +729,7 @@ public struct SettingsStore {
     if let value = stored.posterNetworkName { settings.posterNetworkName = value }
     if let value = stored.posterWiFiSecurity { settings.posterWiFiSecurity = value }
     if let value = stored.posterWiFiHidden { settings.posterWiFiHidden = value }
+    if let value = stored.posterWiFiPassword { settings.posterWiFiPassword = value }
     settings.posterPaperSize = stored.posterPaperSize
     if let value = stored.posterUseFooter { settings.posterUseFooter = value }
     return settings

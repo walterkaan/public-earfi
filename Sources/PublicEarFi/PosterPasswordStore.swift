@@ -1,137 +1,87 @@
 import Foundation
 import Security
 
-/// The poster Wi-Fi password lives in the login keychain. It is not written
-/// to preferences, logs, or the diagnostics report. Do not interpolate it
-/// into a log line or an error string.
-enum PosterPasswordStore {
+/// One-time move of a poster Wi-Fi password out of the login keychain.
+/// After `finishedKey` is set, the app does not read or write the Keychain.
+/// The password then lives in the settings store with the other preferences.
+enum PosterPasswordMigration {
+  static let finishedKey = "roomcast.posterPasswordLeftKeychain"
   static let service = "channel.roomcast.app.poster-wifi"
-  /// Pre-rename Public EarFi service. Load migrates any leftover item here.
+  /// Pre-rename Public EarFi item. Still read once so an older install migrates.
   private static let legacyServices = [
     "io.github.walterkaan.public-earfi.poster-wifi"
   ]
   static let account = "poster"
 
-  struct Load {
-    var password: String
+  struct Read {
+    /// The password when an item was readable, including an empty item.
+    /// Nil when nothing was stored.
+    var password: String?
+    /// The keychain refused the read. Leave the item for the next launch.
     var unreadable: Bool
   }
 
-  enum SaveResult {
-    case saved
-    case cleared
-    case failed(OSStatus)
-  }
-
-  static func load() -> Load {
-    if let data = copyData(service: service, dataProtection: true) {
-      return Load(password: decode(data), unreadable: false)
-    }
-    // Items saved without kSecUseDataProtectionKeychain still live in the
-    // file-based keychain. Read them, then rewrite into the data-protection
-    // keychain so the next launch hits the primary path.
-    if let data = copyData(service: service, dataProtection: false) {
-      let password = decode(data)
-      if !password.isEmpty {
-        _ = save(password)
-      }
-      return Load(password: password, unreadable: false)
-    }
-    for legacy in legacyServices {
-      if let data = copyData(service: legacy, dataProtection: true)
-        ?? copyData(service: legacy, dataProtection: false)
-      {
-        let password = decode(data)
-        if !password.isEmpty {
-          _ = save(password)
-          _ = deleteService(legacy)
+  static func read() -> Read {
+    var sawUnreadable = false
+    var sawEmpty = false
+    for name in [service] + legacyServices {
+      for protection in [true, false] {
+        switch copy(service: name, dataProtection: protection) {
+        case .value(let data):
+          let password = String(data: data, encoding: .utf8) ?? ""
+          if !password.isEmpty {
+            return Read(password: password, unreadable: false)
+          }
+          sawEmpty = true
+        case .missing:
+          break
+        case .unreadable:
+          sawUnreadable = true
         }
-        return Load(password: password, unreadable: false)
       }
     }
-    let status = lastCopyStatus
-    if status == errSecItemNotFound {
-      return Load(password: "", unreadable: false)
+    if sawEmpty {
+      return Read(password: "", unreadable: false)
     }
-    // errSecInteractionNotAllowed before first unlock, and friends: treat as
-    // temporarily unreadable so the poster can still print a blank line.
-    if status == errSecSuccess {
-      return Load(password: "", unreadable: false)
+    if sawUnreadable {
+      return Read(password: nil, unreadable: true)
     }
-    return Load(password: "", unreadable: true)
+    return Read(password: nil, unreadable: false)
   }
 
-  static func save(_ password: String) -> SaveResult {
-    if password.isEmpty {
-      return delete()
-    }
-    let data = Data(password.utf8)
-    let query = baseQuery(service: service, dataProtection: true)
-    let updated = SecItemUpdate(
-      query as CFDictionary,
-      [kSecValueData as String: data] as CFDictionary
-    )
-    if updated == errSecSuccess {
-      return .saved
-    }
-    if updated != errSecItemNotFound {
-      _ = SecItemDelete(query as CFDictionary)
-    }
-    var add = query
-    add[kSecValueData as String] = data
-    add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-    add[kSecAttrLabel as String] = "RoomCast poster Wi-Fi"
-    let added = SecItemAdd(add as CFDictionary, nil)
-    if added == errSecSuccess {
-      // Drop a leftover file-based copy so load does not prefer stale data.
-      _ = SecItemDelete(baseQuery(service: service, dataProtection: false) as CFDictionary)
-      return .saved
-    }
-    return .failed(added)
-  }
-
+  /// Removes the current and legacy items. Missing items count as removed.
   @discardableResult
-  static func delete() -> SaveResult {
-    let primary = deleteService(service)
-    for legacy in legacyServices {
-      _ = deleteService(legacy)
-    }
-    return primary
-  }
-
-  @discardableResult
-  private static func deleteService(_ serviceName: String) -> SaveResult {
-    var sawFailure: OSStatus?
-    for flag in [true, false] {
-      let status = SecItemDelete(baseQuery(service: serviceName, dataProtection: flag) as CFDictionary)
-      if status != errSecSuccess && status != errSecItemNotFound {
-        sawFailure = status
+  static func deleteAll() -> Bool {
+    var ok = true
+    for name in [service] + legacyServices {
+      for protection in [true, false] {
+        let status = SecItemDelete(baseQuery(service: name, dataProtection: protection) as CFDictionary)
+        if status != errSecSuccess && status != errSecItemNotFound {
+          ok = false
+        }
       }
     }
-    if let sawFailure {
-      return .failed(sawFailure)
-    }
-    return .cleared
+    return ok
   }
 
-  private static var lastCopyStatus: OSStatus = errSecItemNotFound
+  private enum Copy {
+    case value(Data)
+    case missing
+    case unreadable
+  }
 
-  private static func copyData(service: String, dataProtection: Bool) -> Data? {
+  private static func copy(service: String, dataProtection: Bool) -> Copy {
     var query = baseQuery(service: service, dataProtection: dataProtection)
     query[kSecReturnData as String] = true
     query[kSecMatchLimit as String] = kSecMatchLimitOne
     var item: CFTypeRef?
     let status = SecItemCopyMatching(query as CFDictionary, &item)
-    lastCopyStatus = status
-    guard status == errSecSuccess else { return nil }
-    if let data = item as? Data {
-      return data
+    if status == errSecItemNotFound { return .missing }
+    if status == errSecSuccess {
+      if let data = item as? Data { return .value(data) }
+      return .value(Data())
     }
-    return nil
-  }
-
-  private static func decode(_ data: Data) -> String {
-    String(data: data, encoding: .utf8) ?? ""
+    return .unreadable
   }
 
   private static func baseQuery(service: String, dataProtection: Bool) -> [String: Any] {
@@ -140,9 +90,6 @@ enum PosterPasswordStore {
       kSecAttrService as String: service,
       kSecAttrAccount as String: account,
     ]
-    // kSecAttrAccessible only applies with the data-protection keychain. Save
-    // and load must agree on this flag or SecItemCopyMatching returns
-    // errSecItemNotFound for a password that is still in Keychain Access.
     if dataProtection {
       query[kSecUseDataProtectionKeychain as String] = true
     }

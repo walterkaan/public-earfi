@@ -811,7 +811,7 @@ struct SettingsTab: View {
       Button("Reset to defaults", role: .destructive) { model.resetDefaults() }
     } message: {
       Text(
-        "Logs are kept. The Wi-Fi password is removed from the Keychain. The defaults are saved immediately. If you are live, they apply on the next Start."
+        "Logs are kept. The Wi-Fi password is cleared with the other settings. The defaults are saved immediately. If you are live, they apply on the next Start."
       )
     }
   }
@@ -1040,7 +1040,7 @@ struct SettingsTab: View {
         .foregroundStyle(.orange)
     }
     Text(
-      "Saved in the macOS Keychain on this Mac. It is not written into settings, the log, or Copy diagnostics. The printed poster shows it under the join code."
+      "Saved with your other RoomCast settings on this Mac. It is not written into the log or Copy diagnostics. The printed poster shows it under the join code."
     )
     .helperText()
     LabeledRow(title: "Security") {
@@ -1098,6 +1098,43 @@ struct SettingsTab: View {
     Toggle("Launch at login", isOn: loginBinding)
     Toggle("Start broadcasting when the app opens", isOn: autoStartBinding)
     if let message = model.loginItemMessage {
+      Text(message)
+        .helperText()
+        .foregroundStyle(.orange)
+    }
+    TintedPushButton("Check for Updates") { model.checkForUpdates() }
+      .disabled(model.updateCheck == .checking)
+    Text("Looks for a newer RoomCast when you ask. Nothing is installed automatically.")
+      .helperText()
+    updateCheckStatus
+  }
+
+  @ViewBuilder
+  private var updateCheckStatus: some View {
+    switch model.updateCheck {
+    case .idle:
+      EmptyView()
+    case .checking:
+      Text("Checking for updates…")
+        .helperText()
+    case .upToDate(let version):
+      Text("You're up to date (\(version))")
+        .helperText()
+    case .available(let version, let notes, _, let osNote):
+      Text("Version \(version) is available")
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundStyle(.white)
+      if !notes.isEmpty {
+        Text(notes)
+          .helperText()
+          .textSelection(.enabled)
+      }
+      if let osNote {
+        Text(osNote)
+          .helperText()
+      }
+      TintedPushButton("Download") { model.openUpdateDownload() }
+    case .failed(let message):
       Text(message)
         .helperText()
         .foregroundStyle(.orange)
@@ -1248,7 +1285,10 @@ struct SettingsTab: View {
       set: { value in model.mutate { $0.posterNetworkName = value } })
   }
   private var posterPasswordBinding: Binding<String> {
-    Binding(get: { model.posterPassword }, set: { model.setPosterPassword($0) })
+    Binding(
+      get: { model.settings.posterWiFiPassword },
+      set: { value in model.mutate { $0.posterWiFiPassword = value } }
+    )
   }
   private var posterSecurityBinding: Binding<WiFiSecurity> {
     Binding(
@@ -1313,7 +1353,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
     case .poster:
       return "Wi-Fi details printed on the QR poster so guests can join and listen."
     case .general:
-      return "Keep the Mac awake, launch at login, and start broadcasting automatically."
+      return "Keep the Mac awake, launch at login, start broadcasting automatically, and check for updates."
     case .advanced:
       return "Ports, listener limits, logging, and custom bitrate for organisers who need them."
     }
@@ -1328,7 +1368,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
     case .poster:
       return ["wifi", "wi-fi", "password", "ssid", "security", "hidden", "qr"]
     case .general:
-      return ["awake", "login", "launch", "autostart", "sleep"]
+      return ["awake", "login", "launch", "autostart", "sleep", "update", "updates", "version"]
     case .advanced:
       return ["ice", "webrtc", "url", "local", "listeners", "log", "custom", "reset"]
     }

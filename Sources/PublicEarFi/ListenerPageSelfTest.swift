@@ -35,6 +35,11 @@ enum ListenerPageSelfTest {
     if !html.contains("id=\"playBtn\"") || !html.contains("#8b5cf6") {
       return fail("listener page is missing the custom play button")
     }
+    if !html.contains("<noscript>") || !html.contains("This page needs javascript enabled")
+      || !html.contains("needs-js-flash") || !html.contains("prefers-reduced-motion")
+    {
+      return fail("listener page is missing the javascript warning")
+    }
     let server = ListenerHTTPServer(
       port: 0,
       upstreamPort: 9,

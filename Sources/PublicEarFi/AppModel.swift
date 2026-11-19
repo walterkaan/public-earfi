@@ -22,10 +22,9 @@ final class AppModel: ObservableObject {
   @Published var showQR = false
   @Published var onBattery = false
   @Published var knownSSID: String?
-  /// Poster Wi-Fi password. Held in memory for the poster and the Settings
-  /// field. The Keychain is the only copy on disk. Never log this value.
-  @Published var posterPassword = ""
+  /// Set when a Keychain password could not be moved into settings yet.
   @Published var posterPasswordNotice: String?
+  @Published var updateCheck: UpdateCheckPhase = .idle
   @Published var now = Date()
   @Published var loginItemMessage: String?
   @Published var qrImage: NSImage?
@@ -61,6 +60,8 @@ final class AppModel: ObservableObject {
   private var silenceWatch = SilenceWatch()
   private var timer: Timer?
   private var meterTimer: Timer?
+  private var updateCheckInFlight = false
+  private static var didReportLaunch = false
 
   init() {
     let home = FileManager.default.homeDirectoryForCurrentUser
@@ -69,11 +70,6 @@ final class AppModel: ObservableObject {
     store = SettingsStore()
     let resolved = store.loadResolved()
     settings = resolved.settings
-    let passwordLoad = PosterPasswordStore.load()
-    posterPassword = passwordLoad.password
-    if passwordLoad.unreadable {
-      posterPasswordNotice = "The saved Wi-Fi password could not be read from the Keychain."
-    }
     credits = BundledResources.credits()
     controller.onPhase = { [weak self] phase in
       Task { @MainActor in self?.apply(phase: phase) }
@@ -135,6 +131,48 @@ final class AppModel: ObservableObject {
       Task { @MainActor in self?.pollMeter() }
     }
     Self.shared = self
+    migratePosterPasswordFromKeychain()
+    reportLaunch()
+  }
+
+  /// Anonymous install (until the server accepts it) and a run report.
+  /// URLSession work starts here and is not awaited.
+  private func reportLaunch() {
+    if Self.didReportLaunch { return }
+    Self.didReportLaunch = true
+    UsageReporter.sendLaunch(
+      defaults: UserDefaults.standard,
+      appVersion: Self.shortVersion(),
+      osVersion: RoomCastSystem.versionString
+    )
+  }
+
+  /// Copies a legacy Keychain password into settings, then deletes the item.
+  /// A later launch does not touch the Keychain once the move has finished.
+  private func migratePosterPasswordFromKeychain() {
+    let defaults = UserDefaults.standard
+    if defaults.bool(forKey: PosterPasswordMigration.finishedKey) { return }
+    let outcome = PosterPasswordMigration.read()
+    if outcome.unreadable {
+      if settings.posterWiFiPassword.isEmpty {
+        posterPasswordNotice =
+          "The saved Wi-Fi password is still in the Keychain and could not be moved yet. RoomCast will try again the next time it opens."
+      }
+      return
+    }
+    if let password = outcome.password, !password.isEmpty, settings.posterWiFiPassword.isEmpty {
+      settings.posterWiFiPassword = password
+      store.save(settings)
+    }
+    // A failed delete is retried next launch. Settings already hold the
+    // password, so the retry does not overwrite them. Reset sets the flag
+    // itself so a cleared password is not copied back.
+    if PosterPasswordMigration.deleteAll() {
+      defaults.set(true, forKey: PosterPasswordMigration.finishedKey)
+    } else {
+      posterPasswordNotice =
+        "The old Keychain copy of the Wi-Fi password could not be removed."
+    }
   }
 
   var isBroadcasting: Bool {
@@ -206,12 +244,36 @@ final class AppModel: ObservableObject {
     ListenerLink.staleWarning(previousURL: store.posterStamp()?.url, currentURL: listenerURL)
   }
 
+  static func shortVersion() -> String {
+    let raw = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? "1.0.0" : trimmed
+  }
+
   var versionLabel: String {
     let info = Bundle.main.infoDictionary
-    let short = info?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     let build = info?["CFBundleVersion"] as? String ?? "0"
     let commit = info?["RoomCastCommit"] as? String ?? "dev"
-    return "\(short) (\(build), \(commit))"
+    return "\(Self.shortVersion()) (\(build), \(commit))"
+  }
+
+  func checkForUpdates() {
+    guard !updateCheckInFlight else { return }
+    updateCheckInFlight = true
+    updateCheck = .checking
+    UpdateChecker.check(
+      currentVersion: Self.shortVersion(), osVersion: RoomCastSystem.versionString
+    ) { [weak self] phase in
+      Task { @MainActor in
+        self?.updateCheckInFlight = false
+        self?.updateCheck = phase
+      }
+    }
+  }
+
+  func openUpdateDownload() {
+    guard case .available(_, _, let url, _) = updateCheck else { return }
+    NSWorkspace.shared.open(url)
   }
 
   var selectedDevice: AudioInputDevice? {
@@ -354,14 +416,14 @@ final class AppModel: ObservableObject {
   }
 
   func resetDefaults() {
-    if case .failed(let status) = PosterPasswordStore.delete() {
-      posterPasswordNotice =
-        "The Wi-Fi password could not be removed from the Keychain (error \(status))."
-    } else {
-      posterPasswordNotice = nil
-    }
-    posterPassword = ""
     settings = store.reset()
+    UserDefaults.standard.set(true, forKey: PosterPasswordMigration.finishedKey)
+    if PosterPasswordMigration.deleteAll() {
+      posterPasswordNotice = nil
+    } else {
+      posterPasswordNotice =
+        "The old Keychain copy of the Wi-Fi password could not be removed."
+    }
     settingsRevision += 1
     loginItemMessage = nil
     try? LoginItemController.apply(false)
@@ -381,17 +443,6 @@ final class AppModel: ObservableObject {
   func useCurrentNetworkName() {
     guard let knownSSID, !knownSSID.isEmpty else { return }
     mutate { $0.posterNetworkName = knownSSID }
-  }
-
-  func setPosterPassword(_ value: String) {
-    posterPassword = value
-    switch PosterPasswordStore.save(value) {
-    case .saved, .cleared:
-      posterPasswordNotice = nil
-    case .failed(let status):
-      posterPasswordNotice =
-        "The Wi-Fi password could not be saved in the Keychain (error \(status))."
-    }
   }
 
   func setInputGain(_ db: Double) {
@@ -457,24 +508,9 @@ final class AppModel: ObservableObject {
   }
 
   func openQuickPosterPDF() {
-    refreshPosterPasswordFromKeychain()
     guard let page = quickPosterModel() else { return }
     let url = AppPaths.posterFile(home: FileManager.default.homeDirectoryForCurrentUser)
     PosterActions.writeAndOpenPDF(model: page, url: url) { self.rememberPoster() }
-  }
-
-  /// Re-read the Keychain immediately before a PDF so a password saved earlier
-  /// (or unlocked after launch) actually prints.
-  private func refreshPosterPasswordFromKeychain() {
-    let passwordLoad = PosterPasswordStore.load()
-    if !passwordLoad.password.isEmpty || !passwordLoad.unreadable {
-      posterPassword = passwordLoad.password
-    }
-    if passwordLoad.unreadable && posterPassword.isEmpty {
-      posterPasswordNotice = "The saved Wi-Fi password could not be read from the Keychain."
-    } else if !passwordLoad.unreadable {
-      posterPasswordNotice = nil
-    }
   }
 
   private func quickPosterModel() -> PosterRenderModel? {
@@ -486,7 +522,7 @@ final class AppModel: ObservableObject {
     let network = settings.posterNetworkName.trimmingCharacters(in: .whitespacesAndNewlines)
     let plan = PosterBuilder.quickPlan(
       networkName: network,
-      password: posterPassword,
+      password: settings.posterWiFiPassword,
       security: settings.posterWiFiSecurity,
       hidden: settings.posterWiFiHidden,
       listenerURL: listenerURL

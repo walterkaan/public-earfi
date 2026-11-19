@@ -184,8 +184,8 @@ public enum PosterBuilder {
   }
 
   /// Main-window poster. A network name adds a Wi-Fi join code beside the
-  /// listener code. The password is printed on that page and is not stored here.
-  /// An empty password (or a Keychain miss) leaves a blank to write in by hand.
+  /// listener code. The password is printed on that page.
+  /// An empty password leaves a blank to write in by hand.
   public static func quickPlan(
     networkName: String,
     password: String,
