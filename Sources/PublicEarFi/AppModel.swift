@@ -179,6 +179,11 @@ final class AppModel: ObservableObject {
     return rankedNetworks.first?.address
   }
 
+  /// True when an interface is up and has a LAN address listeners can reach.
+  var hasLANAddress: Bool {
+    rankedNetworks.contains(where: \.isUp) && selectedIP != nil
+  }
+
   var hostname: String {
     InterfaceEnumerator.localHostname()
   }
@@ -339,6 +344,7 @@ final class AppModel: ObservableObject {
       controller.stop()
       return
     }
+    guard hasLANAddress else { return }
     if !UserDefaults.standard.bool(forKey: Self.firewallKey) {
       showFirewall = true
       return

@@ -155,6 +155,7 @@ struct AppMenus: Commands {
         model.toggleBroadcast()
       }
       .keyboardShortcut("b", modifiers: [.command])
+      .disabled(!model.isBroadcasting && !model.hasLANAddress)
     }
     CommandGroup(replacing: .help) {
       Button("Getting Started") {

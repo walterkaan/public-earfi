@@ -175,7 +175,8 @@ struct RunningTab: View {
         BroadcastButton(
           title: buttonTitle,
           isStop: isStop,
-          showsProgress: isStarting
+          showsProgress: isStarting,
+          isDisabled: needsNetwork
         ) {
           model.toggleBroadcast()
         }
@@ -300,9 +301,11 @@ struct RunningTab: View {
           }
         }
         HStack {
-          TintedPushButton("Open PDF QR Poster") { model.openQuickPosterPDF() }
-            .disabled(model.listenerURL == nil)
-            .help("Save a PDF of the QR poster and open it. Print that PDF yourself.")
+          TintedPushButton("Open PDF QR Poster", textColor: .white) {
+            model.openQuickPosterPDF()
+          }
+          .disabled(model.listenerURL == nil)
+          .help("Save a PDF of the QR poster and open it. Print that PDF yourself.")
           Spacer(minLength: 0)
         }
         if model.rankedNetworks.count > 1 {
@@ -416,7 +419,18 @@ struct RunningTab: View {
     }
   }
 
+  /// Stopped with no LAN address: Start cannot work yet.
+  private var needsNetwork: Bool {
+    switch model.phase {
+    case .stopped, .blocked:
+      return !model.hasLANAddress
+    default:
+      return false
+    }
+  }
+
   private var buttonTitle: String {
+    if needsNetwork { return "Connect to Network to begin" }
     switch model.phase {
     case .starting:
       return "Starting…"
@@ -565,23 +579,26 @@ struct TintedPushButton: View {
   var title: LocalizedStringKey
   var systemImage: String?
   var tint: Color
+  var textColor: Color?
   var action: () -> Void
 
   init(
     _ title: LocalizedStringKey,
     systemImage: String? = nil,
     tint: Color = AppChrome.primary,
+    textColor: Color? = nil,
     action: @escaping () -> Void
   ) {
     self.title = title
     self.systemImage = systemImage
     self.tint = tint
+    self.textColor = textColor
     self.action = action
   }
 
   var body: some View {
     Button(action: action) {
-      TintedLabel(title: title, systemImage: systemImage, tint: tint)
+      TintedLabel(title: title, systemImage: systemImage, tint: tint, textColor: textColor)
     }
     .buttonStyle(.plain)
     .modifier(DarkFocusRing())
@@ -617,6 +634,7 @@ struct BroadcastButton: View {
   var title: String
   var isStop: Bool
   var showsProgress: Bool
+  var isDisabled: Bool = false
   var action: () -> Void
 
   var body: some View {
@@ -632,11 +650,14 @@ struct BroadcastButton: View {
       .frame(maxWidth: .infinity)
       .padding(.vertical, 12)
       .foregroundStyle(.white)
-      .background(isStop ? AppChrome.stopButton : AppChrome.primary)
+      .background(
+        isDisabled ? Color.gray.opacity(0.5) : (isStop ? AppChrome.stopButton : AppChrome.primary)
+      )
       .clipShape(RoundedRectangle(cornerRadius: 10))
       .contentShape(RoundedRectangle(cornerRadius: 10))
     }
     .buttonStyle(.plain)
+    .disabled(isDisabled)
     .modifier(DarkFocusRing())
   }
 }
@@ -664,6 +685,7 @@ private struct TintedLabel: View {
   var title: LocalizedStringKey
   var systemImage: String?
   var tint: Color
+  var textColor: Color? = nil
 
   var body: some View {
     HStack(spacing: 6) {
@@ -675,7 +697,7 @@ private struct TintedLabel: View {
         .font(.system(size: 13, weight: .semibold))
         .lineLimit(1)
     }
-    .foregroundStyle(tint)
+    .foregroundStyle(textColor ?? tint)
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
     .background(tint.opacity(0.16))
