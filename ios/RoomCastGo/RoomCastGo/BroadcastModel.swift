@@ -13,7 +13,7 @@ enum PermissionExplain: String, Identifiable {
     case microphoneDenied
     case location
     case locationDenied
-    case localNetwork
+    case notifications
 
     var id: String { rawValue }
 
@@ -22,30 +22,30 @@ enum PermissionExplain: String, Identifiable {
         case .microphone, .microphoneDenied:
             return "Microphone"
         case .location, .locationDenied:
-            return "Wi-Fi name"
-        case .localNetwork:
-            return "Local network"
+            return "Location notification"
+        case .notifications:
+            return "Notifications"
         }
     }
 
     var message: String {
         switch self {
         case .microphone:
-            return "RoomCast Go needs the microphone to broadcast your voice or a plugged-in mic to phones on this Wi-Fi or Personal Hotspot. Audio stays on the local network and is never recorded or uploaded."
+            return "RoomCast Go will ask for access to your phone's Microphone to enable it to share sound"
         case .microphoneDenied:
             return "Microphone access is off. RoomCast Go needs it to broadcast your voice or a plugged-in mic. Open Settings to turn it on."
         case .location:
-            return "iOS only shows the Wi-Fi network name to apps with location access. RoomCast Go uses it once to show which network listeners should join. Your location is never saved or sent."
+            return "Phone will ask for Location access, which is used to confirm your Wi-Fi name. App will display your current Wi-Fi to assist clients joining."
         case .locationDenied:
             return "Location access is off, so the Wi-Fi name can’t be read. Open Settings to allow location while using the app."
-        case .localNetwork:
-            return "RoomCast Go needs local network access so phones on this Wi-Fi or Personal Hotspot can open the listener page and hear the broadcast. Audio stays on the local network and is never uploaded."
+        case .notifications:
+            return "Allows RoomCast Go to communicate with you even when it is in the background."
         }
     }
 
     var continues: Bool {
         switch self {
-        case .microphone, .location, .localNetwork:
+        case .microphone, .location, .notifications:
             return true
         case .microphoneDenied, .locationDenied:
             return false
@@ -193,10 +193,6 @@ final class BroadcastModel: ObservableObject {
     private var wifiAlertSent = false
     private var wifiDownTask: Task<Void, Never>?
     private var networkChangeTask: Task<Void, Never>?
-    private var pendingProbeIP = ""
-    private var localNetworkExplained = false
-    private var localNetworkAsked = false
-    private var localNetworkWaiting = false
     private var locationExplainDismissed = false
     private var locationPromptActive = false
     private var queuedPermission: PermissionExplain?
@@ -308,8 +304,9 @@ final class BroadcastModel: ObservableObject {
             requestMicrophone()
         case .location:
             Task { await self.requestLocation() }
-        case .localNetwork:
-            allowLocalNetwork()
+        case .notifications:
+            WifiDropNotifier.requestPermission()
+            promotePermission()
         case .microphoneDenied, .locationDenied, nil:
             promotePermission()
         }
@@ -318,10 +315,6 @@ final class BroadcastModel: ObservableObject {
     func dismissPermission() {
         if permissionExplain == .location {
             locationExplainDismissed = true
-        }
-        if permissionExplain == .localNetwork {
-            localNetworkAsked = true
-            localNetworkWaiting = false
         }
         permissionExplain = nil
         promotePermission()
@@ -340,11 +333,6 @@ final class BroadcastModel: ObservableObject {
         if let queuedPermission {
             permissionExplain = queuedPermission
             self.queuedPermission = nil
-            return
-        }
-        if localNetworkWaiting && !localNetworkExplained {
-            localNetworkWaiting = false
-            permissionExplain = .localNetwork
         }
     }
 
@@ -376,33 +364,15 @@ final class BroadcastModel: ObservableObject {
         promotePermission()
     }
 
-    private func allowLocalNetwork() {
-        localNetworkExplained = true
-        localNetworkWaiting = false
-        let address = pendingProbeIP
-        if !address.isEmpty {
-            probe.poke(ip: address)
-        }
-        promotePermission()
-    }
-
-    /// The local-network system dialog appears when a packet is sent.
-    /// Explain first. There is no public way to read that permission later.
-    private func requestLocalNetworkProbe(_ address: String) {
-        pendingProbeIP = address
-        guard !address.isEmpty else { return }
-        if localNetworkExplained {
-            probe.poke(ip: address)
-            return
-        }
-        if localNetworkAsked {
-            return
-        }
-        localNetworkAsked = true
-        if permissionExplain == nil {
-            permissionExplain = .localNetwork
-        } else {
-            localNetworkWaiting = true
+    /// The system notification dialog. Only after the in-app explanation, and
+    /// only while the choice is still not determined.
+    private func offerNotificationsIfNeeded() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let status = settings.authorizationStatus
+            Task { @MainActor in
+                guard status == .notDetermined else { return }
+                self.offerPermission(.notifications)
+            }
         }
     }
 
@@ -601,7 +571,7 @@ final class BroadcastModel: ObservableObject {
             status = networkNote
             return
         }
-        requestLocalNetworkProbe(ip)
+        probe.poke(ip: ip)
         wireCapture()
         refreshUSB()
         capture.setStereoWiden(stereoWiden)
@@ -668,7 +638,7 @@ final class BroadcastModel: ObservableObject {
         // Now Playing card dropped: the Live Activity has mute, gain and the meter.
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         activity.start(activityState())
-        WifiDropNotifier.requestPermission()
+        offerNotificationsIfNeeded()
         if !store.isPro {
             FreeUsage.begin(now: started)
         }
@@ -876,9 +846,6 @@ final class BroadcastModel: ObservableObject {
 
     private func prepareAddress() async {
         await updateAddress()
-        if !ip.isEmpty {
-            requestLocalNetworkProbe(ip)
-        }
     }
 
     private func refreshAfterActive() async {
@@ -1009,7 +976,7 @@ final class BroadcastModel: ObservableObject {
             }
             boundIP = target
             boundIface = interfaceName
-            requestLocalNetworkProbe(target)
+            probe.poke(ip: target)
             failed = false
             phase = .live
             if let previous, previous != target {
